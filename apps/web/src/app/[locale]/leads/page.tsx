@@ -13,6 +13,13 @@ interface PageProps {
 export default async function LeadsPage(props: PageProps) {
   const { locale } = await props.params;
   const messages = getMessages(locale);
+  const columnLabels = {
+    currentOwner: messages.common.currentOwner,
+    lastChange: messages.common.lastChange,
+    lead: messages.common.lead,
+    nextAction: messages.common.nextAction,
+    stage: messages.common.stage
+  };
 
   return (
     <div className="page-stack">
@@ -22,32 +29,34 @@ export default async function LeadsPage(props: PageProps) {
         {demoDataset.cases.length === 0 ? (
           <EmptyState summary={messages.states.emptyCasesSummary} title={messages.states.emptyCasesTitle} />
         ) : (
-          <div className="lead-table-wrapper">
+          <div className="lead-table-wrapper" data-testid="lead-table-wrapper">
             <table className="lead-table">
               <thead>
                 <tr>
-                  <th>{messages.common.lead}</th>
-                  <th>{messages.common.stage}</th>
-                  <th>{messages.common.currentOwner}</th>
-                  <th>{messages.common.nextAction}</th>
-                  <th>{messages.common.lastChange}</th>
+                  <th>{columnLabels.lead}</th>
+                  <th>{columnLabels.stage}</th>
+                  <th>{columnLabels.currentOwner}</th>
+                  <th>{columnLabels.nextAction}</th>
+                  <th>{columnLabels.lastChange}</th>
                 </tr>
               </thead>
               <tbody>
                 {demoDataset.cases.map((caseItem) => (
                   <tr key={caseItem.id}>
-                    <td>
+                    <td data-column-label={columnLabels.lead}>
                       <Link className="table-link" href={`/${locale}/leads/${caseItem.id}`}>
                         <strong>{caseItem.customerName}</strong>
                         <span>{getLocalizedText(caseItem.projectName, locale)}</span>
                       </Link>
                     </td>
-                    <td>
+                    <td data-column-label={columnLabels.stage}>
                       <StatusBadge>{getLocalizedText(caseItem.stage, locale)}</StatusBadge>
                     </td>
-                    <td>{caseItem.owner}</td>
-                    <td>{getLocalizedText(caseItem.nextAction, locale)}</td>
-                    <td>{new Date(caseItem.lastMeaningfulChange).toLocaleString(locale)}</td>
+                    <td data-column-label={columnLabels.currentOwner}>{caseItem.owner}</td>
+                    <td data-column-label={columnLabels.nextAction}>{getLocalizedText(caseItem.nextAction, locale)}</td>
+                    <td data-column-label={columnLabels.lastChange}>
+                      {new Date(caseItem.lastMeaningfulChange).toLocaleString(locale)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

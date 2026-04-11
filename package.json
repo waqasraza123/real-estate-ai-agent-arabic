@@ -13,7 +13,9 @@
     "safe-push": "bash ./scripts/safe-push.sh",
     "test": "pnpm test:fast && pnpm test:web-smoke",
     "test:fast": "vitest run",
-    "test:web-smoke": "playwright test",
+    "test:web-smoke": "playwright test --grep-invert @visual",
+    "test:web-visual": "playwright test --grep @visual",
+    "test:web-visual:update": "playwright test --grep @visual --update-snapshots",
     "typecheck": "turbo run typecheck",
     "verify:push": "bash ./scripts/verify-push.sh"
   },

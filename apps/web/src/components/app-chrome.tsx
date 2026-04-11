@@ -41,7 +41,7 @@ export function AppChrome(props: {
   ];
 
   return (
-    <div className="chrome-shell">
+    <div className="chrome-shell" data-testid="app-chrome">
       <header className="chrome-header">
         <div className="chrome-brand">
           <strong>{props.messages.app.name}</strong>
@@ -64,7 +64,7 @@ export function AppChrome(props: {
       <div className="chrome-layout">
         <aside className="chrome-sidebar">
           <p className="sidebar-label">{props.messages.app.phaseLabel}</p>
-          <div className="sidebar-stack">
+          <nav aria-label={props.messages.common.manager} className="sidebar-stack" data-testid="primary-navigation">
             {navigation.map((item) => (
               <Link
                 key={item.href}
@@ -75,10 +75,12 @@ export function AppChrome(props: {
                 <span>{item.summary}</span>
               </Link>
             ))}
-          </div>
+          </nav>
         </aside>
 
-        <main className="chrome-main">{props.children}</main>
+        <main className="chrome-main" data-testid="chrome-main">
+          {props.children}
+        </main>
       </div>
     </div>
   );

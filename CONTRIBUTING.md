@@ -38,3 +38,10 @@ Start every session by reading:
   - `pnpm typecheck`
   - `pnpm test:fast`
   - `pnpm build`
+
+## Browser Testing
+
+- `pnpm test:web-smoke` runs the fast critical-path Playwright checks and excludes visual snapshot tests.
+- `pnpm test:web-visual` runs opt-in visual regression coverage for top demo routes.
+- `pnpm test:web-visual:update` refreshes visual baselines when an intentional UI change is accepted.
+- Keep visual regression focused on seeded, stable demo routes so snapshot noise stays low.
