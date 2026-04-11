@@ -1,0 +1,17 @@
+{
+  "name": "@real-estate-ai/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@real-estate-ai/contracts": "workspace:*",
+    "drizzle-orm": "^0.44.6"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

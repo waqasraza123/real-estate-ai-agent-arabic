@@ -34,17 +34,19 @@ The repository is past bootstrap and currently contains a production-grade Phase
 
 - TypeScript monorepo with `pnpm` workspaces and `turbo`
 - Next.js App Router web shell in `apps/web`
+- Fastify API foundation in `apps/api`
+- shared `contracts`, `database`, and `workflows` backend packages for the first persisted workflow slice
 - shared `domain`, `i18n`, `ui`, and `testing` packages
 - English and Arabic locale routing with RTL-aware rendering
 - fixture-backed premium demo surfaces for landing, dashboard, leads, conversation, scheduling, documents, handover, and manager views
 - Playwright smoke tests and opt-in visual regression baselines
+- integration-tested website lead capture and manager-readable persisted case APIs
 - versioned safe-push verification via `.githooks/pre-push`
 
 Not implemented yet:
 
-- real API services
 - workers and background jobs
-- database persistence
+- full production PostgreSQL deployment wiring
 - authentication and authorization
 - provider integrations
 - real AI execution and workflow automation
@@ -74,12 +76,16 @@ The product promise is operational excellence:
 
 ```text
 apps/
+  api/                 Fastify API for persisted lead and case workflows
   web/                 Next.js bilingual demo shell
 packages/
+  contracts/           zod contracts for requests, responses, and case payloads
+  database/            Drizzle schema and persisted alpha store
   domain/              product fixtures, domain vocabulary, shared business types
   i18n/                English and Arabic messages and locale helpers
   testing/             shared test routes and browser-test helpers
   ui/                  shared presentation primitives
+  workflows/           backend workflow orchestration for lead intake
 docs/
   architecture/        repo, domain, and journey planning docs
   i18n/                bilingual and RTL strategy
@@ -120,6 +126,12 @@ pnpm setup:githooks
 pnpm dev
 ```
 
+### Run The API
+
+```bash
+pnpm dev:api
+```
+
 Default local route examples:
 
 - `http://localhost:3000/en`
@@ -136,6 +148,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm test:fast
+pnpm test:integration
 pnpm test:web-smoke
 ```
 

@@ -8,11 +8,13 @@
 - Product positioning is now defined as a premium bilingual operating layer for sales, leasing, and handover operations
 
 ## Current Architecture
-- Implemented architecture now includes a TypeScript monorepo foundation with `apps/web`
-- Shared packages implemented in Phase 1A are `domain`, `i18n`, `ui`, and `testing`
+- Implemented architecture now includes a TypeScript monorepo foundation with `apps/web` and `apps/api`
+- Shared packages implemented are `domain`, `i18n`, `ui`, `testing`, `contracts`, `database`, and `workflows`
 - Root tooling now includes `pnpm` workspaces, `turbo`, TypeScript base config, ESLint, Vitest, Playwright, and a versioned pre-push safety system
 - The web application is a Next.js App Router shell with EN and AR routes, RTL-aware layout switching, seeded fixtures, and placeholder Phase 1 surfaces
-- `apps/api`, `apps/worker`, `contracts`, `database`, `workflows`, `integrations`, `analytics`, and `config` remain planned but unimplemented
+- The API application is a Fastify service with schema-validated website lead intake and manager-readable case list and case detail endpoints
+- The current persisted alpha store uses Drizzle over local `PGlite` for safe Phase 2 development without introducing remote infrastructure
+- `apps/worker`, `integrations`, `analytics`, and `config` remain planned and unimplemented
 - Durable memory is kept in `docs/project-state.md`
 - Local working memory is kept in `docs/_local/current-session.md` and must remain uncommitted
 
@@ -28,6 +30,7 @@
 - Phase 1A: Flagship Demo Core covering the bilingual web shell, seeded data, dashboard, inbox, conversation console, scheduling, document, handover, and manager views
 - Phase 1B: Demo hardening for motion, state quality, responsive refinement, and stronger visual coverage
 - Phase 2: functional alpha covering lead capture to qualification to visit scheduling to follow-up to manager review
+- Phase 2 has started with persisted website lead capture and manager-visible case APIs
 - Phase 3: leasing and document workflows
 - Phase 4: handover command center
 - Phase 5: hardening and enterprise controls
@@ -41,6 +44,8 @@
 - Implemented `Phase 1A: Flagship Demo Core`
 - Added the monorepo workspace, shared package shells, Next.js web shell, bilingual routing, premium landing/dashboard/inbox/profile/conversation/scheduling/documents/handover/manager screens, and smoke-test coverage
 - Added a versioned safe-push system with `.githooks/pre-push`, `scripts/verify-push.sh`, `scripts/safe-push.sh`, and root push-verification scripts
+- Started Phase 2 with a persisted alpha API slice for website lead capture and manager-readable case visibility
+- Added `apps/api` plus shared `contracts`, `database`, and `workflows` packages with integration-tested lead intake and case retrieval endpoints
 
 ## Important Decisions
 - `docs/product-spec.md` is the durable product source of truth until implementation matures
@@ -53,21 +58,22 @@
 - PostgreSQL with Drizzle is the planned persistence direction
 - The first implementation phase is `Phase 1A: Flagship Demo Core`, which is web-first and fixture-backed
 - Phase 1A intentionally uses seeded local fixtures instead of real persistence, live AI execution, or external providers
+- The first persisted Phase 2 slice uses local `PGlite` with Drizzle for safe local development while keeping PostgreSQL as the production persistence target
+- Website lead intake is the first persistence-backed workflow boundary before qualification, scheduling, or follow-up automation are introduced
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
 - Normal `git push` runs `scripts/verify-push.sh` via `.githooks/pre-push`
 - `pnpm safe-push` is the preferred AI-facing push command
 
 ## Deferred / Not Yet Implemented
-- Backend services
-- Data model and persistence layer
+- Worker services and durable background job orchestration
 - Authentication and authorization
 - External integrations
 - Dashboards and analytics
 - Agent orchestration and workflow automation
 - Real provider integrations
 - Real AI execution and automation enforcement
-- Phase 1B hardening work on motion, state refinement, and stronger visual coverage
-- Real API, worker, and persistence-backed workflows from Phase 2 onward
+- Qualification logic, visit scheduling, follow-up automation, and manager intervention tooling above basic case visibility
+- Web-to-API wiring for persisted lead submission and manager case views
 
 ## Risks / Watchouts
 - Arabic UX can degrade quickly if RTL support is not designed from the foundation
@@ -75,8 +81,8 @@
 - Auditability requirements can be missed if not designed early
 - The premium product promise raises the bar for motion, state design, and visual quality from the first demo
 - AI trust will fail quickly if escalation, approval, and inspection paths are not explicit
-- Phase 1 must not drift into building real backend workflows prematurely
-- The current shell must not be mistaken for functional workflow automation; Phase 2 is where persistence and real operations begin
+- The web shell must not drift into mixed fixture and persisted state without an explicit boundary during Phase 2
+- The local `PGlite` alpha store is a development convenience and must not be mistaken for the long-term production deployment model
 
 ## Standard Verification
 - `git status --short`

@@ -9,10 +9,12 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command:
-      "rm -rf apps/web/.next && pnpm --filter @real-estate-ai/web exec next build && pnpm --filter @real-estate-ai/web exec next start --port 3100",
+    command: "pnpm --dir apps/web exec next dev --hostname 127.0.0.1 --port 3100",
+    env: {
+      FORCE_COLOR: "0"
+    },
     url: "http://127.0.0.1:3100/en",
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 240000
   },
   projects: [
