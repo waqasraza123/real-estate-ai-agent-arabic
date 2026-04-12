@@ -14,6 +14,9 @@ export const managerInterventionStatusSchema = z.enum(["open", "resolved"]);
 export const handoverCaseStatusSchema = z.enum(["pending_readiness", "internal_tasks_open", "customer_scheduling_ready", "scheduled"]);
 export const handoverTaskTypeSchema = z.enum(["unit_readiness_review", "customer_document_pack", "access_preparation"]);
 export const handoverTaskStatusSchema = z.enum(["open", "blocked", "complete"]);
+export const handoverBlockerTypeSchema = z.enum(["unit_snag", "access_blocker", "document_gap"]);
+export const handoverBlockerStatusSchema = z.enum(["open", "in_progress", "resolved"]);
+export const handoverBlockerSeveritySchema = z.enum(["warning", "critical"]);
 export const handoverMilestoneTypeSchema = z.enum(["readiness_gate", "customer_scheduling_window", "handover_appointment_hold"]);
 export const handoverMilestoneStatusSchema = z.enum(["planned", "blocked", "ready"]);
 export const handoverCustomerUpdateTypeSchema = z.enum(["readiness_update", "scheduling_invite", "appointment_confirmation"]);
@@ -69,6 +72,23 @@ export const updateAutomationStatusInputSchema = z.object({
 
 export const updateHandoverTaskStatusInputSchema = z.object({
   status: handoverTaskStatusSchema
+});
+
+export const createHandoverBlockerInputSchema = z.object({
+  dueAt: z.iso.datetime(),
+  ownerName: z.string().trim().min(2).max(120).optional(),
+  severity: handoverBlockerSeveritySchema,
+  status: z.literal("open"),
+  summary: z.string().trim().min(10).max(240),
+  type: handoverBlockerTypeSchema
+});
+
+export const updateHandoverBlockerInputSchema = z.object({
+  dueAt: z.iso.datetime(),
+  ownerName: z.string().trim().min(2).max(120).optional(),
+  severity: handoverBlockerSeveritySchema,
+  status: handoverBlockerStatusSchema,
+  summary: z.string().trim().min(10).max(240)
 });
 
 export const updateHandoverMilestoneInputSchema = z.object({
@@ -141,6 +161,18 @@ export const persistedHandoverTaskSchema = z.object({
   status: handoverTaskStatusSchema,
   taskId: z.uuid(),
   type: handoverTaskTypeSchema,
+  updatedAt: z.iso.datetime()
+});
+
+export const persistedHandoverBlockerSchema = z.object({
+  blockerId: z.uuid(),
+  createdAt: z.iso.datetime(),
+  dueAt: z.iso.datetime(),
+  ownerName: z.string(),
+  severity: handoverBlockerSeveritySchema,
+  status: handoverBlockerStatusSchema,
+  summary: z.string(),
+  type: handoverBlockerTypeSchema,
   updatedAt: z.iso.datetime()
 });
 
@@ -222,6 +254,7 @@ export const persistedCaseDetailSchema = persistedCaseSummarySchema.extend({
 export const persistedHandoverCaseDetailSchema = persistedLinkedHandoverCaseSchema.extend({
   auditEvents: z.array(persistedAuditEventSchema),
   appointment: persistedHandoverAppointmentSchema.nullable(),
+  blockers: z.array(persistedHandoverBlockerSchema),
   caseId: z.uuid(),
   customerUpdates: z.array(persistedHandoverCustomerUpdateSchema),
   customerName: z.string(),
@@ -240,6 +273,7 @@ export type ApproveHandoverCustomerUpdateInput = z.infer<typeof approveHandoverC
 export type AutomationStatus = z.infer<typeof automationStatusSchema>;
 export type CaseStage = z.infer<typeof caseStageSchema>;
 export type ConfirmHandoverAppointmentInput = z.infer<typeof confirmHandoverAppointmentInputSchema>;
+export type CreateHandoverBlockerInput = z.infer<typeof createHandoverBlockerInputSchema>;
 export type CreateHandoverIntakeInput = z.infer<typeof createHandoverIntakeInputSchema>;
 export type CreateWebsiteLeadInput = z.infer<typeof createWebsiteLeadInputSchema>;
 export type CreateWebsiteLeadResult = z.infer<typeof createWebsiteLeadResultSchema>;
@@ -247,6 +281,9 @@ export type DocumentRequestStatus = z.infer<typeof documentRequestStatusSchema>;
 export type DocumentRequestType = z.infer<typeof documentRequestTypeSchema>;
 export type FollowUpStatus = z.infer<typeof followUpStatusSchema>;
 export type HandoverAppointmentStatus = z.infer<typeof handoverAppointmentStatusSchema>;
+export type HandoverBlockerSeverity = z.infer<typeof handoverBlockerSeveritySchema>;
+export type HandoverBlockerStatus = z.infer<typeof handoverBlockerStatusSchema>;
+export type HandoverBlockerType = z.infer<typeof handoverBlockerTypeSchema>;
 export type HandoverCaseStatus = z.infer<typeof handoverCaseStatusSchema>;
 export type HandoverCustomerUpdateStatus = z.infer<typeof handoverCustomerUpdateStatusSchema>;
 export type HandoverCustomerUpdateType = z.infer<typeof handoverCustomerUpdateTypeSchema>;
@@ -263,6 +300,7 @@ export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseSummary = z.infer<typeof persistedCaseSummarySchema>;
 export type PersistedDocumentRequest = z.infer<typeof persistedDocumentRequestSchema>;
 export type PersistedHandoverAppointment = z.infer<typeof persistedHandoverAppointmentSchema>;
+export type PersistedHandoverBlocker = z.infer<typeof persistedHandoverBlockerSchema>;
 export type PersistedHandoverCaseDetail = z.infer<typeof persistedHandoverCaseDetailSchema>;
 export type PersistedHandoverCustomerUpdate = z.infer<typeof persistedHandoverCustomerUpdateSchema>;
 export type PersistedHandoverMilestone = z.infer<typeof persistedHandoverMilestoneSchema>;
@@ -280,4 +318,5 @@ export type SupportedLocale = z.infer<typeof supportedLocaleSchema>;
 export type UpdateHandoverMilestoneInput = z.infer<typeof updateHandoverMilestoneInputSchema>;
 export type UpdateAutomationStatusInput = z.infer<typeof updateAutomationStatusInputSchema>;
 export type UpdateDocumentRequestInput = z.infer<typeof updateDocumentRequestInputSchema>;
+export type UpdateHandoverBlockerInput = z.infer<typeof updateHandoverBlockerInputSchema>;
 export type UpdateHandoverTaskStatusInput = z.infer<typeof updateHandoverTaskStatusInputSchema>;

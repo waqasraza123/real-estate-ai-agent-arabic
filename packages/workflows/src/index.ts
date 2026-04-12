@@ -1,6 +1,7 @@
 import type {
   ApproveHandoverCustomerUpdateInput,
   ConfirmHandoverAppointmentInput,
+  CreateHandoverBlockerInput,
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
@@ -14,6 +15,7 @@ import type {
   QualifyCaseInput,
   ScheduleVisitInput,
   UpdateAutomationStatusInput,
+  UpdateHandoverBlockerInput,
   UpdateDocumentRequestInput,
   UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
@@ -216,17 +218,126 @@ export async function updatePersistedHandoverTask(
       updatedTasks,
       handoverCase.milestones,
       handoverCase.customerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       updatedTasks,
       handoverCase.milestones,
       handoverCase.customerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus,
     status: input.status
+  });
+}
+
+export async function createPersistedHandoverBlocker(
+  store: LeadCaptureStore,
+  handoverCaseId: string,
+  input: CreateHandoverBlockerInput
+): Promise<PersistedHandoverCaseDetail | null> {
+  const handoverCase = await store.getHandoverCaseDetail(handoverCaseId);
+
+  if (!handoverCase) {
+    return null;
+  }
+
+  if (handoverCase.status !== "scheduled") {
+    throw new WorkflowRuleError("handover_execution_not_ready");
+  }
+
+  const updatedBlockers = [
+    ...handoverCase.blockers,
+    {
+      blockerId: "pending",
+      createdAt: new Date().toISOString(),
+      dueAt: input.dueAt,
+      ownerName: input.ownerName ?? handoverCase.ownerName,
+      severity: input.severity,
+      status: input.status,
+      summary: input.summary,
+      type: input.type,
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  return store.createHandoverBlocker(handoverCaseId, {
+    ...input,
+    nextAction: getHandoverCaseNextAction(
+      handoverCase.preferredLocale,
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      updatedBlockers
+    ),
+    nextActionDueAt: getHandoverCaseNextActionDueAt(
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      updatedBlockers
+    ),
+    nextHandoverStatus: handoverCase.status
+  });
+}
+
+export async function updatePersistedHandoverBlocker(
+  store: LeadCaptureStore,
+  handoverCaseId: string,
+  blockerId: string,
+  input: UpdateHandoverBlockerInput
+): Promise<PersistedHandoverCaseDetail | null> {
+  const handoverCase = await store.getHandoverCaseDetail(handoverCaseId);
+
+  if (!handoverCase) {
+    return null;
+  }
+
+  const blocker = handoverCase.blockers.find((item) => item.blockerId === blockerId);
+
+  if (!blocker) {
+    return null;
+  }
+
+  const updatedBlockers = handoverCase.blockers.map((item) =>
+    item.blockerId === blockerId
+      ? {
+          ...item,
+          dueAt: input.dueAt,
+          ownerName: input.ownerName ?? item.ownerName,
+          severity: input.severity,
+          status: input.status,
+          summary: input.summary
+        }
+      : item
+  );
+
+  return store.updateHandoverBlocker(handoverCaseId, blockerId, {
+    ...input,
+    nextAction: getHandoverCaseNextAction(
+      handoverCase.preferredLocale,
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      updatedBlockers
+    ),
+    nextActionDueAt: getHandoverCaseNextActionDueAt(
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      updatedBlockers
+    ),
+    nextHandoverStatus: handoverCase.status
   });
 }
 
@@ -278,14 +389,16 @@ export async function planPersistedHandoverAppointment(
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      nextAppointment
+      nextAppointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      nextAppointment
+      nextAppointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus
   });
@@ -355,14 +468,16 @@ export async function updatePersistedHandoverMilestone(
       handoverCase.tasks,
       updatedMilestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       updatedMilestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextCustomerUpdateStatus,
     nextHandoverStatus
@@ -409,14 +524,16 @@ export async function approvePersistedHandoverCustomerUpdate(
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus
   });
@@ -463,14 +580,16 @@ export async function confirmPersistedHandoverAppointment(
       handoverCase.tasks,
       handoverCase.milestones,
       handoverCase.customerUpdates,
-      confirmedAppointment
+      confirmedAppointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       handoverCase.milestones,
       handoverCase.customerUpdates,
-      confirmedAppointment
+      confirmedAppointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus
   });
@@ -528,14 +647,16 @@ export async function preparePersistedHandoverCustomerUpdateDelivery(
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus
   });
@@ -591,14 +712,16 @@ export async function markPersistedHandoverCustomerUpdateDispatchReady(
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextActionDueAt: getHandoverCaseNextActionDueAt(
       nextHandoverStatus,
       handoverCase.tasks,
       handoverCase.milestones,
       updatedCustomerUpdates,
-      handoverCase.appointment
+      handoverCase.appointment,
+      handoverCase.blockers
     ),
     nextHandoverStatus
   });

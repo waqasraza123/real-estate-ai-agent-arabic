@@ -7,12 +7,16 @@ import type {
   CaseStage,
   ConfirmHandoverAppointmentInput,
   CreateHandoverIntakeInput,
+  CreateHandoverBlockerInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
   DocumentRequestStatus,
   DocumentRequestType,
   FollowUpStatus,
   HandoverAppointmentStatus,
+  HandoverBlockerSeverity,
+  HandoverBlockerStatus,
+  HandoverBlockerType,
   HandoverCaseStatus,
   HandoverCustomerUpdateStatus,
   HandoverCustomerUpdateType,
@@ -29,6 +33,7 @@ import type {
   PersistedCaseSummary,
   PersistedDocumentRequest,
   PersistedHandoverAppointment,
+  PersistedHandoverBlocker,
   PersistedHandoverCaseDetail,
   PersistedHandoverCustomerUpdate,
   PersistedHandoverMilestone,
@@ -42,6 +47,7 @@ import type {
   ScheduleVisitInput,
   SupportedLocale,
   UpdateHandoverMilestoneInput,
+  UpdateHandoverBlockerInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -151,6 +157,21 @@ const handoverTasks = pgTable("handover_tasks", {
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
+const handoverBlockers = pgTable("handover_blockers", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  dueAt: timestamp("due_at", { mode: "string", withTimezone: true }).notNull(),
+  handoverCaseId: uuid("handover_case_id")
+    .notNull()
+    .references(() => handoverCases.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey(),
+  ownerName: text("owner_name").notNull(),
+  severity: text("severity").notNull(),
+  status: text("status").notNull(),
+  summary: text("summary").notNull(),
+  type: text("type").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
 const handoverMilestones = pgTable("handover_milestones", {
   createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
   handoverCaseId: uuid("handover_case_id")
@@ -254,6 +275,14 @@ export interface LeadCaptureStore {
   getHandoverCaseDetail(handoverCaseId: string): Promise<PersistedHandoverCaseDetail | null>;
   listCases(): Promise<PersistedCaseSummary[]>;
   manageCaseFollowUp(caseId: string, input: ManageCaseFollowUpInput): Promise<PersistedCaseDetail | null>;
+  createHandoverBlocker(
+    handoverCaseId: string,
+    input: CreateHandoverBlockerInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
   runDueFollowUpCycle(input: {
     limit: number;
     runAt: string;
@@ -341,6 +370,15 @@ export interface LeadCaptureStore {
       nextHandoverStatus: HandoverCaseStatus;
     }
   ): Promise<PersistedHandoverCaseDetail | null>;
+  updateHandoverBlocker(
+    handoverCaseId: string,
+    blockerId: string,
+    input: UpdateHandoverBlockerInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
   updateHandoverTaskStatus(
     handoverCaseId: string,
     handoverTaskId: string,
@@ -364,6 +402,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       cases,
       documentRequests,
       handoverAppointments,
+      handoverBlockers,
       handoverCases,
       handoverCustomerUpdates,
       handoverMilestones,
@@ -452,6 +491,19 @@ export async function createAlphaLeadCaptureStore(options?: {
       updated_at timestamptz not null default now()
     );
 
+    create table if not exists handover_blockers (
+      id uuid primary key,
+      handover_case_id uuid not null references handover_cases(id) on delete cascade,
+      type text not null,
+      summary text not null,
+      status text not null,
+      severity text not null,
+      owner_name text not null,
+      due_at timestamptz not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
     create table if not exists handover_milestones (
       id uuid primary key,
       handover_case_id uuid not null references handover_cases(id) on delete cascade,
@@ -525,6 +577,7 @@ export async function createAlphaLeadCaptureStore(options?: {
     create index if not exists visits_case_id_idx on visits (case_id, scheduled_at desc);
     create index if not exists document_requests_case_id_idx on document_requests (case_id, created_at asc);
     create index if not exists handover_tasks_case_id_idx on handover_tasks (handover_case_id, due_at asc);
+    create index if not exists handover_blockers_case_id_idx on handover_blockers (handover_case_id, due_at asc);
     create index if not exists handover_milestones_case_id_idx on handover_milestones (handover_case_id, target_at asc);
     create index if not exists handover_customer_updates_case_id_idx on handover_customer_updates (handover_case_id, created_at asc);
     create index if not exists handover_appointments_case_id_idx on handover_appointments (handover_case_id, scheduled_at asc);
@@ -562,7 +615,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [taskRecords, milestoneRecords, customerUpdateRecords, appointmentRecords, eventRecords] = await Promise.all([
+    const [taskRecords, blockerRecords, milestoneRecords, customerUpdateRecords, appointmentRecords, eventRecords] = await Promise.all([
       db
         .select({
           createdAt: handoverTasks.createdAt,
@@ -576,6 +629,21 @@ export async function createAlphaLeadCaptureStore(options?: {
         .from(handoverTasks)
         .where(eq(handoverTasks.handoverCaseId, handoverCaseId))
         .orderBy(asc(handoverTasks.dueAt)),
+      db
+        .select({
+          blockerId: handoverBlockers.id,
+          createdAt: handoverBlockers.createdAt,
+          dueAt: handoverBlockers.dueAt,
+          ownerName: handoverBlockers.ownerName,
+          severity: handoverBlockers.severity,
+          status: handoverBlockers.status,
+          summary: handoverBlockers.summary,
+          type: handoverBlockers.type,
+          updatedAt: handoverBlockers.updatedAt
+        })
+        .from(handoverBlockers)
+        .where(eq(handoverBlockers.handoverCaseId, handoverCaseId))
+        .orderBy(asc(handoverBlockers.dueAt)),
       db
         .select({
           createdAt: handoverMilestones.createdAt,
@@ -634,6 +702,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         payload: event.payload
       })),
       appointment: appointmentRecords[0] ? hydrateHandoverAppointment(appointmentRecords[0]) : null,
+      blockers: blockerRecords.map((blocker) => hydrateHandoverBlocker(blocker)),
       caseId: baseRecord.caseId,
       createdAt: baseRecord.createdAt,
       customerUpdates: customerUpdateRecords.map((customerUpdate) => hydrateHandoverCustomerUpdate(customerUpdate)),
@@ -1542,6 +1611,82 @@ export async function createAlphaLeadCaptureStore(options?: {
 
       return getPersistedCaseDetail(caseId);
     },
+    async createHandoverBlocker(handoverCaseId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const blockerId = randomUUID();
+      const nextOwnerName = input.ownerName ?? handoverRecord.ownerName;
+
+      await db.transaction(async (transaction) => {
+        await transaction.insert(handoverBlockers).values({
+          createdAt: updatedAt,
+          dueAt: input.dueAt,
+          handoverCaseId,
+          id: blockerId,
+          ownerName: nextOwnerName,
+          severity: input.severity,
+          status: input.status,
+          summary: input.summary,
+          type: input.type,
+          updatedAt
+        });
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_blocker_logged",
+          id: randomUUID(),
+          payload: {
+            blockerId,
+            dueAt: input.dueAt,
+            handoverCaseId,
+            ownerName: nextOwnerName,
+            severity: input.severity,
+            status: input.status,
+            summary: input.summary,
+            type: input.type
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
     async planHandoverAppointment(handoverCaseId, input) {
       const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
 
@@ -1703,6 +1848,85 @@ export async function createAlphaLeadCaptureStore(options?: {
             appointmentId,
             handoverCaseId,
             status: input.status
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
+    async updateHandoverBlocker(handoverCaseId, blockerId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const blockerRecord = handoverRecord.blockers.find((blocker) => blocker.blockerId === blockerId);
+
+      if (!blockerRecord) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const nextOwnerName = input.ownerName ?? blockerRecord.ownerName;
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(handoverBlockers)
+          .set({
+            dueAt: input.dueAt,
+            ownerName: nextOwnerName,
+            severity: input.severity,
+            status: input.status,
+            summary: input.summary,
+            updatedAt
+          })
+          .where(and(eq(handoverBlockers.handoverCaseId, handoverCaseId), eq(handoverBlockers.id, blockerId)));
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_blocker_updated",
+          id: randomUUID(),
+          payload: {
+            blockerId,
+            dueAt: input.dueAt,
+            handoverCaseId,
+            ownerName: nextOwnerName,
+            severity: input.severity,
+            status: input.status,
+            summary: input.summary
           }
         });
 
@@ -2157,10 +2381,18 @@ function getHandoverCaseNextAction(
   tasks: PersistedHandoverTask[],
   milestones: PersistedHandoverMilestone[],
   customerUpdates: PersistedHandoverCustomerUpdate[],
-  appointment: PersistedHandoverAppointment | null
+  appointment: PersistedHandoverAppointment | null,
+  blockers: PersistedHandoverBlocker[] = []
 ) {
   const schedulingInviteStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "scheduling_invite")?.status;
   const appointmentConfirmationStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "appointment_confirmation")?.status;
+  const openBlockers = blockers.filter((blocker) => blocker.status !== "resolved");
+
+  if (status === "scheduled" && openBlockers.length > 0) {
+    return locale === "ar"
+      ? "معالجة عوائق التنفيذ المفتوحة قبل المتابعة في يوم التسليم"
+      : "Resolve the open execution blockers before advancing the handover day plan";
+  }
 
   if (status === "scheduled" || appointmentConfirmationStatus === "ready_to_dispatch") {
     return locale === "ar"
@@ -2222,12 +2454,20 @@ function getHandoverCaseNextActionDueAt(
   tasks: PersistedHandoverTask[],
   milestones: PersistedHandoverMilestone[],
   customerUpdates: PersistedHandoverCustomerUpdate[],
-  appointment: PersistedHandoverAppointment | null
+  appointment: PersistedHandoverAppointment | null,
+  blockers: PersistedHandoverBlocker[] = []
 ) {
   const blockedTask = tasks.find((task) => task.status === "blocked");
   const blockedMilestone = milestones.find((milestone) => milestone.status === "blocked");
   const schedulingInviteStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "scheduling_invite")?.status;
   const appointmentConfirmationStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "appointment_confirmation")?.status;
+  const openBlocker = blockers
+    .filter((blocker) => blocker.status !== "resolved")
+    .sort((left, right) => new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime())[0];
+
+  if (status === "scheduled" && openBlocker) {
+    return openBlocker.dueAt;
+  }
 
   if (status === "scheduled" || appointmentConfirmationStatus === "ready_to_dispatch") {
     return appointment?.scheduledAt ?? createFutureTimestamp(new Date().toISOString(), 12);
@@ -2332,6 +2572,30 @@ function hydrateHandoverAppointment(value: {
     location: value.location,
     scheduledAt: value.scheduledAt,
     status: toHandoverAppointmentStatus(value.status),
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydrateHandoverBlocker(value: {
+  blockerId: string;
+  createdAt: string;
+  dueAt: string;
+  ownerName: string;
+  severity: string;
+  status: string;
+  summary: string;
+  type: string;
+  updatedAt: string;
+}): PersistedHandoverBlocker {
+  return {
+    blockerId: value.blockerId,
+    createdAt: value.createdAt,
+    dueAt: value.dueAt,
+    ownerName: value.ownerName,
+    severity: toHandoverBlockerSeverity(value.severity),
+    status: toHandoverBlockerStatus(value.status),
+    summary: value.summary,
+    type: toHandoverBlockerType(value.type),
     updatedAt: value.updatedAt
   };
 }
@@ -2446,6 +2710,30 @@ function toHandoverAppointmentStatus(value: string): HandoverAppointmentStatus {
   }
 
   throw new Error(`unsupported_handover_appointment_status:${value}`);
+}
+
+function toHandoverBlockerSeverity(value: string): HandoverBlockerSeverity {
+  if (value === "warning" || value === "critical") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_blocker_severity:${value}`);
+}
+
+function toHandoverBlockerStatus(value: string): HandoverBlockerStatus {
+  if (value === "open" || value === "in_progress" || value === "resolved") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_blocker_status:${value}`);
+}
+
+function toHandoverBlockerType(value: string): HandoverBlockerType {
+  if (value === "unit_snag" || value === "access_blocker" || value === "document_gap") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_blocker_type:${value}`);
 }
 
 function toHandoverCustomerUpdateStatus(value: string): HandoverCustomerUpdateStatus {

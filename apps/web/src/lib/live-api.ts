@@ -1,6 +1,7 @@
 import type {
   ApproveHandoverCustomerUpdateInput,
   ConfirmHandoverAppointmentInput,
+  CreateHandoverBlockerInput,
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
@@ -15,6 +16,7 @@ import type {
   ScheduleVisitInput,
   UpdateAutomationStatusInput,
   UpdateDocumentRequestInput,
+  UpdateHandoverBlockerInput,
   UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
@@ -143,6 +145,24 @@ export async function updateDocumentRequest(caseId: string, documentRequestId: s
 
 export async function updateHandoverTask(handoverCaseId: string, handoverTaskId: string, input: UpdateHandoverTaskStatusInput) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/tasks/${handoverTaskId}`, {
+    method: "PATCH",
+    payload: input
+  });
+}
+
+export async function createHandoverBlocker(handoverCaseId: string, input: CreateHandoverBlockerInput) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/blockers`, {
+    method: "POST",
+    payload: input
+  });
+}
+
+export async function updateHandoverBlocker(
+  handoverCaseId: string,
+  blockerId: string,
+  input: UpdateHandoverBlockerInput
+) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/blockers/${blockerId}`, {
     method: "PATCH",
     payload: input
   });

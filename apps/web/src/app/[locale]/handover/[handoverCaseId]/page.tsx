@@ -6,6 +6,8 @@ import { Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { HandoverAppointmentConfirmationForm } from "@/components/handover-appointment-confirmation-form";
 import { HandoverAppointmentForm } from "@/components/handover-appointment-form";
+import { HandoverBlockerForm } from "@/components/handover-blocker-form";
+import { HandoverBlockerStatusForm } from "@/components/handover-blocker-status-form";
 import { HandoverCustomerUpdateApprovalForm } from "@/components/handover-customer-update-approval-form";
 import { HandoverCustomerUpdateDeliveryForm } from "@/components/handover-customer-update-delivery-form";
 import { HandoverCustomerUpdateDispatchReadyForm } from "@/components/handover-customer-update-dispatch-ready-form";
@@ -18,6 +20,7 @@ import { TimelinePanel } from "@/components/timeline-panel";
 import {
   buildCaseReferenceCode,
   getPersistedHandoverAppointmentDisplay,
+  getPersistedHandoverBlockerDisplay,
   getPersistedHandoverCustomerUpdateDisplay,
   getPersistedHandoverMilestoneDisplay,
   buildPersistedHandoverTimeline,
@@ -37,6 +40,7 @@ export default async function HandoverPage(props: PageProps) {
 
   if (persistedHandoverCase) {
     const appointmentItem = getPersistedHandoverAppointmentDisplay(locale, persistedHandoverCase);
+    const blockerItems = getPersistedHandoverBlockerDisplay(locale, persistedHandoverCase);
     const taskItems = getPersistedHandoverDisplay(locale, persistedHandoverCase);
     const milestoneItems = getPersistedHandoverMilestoneDisplay(locale, persistedHandoverCase);
     const customerUpdateItems = getPersistedHandoverCustomerUpdateDisplay(locale, persistedHandoverCase);
@@ -268,6 +272,70 @@ export default async function HandoverPage(props: PageProps) {
         </div>
 
         <div className="two-column-grid">
+          <Panel title={locale === "ar" ? "عوائق التنفيذ" : "Execution blockers"}>
+            <div className="page-stack">
+              <p className="panel-summary">
+                {locale === "ar"
+                  ? "بعد وصول السجل إلى حالة مجدولة، استخدم هذا القسم لإبقاء الـ snag والعوائق الميدانية مرئية قبل التنفيذ الفعلي."
+                  : "Once the record reaches the scheduled boundary, use this section to keep snags and field blockers visible before live execution."}
+              </p>
+              <StatefulStack
+                emptySummary={
+                  locale === "ar"
+                    ? "لا توجد عوائق تنفيذ مفتوحة أو مسجلة حتى الآن."
+                    : "No execution blockers have been logged on this scheduled handover record yet."
+                }
+                emptyTitle={locale === "ar" ? "لا توجد عوائق" : "No blockers"}
+                items={blockerItems}
+                renderItem={(blocker) => (
+                  <article key={blocker.blockerId} className="document-row document-row-live">
+                    <div>
+                      <div className="row-between">
+                        <h3>{blocker.title}</h3>
+                        <div className="row-between">
+                          <StatusBadge tone={blocker.severityTone}>{blocker.severityLabel}</StatusBadge>
+                          <StatusBadge tone={blocker.statusTone}>{blocker.statusLabel}</StatusBadge>
+                        </div>
+                      </div>
+                      <p>{blocker.typeDetail}</p>
+                      <p>{blocker.summary}</p>
+                      <p className="case-link-meta">{blocker.ownerName}</p>
+                      <p className="case-link-meta">{blocker.dueAt}</p>
+                    </div>
+                    <div className="document-row-actions">
+                      <HandoverBlockerStatusForm
+                        blockerId={blocker.blockerId}
+                        dueAt={blocker.dueAtInput}
+                        handoverCaseId={persistedHandoverCase.handoverCaseId}
+                        locale={locale}
+                        ownerName={blocker.ownerName}
+                        returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                        severity={blocker.severity}
+                        status={blocker.status}
+                        summary={blocker.summary}
+                      />
+                    </div>
+                  </article>
+                )}
+              />
+              {persistedHandoverCase.status === "scheduled" ? (
+                <HandoverBlockerForm
+                  dueAt={appointmentItem?.scheduledAtInput ?? ""}
+                  handoverCaseId={persistedHandoverCase.handoverCaseId}
+                  locale={locale}
+                  ownerName={persistedHandoverCase.ownerName}
+                  returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                />
+              ) : (
+                <p className="panel-summary">
+                  {locale === "ar"
+                    ? "سيفتح تسجيل عوائق التنفيذ بعد انتقال السجل إلى حالة التسليم المجدولة."
+                    : "Execution blocker logging opens after the handover record reaches the scheduled boundary."}
+                </p>
+              )}
+            </div>
+          </Panel>
+
           <Panel title={locale === "ar" ? "خطة المحطات" : "Milestone plan"}>
             <StatefulStack
               emptySummary={locale === "ar" ? "لم يتم إنشاء أي محطات بعد." : "No handover milestones have been planned yet."}

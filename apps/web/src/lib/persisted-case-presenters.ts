@@ -15,6 +15,10 @@ import {
   getDocumentRequestTypeLabel,
   getFollowUpStatusLabel,
   getHandoverAppointmentStatusLabel,
+  getHandoverBlockerSeverityLabel,
+  getHandoverBlockerStatusLabel,
+  getHandoverBlockerTypeDetail,
+  getHandoverBlockerTypeLabel,
   getHandoverCaseStatusLabel,
   getHandoverCustomerUpdateStatusLabel,
   getHandoverCustomerUpdateTypeDetail,
@@ -134,6 +138,26 @@ export function getPersistedHandoverDisplay(locale: SupportedLocale, handoverCas
     type: task.type,
     updatedAt: new Date(task.updatedAt).toLocaleString(locale),
     summary: getHandoverTaskTypeDetail(locale, task.type)
+  }));
+}
+
+export function getPersistedHandoverBlockerDisplay(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail) {
+  return handoverCase.blockers.map((blocker) => ({
+    blockerId: blocker.blockerId,
+    dueAt: new Date(blocker.dueAt).toLocaleString(locale),
+    dueAtInput: blocker.dueAt.slice(0, 16),
+    ownerName: blocker.ownerName,
+    severity: blocker.severity,
+    severityLabel: getHandoverBlockerSeverityLabel(locale, blocker.severity),
+    severityTone: getHandoverBlockerSeverityTone(blocker.severity),
+    status: blocker.status,
+    statusLabel: getHandoverBlockerStatusLabel(locale, blocker.status),
+    statusTone: getHandoverBlockerTone(blocker.status),
+    summary: blocker.summary,
+    title: getHandoverBlockerTypeLabel(locale, blocker.type),
+    type: blocker.type,
+    typeDetail: getHandoverBlockerTypeDetail(locale, blocker.type),
+    updatedAt: new Date(blocker.updatedAt).toLocaleString(locale)
   }));
 }
 
@@ -332,6 +356,14 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
         detail: "A real internal handover appointment was attached to the record behind the approved scheduling boundary.",
         title: "Appointment planned"
       },
+      handover_blocker_logged: {
+        detail: "A live execution blocker was attached to the scheduled handover record to keep snag or field risk visible.",
+        title: "Execution blocker logged"
+      },
+      handover_blocker_updated: {
+        detail: "A handover execution blocker changed status, ownership, or due time on the live record.",
+        title: "Execution blocker updated"
+      },
       handover_customer_delivery_prepared: {
         detail: "The approved appointment-confirmation update was prepared for later dispatch without contacting the customer yet.",
         title: "Delivery prepared"
@@ -396,6 +428,14 @@ function describeHandoverAuditEvent(
       handover_appointment_planned: {
         detail: "تم إرفاق موعد تسليم داخلي حي بالسجل بعد اعتماد حد الجدولة.",
         title: "تخطيط موعد التسليم"
+      },
+      handover_blocker_logged: {
+        detail: "تم تسجيل عائق تنفيذ حي لإبقاء المخاطر الميدانية أو الـ snag ظاهرة قبل يوم التسليم.",
+        title: "تسجيل عائق تنفيذ"
+      },
+      handover_blocker_updated: {
+        detail: "تم تحديث حالة عائق التنفيذ أو مالكه أو موعد معالجته في السجل الحي.",
+        title: "تحديث عائق التنفيذ"
       },
       handover_customer_delivery_prepared: {
         detail: "تم تجهيز رسالة تأكيد الموعد المعتمدة كحد جاهز للإرسال لاحقاً دون التواصل مع العميل بعد.",
@@ -523,6 +563,24 @@ function getHandoverCustomerUpdateTone(
   }
 
   return "warning";
+}
+
+function getHandoverBlockerTone(status: PersistedHandoverCaseDetail["blockers"][number]["status"]): "success" | "critical" | "warning" {
+  if (status === "resolved") {
+    return "success";
+  }
+
+  if (status === "open") {
+    return "critical";
+  }
+
+  return "warning";
+}
+
+function getHandoverBlockerSeverityTone(
+  severity: PersistedHandoverCaseDetail["blockers"][number]["severity"]
+): "critical" | "warning" {
+  return severity === "critical" ? "critical" : "warning";
 }
 
 function getHandoverAppointmentTone(

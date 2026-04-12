@@ -58,7 +58,7 @@ describe("lead capture api", () => {
     expect(detailResponse.json().handoverCase).toBeNull();
   });
 
-  it("promotes a document-complete case into handover planning, dispatch preparation, and scheduled readiness", async () => {
+  it("promotes a document-complete case into scheduled readiness with execution blockers", async () => {
     const createResponse = await app.inject({
       method: "POST",
       payload: {
@@ -372,6 +372,22 @@ describe("lead capture api", () => {
       )?.status
     ).toBe("prepared_for_delivery");
 
+    const earlyExecutionBlockerResponse = await app.inject({
+      method: "POST",
+      payload: {
+        dueAt: "2026-04-22T09:00:00.000Z",
+        ownerName: "Project Defects Desk",
+        severity: "critical",
+        status: "open",
+        summary: "Attempt to log a snag before the handover record is promoted into the scheduled boundary.",
+        type: "unit_snag"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/blockers`
+    });
+
+    expect(earlyExecutionBlockerResponse.statusCode).toBe(409);
+    expect(earlyExecutionBlockerResponse.json().error).toBe("handover_execution_not_ready");
+
     const dispatchReadyResponse = await app.inject({
       method: "PATCH",
       payload: {
@@ -388,6 +404,55 @@ describe("lead capture api", () => {
       )?.status
     ).toBe("ready_to_dispatch");
 
+    const blockerCreateResponse = await app.inject({
+      method: "POST",
+      payload: {
+        dueAt: "2026-04-22T09:00:00.000Z",
+        ownerName: "Project Defects Desk",
+        severity: "critical",
+        status: "open",
+        summary: "Two unit snag items remain unresolved at the apartment entrance and bathroom fit-out.",
+        type: "unit_snag"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/blockers`
+    });
+
+    expect(blockerCreateResponse.statusCode).toBe(201);
+    expect(blockerCreateResponse.json().blockers).toHaveLength(1);
+    expect(blockerCreateResponse.json().blockers[0]?.status).toBe("open");
+
+    const blockerId = blockerCreateResponse.json().blockers[0]?.blockerId;
+
+    const blockerProgressResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-22T12:00:00.000Z",
+        ownerName: "Project Defects Desk",
+        severity: "critical",
+        status: "in_progress",
+        summary: "The snag crew is actively addressing the entrance and bathroom fit-out issues."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/blockers/${blockerId}`
+    });
+
+    expect(blockerProgressResponse.statusCode).toBe(200);
+    expect(blockerProgressResponse.json().blockers[0]?.status).toBe("in_progress");
+
+    const blockerResolvedResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-22T15:00:00.000Z",
+        ownerName: "Project Defects Desk",
+        severity: "warning",
+        status: "resolved",
+        summary: "The unit snag list was cleared and the final walkthrough notes were closed."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/blockers/${blockerId}`
+    });
+
+    expect(blockerResolvedResponse.statusCode).toBe(200);
+    expect(blockerResolvedResponse.json().blockers[0]?.status).toBe("resolved");
+
     const refreshedCaseResponse = await app.inject({
       method: "GET",
       url: `/v1/cases/${createdCase.caseId}`
@@ -395,7 +460,7 @@ describe("lead capture api", () => {
 
     expect(refreshedCaseResponse.statusCode).toBe(200);
     expect(refreshedCaseResponse.json().handoverCase.status).toBe("scheduled");
-  });
+  }, 40000);
 
   it("rejects invalid payloads and invalid handover promotion attempts", async () => {
     const createResponse = await app.inject({

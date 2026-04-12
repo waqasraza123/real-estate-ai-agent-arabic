@@ -5,6 +5,9 @@ import type {
   DocumentRequestType,
   FollowUpStatus,
   HandoverAppointmentStatus,
+  HandoverBlockerSeverity,
+  HandoverBlockerStatus,
+  HandoverBlockerType,
   HandoverCaseStatus,
   HandoverCustomerUpdateStatus,
   HandoverCustomerUpdateType,
@@ -329,6 +332,96 @@ export function getHandoverAppointmentConfirmationCopy(locale: SupportedLocale) 
     helper: "This confirms the appointment inside the current operational boundary and does not send any real outbound message.",
     title: "Internal confirmation"
   };
+}
+
+export function getHandoverBlockerCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "تسجيل العائق",
+      dueAt: "الموعد المستهدف للمعالجة",
+      ownerName: "مالك المعالجة",
+      severity: "الشدة",
+      status: "الحالة",
+      summary: "ملخص العائق",
+      title: "عوائق التنفيذ"
+    };
+  }
+
+  return {
+    action: "Log blocker",
+    dueAt: "Resolution due",
+    ownerName: "Blocker owner",
+    severity: "Severity",
+    status: "Status",
+    summary: "Blocker summary",
+    title: "Execution blockers"
+  };
+}
+
+export function getHandoverBlockerStatusLabel(locale: SupportedLocale, status: HandoverBlockerStatus) {
+  const labels = {
+    ar: {
+      in_progress: "قيد المعالجة",
+      open: "مفتوح",
+      resolved: "تمت المعالجة"
+    },
+    en: {
+      in_progress: "In progress",
+      open: "Open",
+      resolved: "Resolved"
+    }
+  } as const;
+
+  return labels[locale][status];
+}
+
+export function getHandoverBlockerSeverityLabel(locale: SupportedLocale, severity: HandoverBlockerSeverity) {
+  const labels = {
+    ar: {
+      critical: "حرج",
+      warning: "يتطلب متابعة"
+    },
+    en: {
+      critical: "Critical",
+      warning: "Needs review"
+    }
+  } as const;
+
+  return labels[locale][severity];
+}
+
+export function getHandoverBlockerTypeDetail(locale: SupportedLocale, type: HandoverBlockerType) {
+  const details = {
+    ar: {
+      access_blocker: "يعكس عائقاً في بطاقات الوصول أو المفاتيح أو التنسيق الميداني قبل التنفيذ.",
+      document_gap: "يعكس نقصاً في حزمة العميل أو المستندات التشغيلية المطلوبة في يوم التسليم.",
+      unit_snag: "يعكس ملاحظة فنية أو snag في الوحدة يجب إغلاقها قبل التنفيذ الميداني."
+    },
+    en: {
+      access_blocker: "Represents an access, key, or field-coordination issue before handover-day execution.",
+      document_gap: "Represents a missing customer pack or operating document needed on handover day.",
+      unit_snag: "Represents a physical unit snag that must be cleared before field execution."
+    }
+  } as const;
+
+  return details[locale][type];
+}
+
+export function getHandoverBlockerTypeLabel(locale: SupportedLocale, type: HandoverBlockerType) {
+  const labels = {
+    ar: {
+      access_blocker: "عائق الوصول",
+      document_gap: "نقص في الحزمة أو المستندات",
+      unit_snag: "snag أو ملاحظة في الوحدة"
+    },
+    en: {
+      access_blocker: "Access blocker",
+      document_gap: "Document gap",
+      unit_snag: "Unit snag"
+    }
+  } as const;
+
+  return labels[locale][type];
 }
 
 export function getHandoverDeliveryPreparationCopy(locale: SupportedLocale) {

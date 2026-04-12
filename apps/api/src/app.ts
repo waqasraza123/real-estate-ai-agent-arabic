@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import {
   approveHandoverCustomerUpdateInputSchema,
   confirmHandoverAppointmentInputSchema,
+  createHandoverBlockerInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
   markHandoverCustomerUpdateDispatchReadyInputSchema,
@@ -13,6 +14,7 @@ import {
   scheduleVisitInputSchema,
   updateAutomationStatusInputSchema,
   updateDocumentRequestInputSchema,
+  updateHandoverBlockerInputSchema,
   updateHandoverMilestoneInputSchema,
   updateHandoverTaskStatusInputSchema
 } from "@real-estate-ai/contracts";
@@ -20,6 +22,7 @@ import type { LeadCaptureStore } from "@real-estate-ai/database";
 import {
   approvePersistedHandoverCustomerUpdate,
   confirmPersistedHandoverAppointment,
+  createPersistedHandoverBlocker,
   WorkflowRuleError,
   getPersistedCaseDetail,
   getPersistedHandoverCaseDetail,
@@ -34,6 +37,7 @@ import {
   startPersistedHandoverIntake,
   submitWebsiteLead,
   updatePersistedDocumentRequest,
+  updatePersistedHandoverBlocker,
   updatePersistedHandoverMilestone,
   updatePersistedHandoverTask
 } from "@real-estate-ai/workflows";
@@ -422,6 +426,72 @@ export function buildApiApp(dependencies: {
 
       throw error;
     }
+  });
+
+  app.post<{
+    Params: {
+      handoverCaseId: string;
+    };
+  }>("/v1/handover-cases/:handoverCaseId/blockers", async (request, reply) => {
+    const result = createHandoverBlockerInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    try {
+      const handoverCase = await createPersistedHandoverBlocker(dependencies.store, request.params.handoverCaseId, result.data);
+
+      if (!handoverCase) {
+        return reply.status(404).send({
+          error: "resource_not_found"
+        });
+      }
+
+      return reply.status(201).send(handoverCase);
+    } catch (error) {
+      if (error instanceof WorkflowRuleError) {
+        return reply.status(409).send({
+          error: error.code
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.patch<{
+    Params: {
+      blockerId: string;
+      handoverCaseId: string;
+    };
+  }>("/v1/handover-cases/:handoverCaseId/blockers/:blockerId", async (request, reply) => {
+    const result = updateHandoverBlockerInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    const handoverCase = await updatePersistedHandoverBlocker(
+      dependencies.store,
+      request.params.handoverCaseId,
+      request.params.blockerId,
+      result.data
+    );
+
+    if (!handoverCase) {
+      return reply.status(404).send({
+        error: "resource_not_found"
+      });
+    }
+
+    return reply.status(200).send(handoverCase);
   });
 
   app.patch<{

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   approveHandoverCustomerUpdateInputSchema,
   confirmHandoverAppointmentInputSchema,
+  createHandoverBlockerInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
   markHandoverCustomerUpdateDispatchReadyInputSchema,
@@ -17,6 +18,7 @@ import {
   supportedLocaleSchema,
   updateAutomationStatusInputSchema,
   updateDocumentRequestInputSchema,
+  updateHandoverBlockerInputSchema,
   updateHandoverMilestoneInputSchema,
   updateHandoverTaskStatusInputSchema
 } from "@real-estate-ai/contracts";
@@ -26,6 +28,7 @@ import {
   WebApiError,
   approveHandoverCustomerUpdate,
   confirmHandoverAppointment,
+  createHandoverBlocker,
   createHandoverIntake,
   createWebsiteLead,
   markHandoverCustomerUpdateDispatchReady,
@@ -36,6 +39,7 @@ import {
   scheduleVisit,
   updateAutomationStatus,
   updateDocumentRequest,
+  updateHandoverBlocker,
   updateHandoverMilestone,
   updateHandoverTask
 } from "@/lib/live-api";
@@ -329,6 +333,94 @@ export async function updateHandoverTaskStatusAction(_: FormActionState, formDat
 
     return {
       message: locale === "ar" ? "تم تحديث عنصر جاهزية التسليم." : "The handover readiness item was updated.",
+      status: "success"
+    };
+  } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function createHandoverBlockerAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+  const dueAt = formData.get("dueAt");
+
+  if (typeof handoverCaseId !== "string" || typeof returnPath !== "string" || typeof dueAt !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = createHandoverBlockerInputSchema.safeParse({
+    dueAt: toIsoDateTimeOrEmpty(dueAt),
+    ownerName: normalizeOptionalString(formData.get("ownerName")),
+    severity: formData.get("severity"),
+    status: formData.get("status"),
+    summary: formData.get("summary"),
+    type: formData.get("type")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await createHandoverBlocker(handoverCaseId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message: locale === "ar" ? "تم تسجيل عائق التنفيذ في السجل الحي." : "The execution blocker was logged on the live handover record.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لا يمكن تسجيل عوائق التنفيذ قبل وصول السجل إلى حالة التسليم المجدولة."
+            : "Execution blockers can only be logged after the handover record reaches the scheduled boundary.",
+        status: "error"
+      };
+    }
+
+    return getActionError(locale, error);
+  }
+}
+
+export async function updateHandoverBlockerAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const blockerId = formData.get("blockerId");
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+  const dueAt = formData.get("dueAt");
+
+  if (typeof blockerId !== "string" || typeof handoverCaseId !== "string" || typeof returnPath !== "string" || typeof dueAt !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = updateHandoverBlockerInputSchema.safeParse({
+    dueAt: toIsoDateTimeOrEmpty(dueAt),
+    ownerName: normalizeOptionalString(formData.get("ownerName")),
+    severity: formData.get("severity"),
+    status: formData.get("status"),
+    summary: formData.get("summary")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await updateHandoverBlocker(handoverCaseId, blockerId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message: locale === "ar" ? "تم تحديث عائق التنفيذ." : "The execution blocker was updated.",
       status: "success"
     };
   } catch (error) {
