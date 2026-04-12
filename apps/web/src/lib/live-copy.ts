@@ -13,6 +13,8 @@ import type {
   HandoverCustomerUpdateType,
   HandoverMilestoneStatus,
   HandoverMilestoneType,
+  HandoverPostCompletionFollowUpStatus,
+  HandoverReviewOutcome,
   HandoverTaskStatus,
   HandoverTaskType,
   ManagerInterventionSeverity,
@@ -266,6 +268,94 @@ export function getHandoverCompletionCopy(locale: SupportedLocale) {
     helper: "Close the handover day with a controlled summary after execution is complete and open blockers are resolved.",
     title: "Controlled completion"
   };
+}
+
+export function getHandoverReviewCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      accepted: "مكتمل بلا متابعة",
+      action: "حفظ المراجعة",
+      followUpRequired: "تتطلب متابعة",
+      outcome: "النتيجة",
+      summary: "ملخص المراجعة",
+      title: "مراجعة ما بعد التسليم"
+    };
+  }
+
+  return {
+    accepted: "Completed without follow-up",
+    action: "Save review",
+    followUpRequired: "Follow-up required",
+    outcome: "Outcome",
+    summary: "Review summary",
+    title: "Post-handover review"
+  };
+}
+
+export function getHandoverReviewOutcomeLabel(locale: SupportedLocale, outcome: HandoverReviewOutcome) {
+  const labels = {
+    ar: {
+      accepted: "مكتمل بلا متابعة",
+      follow_up_required: "تتطلب متابعة"
+    },
+    en: {
+      accepted: "Completed without follow-up",
+      follow_up_required: "Follow-up required"
+    }
+  } as const;
+
+  return labels[locale][outcome];
+}
+
+export function getHandoverPostCompletionFollowUpCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "حفظ المتابعة",
+      dueAt: "موعد المتابعة",
+      ownerName: "مالك المتابعة",
+      summary: "ملخص المتابعة",
+      title: "متابعة ما بعد التسليم"
+    };
+  }
+
+  return {
+    action: "Save follow-up",
+    dueAt: "Follow-up due",
+    ownerName: "Follow-up owner",
+    summary: "Follow-up summary",
+    title: "Post-handover follow-up"
+  };
+}
+
+export function getHandoverPostCompletionFollowUpResolutionCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "إغلاق المتابعة",
+      resolutionSummary: "ملخص الحل",
+      title: "إغلاق المتابعة"
+    };
+  }
+
+  return {
+    action: "Resolve follow-up",
+    resolutionSummary: "Resolution summary",
+    title: "Resolve follow-up"
+  };
+}
+
+export function getHandoverPostCompletionFollowUpStatusLabel(locale: SupportedLocale, status: HandoverPostCompletionFollowUpStatus) {
+  const labels = {
+    ar: {
+      open: "مفتوحة",
+      resolved: "مغلقة"
+    },
+    en: {
+      open: "Open",
+      resolved: "Resolved"
+    }
+  } as const;
+
+  return labels[locale][status];
 }
 
 export function getHandoverMilestoneStatusLabel(locale: SupportedLocale, status: HandoverMilestoneStatus) {

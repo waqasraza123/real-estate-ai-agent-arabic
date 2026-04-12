@@ -476,6 +476,18 @@ describe("lead capture api", () => {
     expect(earlyCompletionResponse.statusCode).toBe(409);
     expect(earlyCompletionResponse.json().error).toBe("handover_completion_not_ready");
 
+    const earlyReviewResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        outcome: "accepted",
+        summary: "Attempt to save the post-handover review before the execution state has been completed."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/review`
+    });
+
+    expect(earlyReviewResponse.statusCode).toBe(409);
+    expect(earlyReviewResponse.json().error).toBe("handover_review_not_ready");
+
     const executionStartResponse = await app.inject({
       method: "PATCH",
       payload: {
@@ -501,6 +513,61 @@ describe("lead capture api", () => {
     expect(completionResponse.json().status).toBe("completed");
     expect(completionResponse.json().completedAt).not.toBeNull();
     expect(completionResponse.json().completionSummary).toContain("final walkthrough");
+
+    const earlyPostCompletionFollowUpResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-23T10:00:00.000Z",
+        ownerName: "Aftercare Desk",
+        status: "open",
+        summary: "Attempt to open aftercare follow-up before the review marks follow-up as required."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/post-completion-follow-up`
+    });
+
+    expect(earlyPostCompletionFollowUpResponse.statusCode).toBe(409);
+    expect(earlyPostCompletionFollowUpResponse.json().error).toBe("handover_follow_up_not_required");
+
+    const reviewResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        outcome: "follow_up_required",
+        summary: "Customer requested one more aftercare check for access-card configuration after key release."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/review`
+    });
+
+    expect(reviewResponse.statusCode).toBe(200);
+    expect(reviewResponse.json().review.outcome).toBe("follow_up_required");
+
+    const followUpResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-23T10:00:00.000Z",
+        ownerName: "Aftercare Desk",
+        status: "open",
+        summary: "Confirm the access-card configuration and close the final customer aftercare point."
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/post-completion-follow-up`
+    });
+
+    expect(followUpResponse.statusCode).toBe(200);
+    expect(followUpResponse.json().postCompletionFollowUp.status).toBe("open");
+
+    const followUpId = followUpResponse.json().postCompletionFollowUp.followUpId;
+
+    const resolveFollowUpResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        resolutionSummary: "Access cards were configured correctly and the customer confirmed that the aftercare issue is closed.",
+        status: "resolved"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/post-completion-follow-up/${followUpId}`
+    });
+
+    expect(resolveFollowUpResponse.statusCode).toBe(200);
+    expect(resolveFollowUpResponse.json().postCompletionFollowUp.status).toBe("resolved");
+    expect(resolveFollowUpResponse.json().postCompletionFollowUp.resolutionSummary).toContain("Access cards");
 
     const refreshedCaseResponse = await app.inject({
       method: "GET",

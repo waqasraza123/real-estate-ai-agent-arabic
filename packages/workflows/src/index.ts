@@ -3,6 +3,7 @@ import type {
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
   CreateHandoverBlockerInput,
+  CreateHandoverPostCompletionFollowUpInput,
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
@@ -14,6 +15,8 @@ import type {
   PersistedCaseSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
+  ResolveHandoverPostCompletionFollowUpInput,
+  SaveHandoverReviewInput,
   ScheduleVisitInput,
   StartHandoverExecutionInput,
   UpdateAutomationStatusInput,
@@ -435,6 +438,173 @@ export async function completePersistedHandover(
       handoverCase.blockers
     ),
     nextHandoverStatus: input.status
+  });
+}
+
+export async function savePersistedHandoverReview(
+  store: LeadCaptureStore,
+  handoverCaseId: string,
+  input: SaveHandoverReviewInput
+): Promise<PersistedHandoverCaseDetail | null> {
+  const handoverCase = await store.getHandoverCaseDetail(handoverCaseId);
+
+  if (!handoverCase) {
+    return null;
+  }
+
+  if (handoverCase.status !== "completed") {
+    throw new WorkflowRuleError("handover_review_not_ready");
+  }
+
+  const nextReview = {
+    createdAt: handoverCase.review?.createdAt ?? new Date().toISOString(),
+    outcome: input.outcome,
+    reviewId: handoverCase.review?.reviewId ?? "pending",
+    summary: input.summary,
+    updatedAt: new Date().toISOString()
+  };
+
+  return store.saveHandoverReview(handoverCaseId, {
+    ...input,
+    nextAction: getHandoverCaseNextAction(
+      handoverCase.preferredLocale,
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      nextReview,
+      handoverCase.postCompletionFollowUp
+    ),
+    nextActionDueAt: getHandoverCaseNextActionDueAt(
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      nextReview,
+      handoverCase.postCompletionFollowUp
+    ),
+    nextHandoverStatus: handoverCase.status
+  });
+}
+
+export async function createPersistedHandoverPostCompletionFollowUp(
+  store: LeadCaptureStore,
+  handoverCaseId: string,
+  input: CreateHandoverPostCompletionFollowUpInput
+): Promise<PersistedHandoverCaseDetail | null> {
+  const handoverCase = await store.getHandoverCaseDetail(handoverCaseId);
+
+  if (!handoverCase) {
+    return null;
+  }
+
+  if (handoverCase.status !== "completed") {
+    throw new WorkflowRuleError("handover_post_completion_follow_up_not_ready");
+  }
+
+  if (handoverCase.review?.outcome !== "follow_up_required") {
+    throw new WorkflowRuleError("handover_follow_up_not_required");
+  }
+
+  const nextFollowUp = {
+    createdAt: handoverCase.postCompletionFollowUp?.createdAt ?? new Date().toISOString(),
+    dueAt: input.dueAt,
+    followUpId: handoverCase.postCompletionFollowUp?.followUpId ?? "pending",
+    ownerName: input.ownerName ?? handoverCase.ownerName,
+    resolutionSummary: null,
+    resolvedAt: null,
+    status: input.status,
+    summary: input.summary,
+    updatedAt: new Date().toISOString()
+  };
+
+  return store.createHandoverPostCompletionFollowUp(handoverCaseId, {
+    ...input,
+    nextAction: getHandoverCaseNextAction(
+      handoverCase.preferredLocale,
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      handoverCase.review,
+      nextFollowUp
+    ),
+    nextActionDueAt: getHandoverCaseNextActionDueAt(
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      handoverCase.review,
+      nextFollowUp
+    ),
+    nextHandoverStatus: handoverCase.status
+  });
+}
+
+export async function resolvePersistedHandoverPostCompletionFollowUp(
+  store: LeadCaptureStore,
+  handoverCaseId: string,
+  followUpId: string,
+  input: ResolveHandoverPostCompletionFollowUpInput
+): Promise<PersistedHandoverCaseDetail | null> {
+  const handoverCase = await store.getHandoverCaseDetail(handoverCaseId);
+
+  if (!handoverCase) {
+    return null;
+  }
+
+  if (handoverCase.status !== "completed") {
+    throw new WorkflowRuleError("handover_post_completion_follow_up_not_ready");
+  }
+
+  if (!handoverCase.postCompletionFollowUp || handoverCase.postCompletionFollowUp.followUpId !== followUpId) {
+    return null;
+  }
+
+  if (handoverCase.postCompletionFollowUp.status !== "open") {
+    throw new WorkflowRuleError("handover_post_completion_follow_up_not_open");
+  }
+
+  const nextFollowUp = {
+    ...handoverCase.postCompletionFollowUp,
+    resolutionSummary: input.resolutionSummary,
+    resolvedAt: new Date().toISOString(),
+    status: input.status,
+    updatedAt: new Date().toISOString()
+  };
+
+  return store.resolveHandoverPostCompletionFollowUp(handoverCaseId, followUpId, {
+    ...input,
+    nextAction: getHandoverCaseNextAction(
+      handoverCase.preferredLocale,
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      handoverCase.review,
+      nextFollowUp
+    ),
+    nextActionDueAt: getHandoverCaseNextActionDueAt(
+      handoverCase.status,
+      handoverCase.tasks,
+      handoverCase.milestones,
+      handoverCase.customerUpdates,
+      handoverCase.appointment,
+      handoverCase.blockers,
+      handoverCase.review,
+      nextFollowUp
+    ),
+    nextHandoverStatus: handoverCase.status
   });
 }
 

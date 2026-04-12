@@ -7,6 +7,7 @@ import type {
   CaseStage,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
+  CreateHandoverPostCompletionFollowUpInput,
   CreateHandoverIntakeInput,
   CreateHandoverBlockerInput,
   CreateWebsiteLeadInput,
@@ -38,6 +39,8 @@ import type {
   PersistedHandoverCaseDetail,
   PersistedHandoverCustomerUpdate,
   PersistedHandoverMilestone,
+  PersistedHandoverPostCompletionFollowUp,
+  PersistedHandoverReview,
   PersistedHandoverTask,
   PersistedLinkedHandoverCase,
   PersistedManagerIntervention,
@@ -45,6 +48,8 @@ import type {
   PrepareHandoverCustomerUpdateDeliveryInput,
   QualifyCaseInput,
   QualificationReadiness,
+  ResolveHandoverPostCompletionFollowUpInput,
+  SaveHandoverReviewInput,
   ScheduleVisitInput,
   StartHandoverExecutionInput,
   SupportedLocale,
@@ -218,6 +223,34 @@ const handoverAppointments = pgTable("handover_appointments", {
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
+const handoverReviews = pgTable("handover_reviews", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  handoverCaseId: uuid("handover_case_id")
+    .notNull()
+    .unique()
+    .references(() => handoverCases.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey(),
+  outcome: text("outcome").notNull(),
+  summary: text("summary").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
+const handoverPostCompletionFollowUps = pgTable("handover_post_completion_follow_ups", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  dueAt: timestamp("due_at", { mode: "string", withTimezone: true }).notNull(),
+  handoverCaseId: uuid("handover_case_id")
+    .notNull()
+    .unique()
+    .references(() => handoverCases.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey(),
+  ownerName: text("owner_name").notNull(),
+  resolutionSummary: text("resolution_summary"),
+  resolvedAt: timestamp("resolved_at", { mode: "string", withTimezone: true }),
+  status: text("status").notNull(),
+  summary: text("summary").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
 const managerInterventions = pgTable("manager_interventions", {
   caseId: uuid("case_id")
     .notNull()
@@ -283,6 +316,22 @@ export interface LeadCaptureStore {
   createHandoverBlocker(
     handoverCaseId: string,
     input: CreateHandoverBlockerInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
+  createHandoverPostCompletionFollowUp(
+    handoverCaseId: string,
+    input: CreateHandoverPostCompletionFollowUpInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
+  saveHandoverReview(
+    handoverCaseId: string,
+    input: SaveHandoverReviewInput & {
       nextAction: string;
       nextActionDueAt: string;
       nextHandoverStatus: HandoverCaseStatus;
@@ -372,6 +421,15 @@ export interface LeadCaptureStore {
       nextHandoverStatus: HandoverCaseStatus;
     }
   ): Promise<PersistedHandoverCaseDetail | null>;
+  resolveHandoverPostCompletionFollowUp(
+    handoverCaseId: string,
+    followUpId: string,
+    input: ResolveHandoverPostCompletionFollowUpInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
   updateHandoverCustomerUpdateStatus(
     handoverCaseId: string,
     customerUpdateId: string,
@@ -427,6 +485,8 @@ export async function createAlphaLeadCaptureStore(options?: {
       handoverCases,
       handoverCustomerUpdates,
       handoverMilestones,
+      handoverPostCompletionFollowUps,
+      handoverReviews,
       handoverTasks,
       leads,
       managerInterventions,
@@ -570,6 +630,28 @@ export async function createAlphaLeadCaptureStore(options?: {
       updated_at timestamptz not null default now()
     );
 
+    create table if not exists handover_reviews (
+      id uuid primary key,
+      handover_case_id uuid not null unique references handover_cases(id) on delete cascade,
+      outcome text not null,
+      summary text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create table if not exists handover_post_completion_follow_ups (
+      id uuid primary key,
+      handover_case_id uuid not null unique references handover_cases(id) on delete cascade,
+      owner_name text not null,
+      due_at timestamptz not null,
+      status text not null,
+      summary text not null,
+      resolution_summary text,
+      resolved_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
     create table if not exists manager_interventions (
       id uuid primary key,
       case_id uuid not null references cases(id) on delete cascade,
@@ -609,6 +691,8 @@ export async function createAlphaLeadCaptureStore(options?: {
     create index if not exists handover_milestones_case_id_idx on handover_milestones (handover_case_id, target_at asc);
     create index if not exists handover_customer_updates_case_id_idx on handover_customer_updates (handover_case_id, created_at asc);
     create index if not exists handover_appointments_case_id_idx on handover_appointments (handover_case_id, scheduled_at asc);
+    create index if not exists handover_reviews_case_id_idx on handover_reviews (handover_case_id, updated_at desc);
+    create index if not exists handover_post_completion_follow_ups_case_id_idx on handover_post_completion_follow_ups (handover_case_id, due_at asc);
     create index if not exists audit_events_case_id_idx on audit_events (case_id, created_at asc);
     create index if not exists manager_interventions_case_id_idx on manager_interventions (case_id, created_at desc);
     create index if not exists manager_interventions_open_case_idx on manager_interventions (case_id, status);
@@ -646,7 +730,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [taskRecords, blockerRecords, milestoneRecords, customerUpdateRecords, appointmentRecords, eventRecords] = await Promise.all([
+    const [taskRecords, blockerRecords, milestoneRecords, customerUpdateRecords, appointmentRecords, reviewRecords, postCompletionFollowUpRecords, eventRecords] = await Promise.all([
       db
         .select({
           createdAt: handoverTasks.createdAt,
@@ -717,6 +801,32 @@ export async function createAlphaLeadCaptureStore(options?: {
         .limit(1),
       db
         .select({
+          createdAt: handoverReviews.createdAt,
+          outcome: handoverReviews.outcome,
+          reviewId: handoverReviews.id,
+          summary: handoverReviews.summary,
+          updatedAt: handoverReviews.updatedAt
+        })
+        .from(handoverReviews)
+        .where(eq(handoverReviews.handoverCaseId, handoverCaseId))
+        .limit(1),
+      db
+        .select({
+          createdAt: handoverPostCompletionFollowUps.createdAt,
+          dueAt: handoverPostCompletionFollowUps.dueAt,
+          followUpId: handoverPostCompletionFollowUps.id,
+          ownerName: handoverPostCompletionFollowUps.ownerName,
+          resolutionSummary: handoverPostCompletionFollowUps.resolutionSummary,
+          resolvedAt: handoverPostCompletionFollowUps.resolvedAt,
+          status: handoverPostCompletionFollowUps.status,
+          summary: handoverPostCompletionFollowUps.summary,
+          updatedAt: handoverPostCompletionFollowUps.updatedAt
+        })
+        .from(handoverPostCompletionFollowUps)
+        .where(eq(handoverPostCompletionFollowUps.handoverCaseId, handoverCaseId))
+        .limit(1),
+      db
+        .select({
           createdAt: auditEvents.createdAt,
           eventType: auditEvents.eventType,
           payload: auditEvents.payload
@@ -744,9 +854,11 @@ export async function createAlphaLeadCaptureStore(options?: {
       handoverCaseId: baseRecord.handoverCaseId,
       milestones: milestoneRecords.map((milestone) => hydrateHandoverMilestone(milestone)),
       ownerName: baseRecord.ownerName,
+      postCompletionFollowUp: postCompletionFollowUpRecords[0] ? hydrateHandoverPostCompletionFollowUp(postCompletionFollowUpRecords[0]) : null,
       preferredLocale: toSupportedLocale(baseRecord.preferredLocale),
       projectInterest: baseRecord.projectInterest,
       readinessSummary: baseRecord.readinessSummary,
+      review: reviewRecords[0] ? hydrateHandoverReview(reviewRecords[0]) : null,
       status: toHandoverCaseStatus(baseRecord.status),
       tasks: taskRecords.map((task) => hydrateHandoverTask(task)),
       updatedAt: baseRecord.updatedAt
@@ -2092,6 +2204,240 @@ export async function createAlphaLeadCaptureStore(options?: {
 
       return getHandoverCaseDetail(handoverCaseId);
     },
+    async saveHandoverReview(handoverCaseId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const existingReview = handoverRecord.review;
+      const reviewId = existingReview?.reviewId ?? randomUUID();
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .insert(handoverReviews)
+          .values({
+            createdAt: existingReview?.createdAt ?? updatedAt,
+            handoverCaseId,
+            id: reviewId,
+            outcome: input.outcome,
+            summary: input.summary,
+            updatedAt
+          })
+          .onConflictDoUpdate({
+            set: {
+              outcome: input.outcome,
+              summary: input.summary,
+              updatedAt
+            },
+            target: handoverReviews.handoverCaseId
+          });
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_review_saved",
+          id: randomUUID(),
+          payload: {
+            handoverCaseId,
+            outcome: input.outcome,
+            reviewId,
+            summary: input.summary
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
+    async createHandoverPostCompletionFollowUp(handoverCaseId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const existingFollowUp = handoverRecord.postCompletionFollowUp;
+      const followUpId = existingFollowUp?.followUpId ?? randomUUID();
+      const ownerName = input.ownerName ?? handoverRecord.ownerName;
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .insert(handoverPostCompletionFollowUps)
+          .values({
+            createdAt: existingFollowUp?.createdAt ?? updatedAt,
+            dueAt: input.dueAt,
+            handoverCaseId,
+            id: followUpId,
+            ownerName,
+            resolutionSummary: null,
+            resolvedAt: null,
+            status: input.status,
+            summary: input.summary,
+            updatedAt
+          })
+          .onConflictDoUpdate({
+            set: {
+              dueAt: input.dueAt,
+              ownerName,
+              resolutionSummary: null,
+              resolvedAt: null,
+              status: input.status,
+              summary: input.summary,
+              updatedAt
+            },
+            target: handoverPostCompletionFollowUps.handoverCaseId
+          });
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_post_completion_follow_up_opened",
+          id: randomUUID(),
+          payload: {
+            dueAt: input.dueAt,
+            followUpId,
+            handoverCaseId,
+            ownerName,
+            status: input.status,
+            summary: input.summary
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
+    async resolveHandoverPostCompletionFollowUp(handoverCaseId, followUpId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord || !handoverRecord.postCompletionFollowUp || handoverRecord.postCompletionFollowUp.followUpId !== followUpId) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(handoverPostCompletionFollowUps)
+          .set({
+            resolutionSummary: input.resolutionSummary,
+            resolvedAt: updatedAt,
+            status: input.status,
+            updatedAt
+          })
+          .where(and(eq(handoverPostCompletionFollowUps.handoverCaseId, handoverCaseId), eq(handoverPostCompletionFollowUps.id, followUpId)));
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_post_completion_follow_up_resolved",
+          id: randomUUID(),
+          payload: {
+            followUpId,
+            handoverCaseId,
+            resolutionSummary: input.resolutionSummary,
+            status: input.status
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
     async prepareHandoverCustomerUpdateDelivery(handoverCaseId, customerUpdateId, input) {
       const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
 
@@ -2534,11 +2880,31 @@ function getHandoverCaseNextAction(
   milestones: PersistedHandoverMilestone[],
   customerUpdates: PersistedHandoverCustomerUpdate[],
   appointment: PersistedHandoverAppointment | null,
-  blockers: PersistedHandoverBlocker[] = []
+  blockers: PersistedHandoverBlocker[] = [],
+  review: PersistedHandoverReview | null = null,
+  postCompletionFollowUp: PersistedHandoverPostCompletionFollowUp | null = null
 ) {
   const schedulingInviteStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "scheduling_invite")?.status;
   const appointmentConfirmationStatus = customerUpdates.find((customerUpdate) => customerUpdate.type === "appointment_confirmation")?.status;
   const openBlockers = blockers.filter((blocker) => blocker.status !== "resolved");
+
+  if (status === "completed" && !review) {
+    return locale === "ar"
+      ? "تسجيل مراجعة المدير بعد التسليم وتحديد ما إذا كانت متابعة ما بعد التسليم مطلوبة"
+      : "Record the post-handover manager review and decide whether aftercare follow-up is required";
+  }
+
+  if (status === "completed" && review?.outcome === "follow_up_required" && postCompletionFollowUp?.status === "open") {
+    return locale === "ar"
+      ? "معالجة متابعة ما بعد التسليم المفتوحة حتى يتم إغلاقها بملخص حل واضح"
+      : "Resolve the open post-handover follow-up and close it with a clear resolution summary";
+  }
+
+  if (status === "completed" && review?.outcome === "follow_up_required" && !postCompletionFollowUp) {
+    return locale === "ar"
+      ? "فتح حد متابعة ما بعد التسليم وتعيين المالك والموعد النهائي"
+      : "Open the post-handover follow-up boundary with an owner and due time";
+  }
 
   if (status === "completed") {
     return locale === "ar"
@@ -2631,7 +2997,9 @@ function getHandoverCaseNextActionDueAt(
   milestones: PersistedHandoverMilestone[],
   customerUpdates: PersistedHandoverCustomerUpdate[],
   appointment: PersistedHandoverAppointment | null,
-  blockers: PersistedHandoverBlocker[] = []
+  blockers: PersistedHandoverBlocker[] = [],
+  review: PersistedHandoverReview | null = null,
+  postCompletionFollowUp: PersistedHandoverPostCompletionFollowUp | null = null
 ) {
   const blockedTask = tasks.find((task) => task.status === "blocked");
   const blockedMilestone = milestones.find((milestone) => milestone.status === "blocked");
@@ -2640,6 +3008,18 @@ function getHandoverCaseNextActionDueAt(
   const openBlocker = blockers
     .filter((blocker) => blocker.status !== "resolved")
     .sort((left, right) => new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime())[0];
+
+  if (status === "completed" && !review) {
+    return createFutureTimestamp(new Date().toISOString(), 4);
+  }
+
+  if (status === "completed" && review?.outcome === "follow_up_required" && postCompletionFollowUp?.status === "open") {
+    return postCompletionFollowUp.dueAt;
+  }
+
+  if (status === "completed" && review?.outcome === "follow_up_required" && !postCompletionFollowUp) {
+    return createFutureTimestamp(new Date().toISOString(), 8);
+  }
 
   if (status === "completed") {
     return createFutureTimestamp(new Date().toISOString(), 24);
@@ -2810,6 +3190,46 @@ function hydrateHandoverCustomerUpdate(value: {
     dispatchReadyAt: value.dispatchReadyAt,
     status: toHandoverCustomerUpdateStatus(value.status),
     type: toHandoverCustomerUpdateType(value.type),
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydrateHandoverReview(value: {
+  createdAt: string;
+  outcome: string;
+  reviewId: string;
+  summary: string;
+  updatedAt: string;
+}): PersistedHandoverReview {
+  return {
+    createdAt: value.createdAt,
+    outcome: toHandoverReviewOutcome(value.outcome),
+    reviewId: value.reviewId,
+    summary: value.summary,
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydrateHandoverPostCompletionFollowUp(value: {
+  createdAt: string;
+  dueAt: string;
+  followUpId: string;
+  ownerName: string;
+  resolutionSummary: string | null;
+  resolvedAt: string | null;
+  status: string;
+  summary: string;
+  updatedAt: string;
+}): PersistedHandoverPostCompletionFollowUp {
+  return {
+    createdAt: value.createdAt,
+    dueAt: value.dueAt,
+    followUpId: value.followUpId,
+    ownerName: value.ownerName,
+    resolutionSummary: value.resolutionSummary,
+    resolvedAt: value.resolvedAt,
+    status: toHandoverPostCompletionFollowUpStatus(value.status),
+    summary: value.summary,
     updatedAt: value.updatedAt
   };
 }
@@ -2987,6 +3407,22 @@ function toHandoverTaskType(value: string): HandoverTaskType {
   }
 
   throw new Error(`unsupported_handover_task_type:${value}`);
+}
+
+function toHandoverReviewOutcome(value: string) {
+  if (value === "accepted" || value === "follow_up_required") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_review_outcome:${value}`);
+}
+
+function toHandoverPostCompletionFollowUpStatus(value: string) {
+  if (value === "open" || value === "resolved") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_post_completion_follow_up_status:${value}`);
 }
 
 function toLeadSource(value: string): "website" {

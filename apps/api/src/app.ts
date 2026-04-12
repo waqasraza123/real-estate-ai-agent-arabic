@@ -5,6 +5,7 @@ import {
   completeHandoverInputSchema,
   confirmHandoverAppointmentInputSchema,
   createHandoverBlockerInputSchema,
+  createHandoverPostCompletionFollowUpInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
   markHandoverCustomerUpdateDispatchReadyInputSchema,
@@ -12,6 +13,8 @@ import {
   planHandoverAppointmentInputSchema,
   prepareHandoverCustomerUpdateDeliveryInputSchema,
   qualifyCaseInputSchema,
+  resolveHandoverPostCompletionFollowUpInputSchema,
+  saveHandoverReviewInputSchema,
   scheduleVisitInputSchema,
   startHandoverExecutionInputSchema,
   updateAutomationStatusInputSchema,
@@ -26,6 +29,9 @@ import {
   completePersistedHandover,
   confirmPersistedHandoverAppointment,
   createPersistedHandoverBlocker,
+  createPersistedHandoverPostCompletionFollowUp,
+  resolvePersistedHandoverPostCompletionFollowUp,
+  savePersistedHandoverReview,
   startPersistedHandoverExecution,
   WorkflowRuleError,
   getPersistedCaseDetail,
@@ -514,6 +520,121 @@ export function buildApiApp(dependencies: {
 
     try {
       const handoverCase = await startPersistedHandoverExecution(dependencies.store, request.params.handoverCaseId, result.data);
+
+      if (!handoverCase) {
+        return reply.status(404).send({
+          error: "resource_not_found"
+        });
+      }
+
+      return reply.status(200).send(handoverCase);
+    } catch (error) {
+      if (error instanceof WorkflowRuleError) {
+        return reply.status(409).send({
+          error: error.code
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.patch<{
+    Params: {
+      handoverCaseId: string;
+    };
+  }>("/v1/handover-cases/:handoverCaseId/review", async (request, reply) => {
+    const result = saveHandoverReviewInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    try {
+      const handoverCase = await savePersistedHandoverReview(dependencies.store, request.params.handoverCaseId, result.data);
+
+      if (!handoverCase) {
+        return reply.status(404).send({
+          error: "resource_not_found"
+        });
+      }
+
+      return reply.status(200).send(handoverCase);
+    } catch (error) {
+      if (error instanceof WorkflowRuleError) {
+        return reply.status(409).send({
+          error: error.code
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.patch<{
+    Params: {
+      handoverCaseId: string;
+    };
+  }>("/v1/handover-cases/:handoverCaseId/post-completion-follow-up", async (request, reply) => {
+    const result = createHandoverPostCompletionFollowUpInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    try {
+      const handoverCase = await createPersistedHandoverPostCompletionFollowUp(
+        dependencies.store,
+        request.params.handoverCaseId,
+        result.data
+      );
+
+      if (!handoverCase) {
+        return reply.status(404).send({
+          error: "resource_not_found"
+        });
+      }
+
+      return reply.status(200).send(handoverCase);
+    } catch (error) {
+      if (error instanceof WorkflowRuleError) {
+        return reply.status(409).send({
+          error: error.code
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.patch<{
+    Params: {
+      followUpId: string;
+      handoverCaseId: string;
+    };
+  }>("/v1/handover-cases/:handoverCaseId/post-completion-follow-up/:followUpId", async (request, reply) => {
+    const result = resolveHandoverPostCompletionFollowUpInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    try {
+      const handoverCase = await resolvePersistedHandoverPostCompletionFollowUp(
+        dependencies.store,
+        request.params.handoverCaseId,
+        request.params.followUpId,
+        result.data
+      );
 
       if (!handoverCase) {
         return reply.status(404).send({

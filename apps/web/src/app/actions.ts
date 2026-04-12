@@ -8,6 +8,7 @@ import {
   completeHandoverInputSchema,
   confirmHandoverAppointmentInputSchema,
   createHandoverBlockerInputSchema,
+  createHandoverPostCompletionFollowUpInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
   markHandoverCustomerUpdateDispatchReadyInputSchema,
@@ -15,7 +16,9 @@ import {
   planHandoverAppointmentInputSchema,
   prepareHandoverCustomerUpdateDeliveryInputSchema,
   qualifyCaseInputSchema,
+  resolveHandoverPostCompletionFollowUpInputSchema,
   scheduleVisitInputSchema,
+  saveHandoverReviewInputSchema,
   startHandoverExecutionInputSchema,
   supportedLocaleSchema,
   updateAutomationStatusInputSchema,
@@ -32,6 +35,7 @@ import {
   completeHandover,
   confirmHandoverAppointment,
   createHandoverBlocker,
+  createHandoverPostCompletionFollowUp,
   createHandoverIntake,
   createWebsiteLead,
   markHandoverCustomerUpdateDispatchReady,
@@ -39,7 +43,9 @@ import {
   planHandoverAppointment,
   prepareHandoverCustomerUpdateDelivery,
   qualifyCase,
+  resolveHandoverPostCompletionFollowUp,
   scheduleVisit,
+  saveHandoverReview,
   startHandoverExecution,
   updateAutomationStatus,
   updateDocumentRequest,
@@ -517,6 +523,157 @@ export async function completeHandoverAction(_: FormActionState, formData: FormD
           locale === "ar"
             ? "لا يمكن إتمام التسليم قبل بدء التنفيذ ومعالجة جميع العوائق المفتوحة."
             : "Handover completion requires an active execution state with no open blockers.",
+        status: "error"
+      };
+    }
+
+    return getActionError(locale, error);
+  }
+}
+
+export async function saveHandoverReviewAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+
+  if (typeof handoverCaseId !== "string" || typeof returnPath !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = saveHandoverReviewInputSchema.safeParse({
+    outcome: formData.get("outcome"),
+    summary: formData.get("summary")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await saveHandoverReview(handoverCaseId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message:
+        locale === "ar"
+          ? "تم حفظ مراجعة ما بعد التسليم على السجل الحي."
+          : "The post-handover review was saved on the live record.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لا يمكن حفظ مراجعة ما بعد التسليم قبل اكتمال السجل أولاً."
+            : "The post-handover review cannot be saved until the handover is completed first.",
+        status: "error"
+      };
+    }
+
+    return getActionError(locale, error);
+  }
+}
+
+export async function createHandoverPostCompletionFollowUpAction(
+  _: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+  const dueAt = formData.get("dueAt");
+
+  if (typeof handoverCaseId !== "string" || typeof returnPath !== "string" || typeof dueAt !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = createHandoverPostCompletionFollowUpInputSchema.safeParse({
+    dueAt: toIsoDateTimeOrEmpty(dueAt),
+    ownerName: normalizeOptionalString(formData.get("ownerName")),
+    status: formData.get("status"),
+    summary: formData.get("summary")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await createHandoverPostCompletionFollowUp(handoverCaseId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message:
+        locale === "ar"
+          ? "تم حفظ متابعة ما بعد التسليم على السجل الحي."
+          : "The post-handover follow-up boundary was saved on the live record.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لن يتم فتح متابعة ما بعد التسليم حتى تكتمل الحالة وتُحفظ مراجعة تطلب المتابعة."
+            : "Post-handover follow-up only opens after completion and a saved review that requires follow-up.",
+        status: "error"
+      };
+    }
+
+    return getActionError(locale, error);
+  }
+}
+
+export async function resolveHandoverPostCompletionFollowUpAction(
+  _: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const followUpId = formData.get("followUpId");
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+
+  if (typeof followUpId !== "string" || typeof handoverCaseId !== "string" || typeof returnPath !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = resolveHandoverPostCompletionFollowUpInputSchema.safeParse({
+    resolutionSummary: formData.get("resolutionSummary"),
+    status: formData.get("status")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await resolveHandoverPostCompletionFollowUp(handoverCaseId, followUpId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message:
+        locale === "ar"
+          ? "تم إغلاق متابعة ما بعد التسليم بملخص حل واضح."
+          : "The post-handover follow-up was closed with a clear resolution summary.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لا يمكن إغلاق المتابعة قبل وجود متابعة مفتوحة على السجل المكتمل."
+            : "The follow-up cannot be resolved until an open post-handover follow-up exists on the completed record.",
         status: "error"
       };
     }

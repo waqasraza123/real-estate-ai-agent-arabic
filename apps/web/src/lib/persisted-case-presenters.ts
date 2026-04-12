@@ -26,6 +26,8 @@ import {
   getHandoverMilestoneStatusLabel,
   getHandoverMilestoneTypeDetail,
   getHandoverMilestoneTypeLabel,
+  getHandoverPostCompletionFollowUpStatusLabel,
+  getHandoverReviewOutcomeLabel,
   getHandoverTaskStatusLabel,
   getHandoverTaskTypeDetail,
   getHandoverTaskTypeLabel,
@@ -211,6 +213,44 @@ export function getPersistedHandoverAppointmentDisplay(locale: SupportedLocale, 
   };
 }
 
+export function getPersistedHandoverReviewDisplay(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail) {
+  if (!handoverCase.review) {
+    return null;
+  }
+
+  return {
+    outcome: handoverCase.review.outcome,
+    outcomeLabel: getHandoverReviewOutcomeLabel(locale, handoverCase.review.outcome),
+    reviewId: handoverCase.review.reviewId,
+    summary: handoverCase.review.summary,
+    updatedAt: new Date(handoverCase.review.updatedAt).toLocaleString(locale)
+  };
+}
+
+export function getPersistedHandoverPostCompletionFollowUpDisplay(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail) {
+  if (!handoverCase.postCompletionFollowUp) {
+    return null;
+  }
+
+  const statusTone: "success" | "warning" = handoverCase.postCompletionFollowUp.status === "resolved" ? "success" : "warning";
+
+  return {
+    dueAt: new Date(handoverCase.postCompletionFollowUp.dueAt).toLocaleString(locale),
+    dueAtInput: handoverCase.postCompletionFollowUp.dueAt.slice(0, 16),
+    followUpId: handoverCase.postCompletionFollowUp.followUpId,
+    ownerName: handoverCase.postCompletionFollowUp.ownerName,
+    resolutionSummary: handoverCase.postCompletionFollowUp.resolutionSummary,
+    resolvedAt: handoverCase.postCompletionFollowUp.resolvedAt
+      ? new Date(handoverCase.postCompletionFollowUp.resolvedAt).toLocaleString(locale)
+      : null,
+    status: handoverCase.postCompletionFollowUp.status,
+    statusLabel: getHandoverPostCompletionFollowUpStatusLabel(locale, handoverCase.postCompletionFollowUp.status),
+    statusTone,
+    summary: handoverCase.postCompletionFollowUp.summary,
+    updatedAt: new Date(handoverCase.postCompletionFollowUp.updatedAt).toLocaleString(locale)
+  };
+}
+
 export function getPersistedHandoverStatusLabel(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail | PersistedCaseDetail["handoverCase"]) {
   if (!handoverCase) {
     return null;
@@ -294,6 +334,18 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
         detail: "تم إغلاق يوم التسليم بملخص إتمام مضبوط بعد اكتمال التنفيذ الميداني.",
         title: "إتمام التسليم"
       },
+      handover_post_completion_follow_up_opened: {
+        detail: "تم فتح متابعة ما بعد التسليم مع مالك وموعد واضحين على السجل المكتمل.",
+        title: "فتح متابعة ما بعد التسليم"
+      },
+      handover_post_completion_follow_up_resolved: {
+        detail: "تم إغلاق متابعة ما بعد التسليم بملخص حل واضح على السجل الحي.",
+        title: "إغلاق متابعة ما بعد التسليم"
+      },
+      handover_review_saved: {
+        detail: "تم حفظ مراجعة المدير بعد التسليم وتحديد ما إذا كانت المتابعة اللاحقة مطلوبة.",
+        title: "حفظ مراجعة ما بعد التسليم"
+      },
       handover_customer_delivery_prepared: {
         detail: "تم تجهيز تحديث العميل المعتمد كرسالة جاهزة للإرسال لاحقاً من دون التواصل مع العميل بعد.",
         title: "تجهيز الإرسال"
@@ -367,6 +419,18 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
       handover_completed: {
         detail: "The handover day was closed with a controlled completion summary after field execution was finished.",
         title: "Handover completed"
+      },
+      handover_post_completion_follow_up_opened: {
+        detail: "A post-handover follow-up boundary was opened with an explicit owner and due time on the completed record.",
+        title: "Post-handover follow-up opened"
+      },
+      handover_post_completion_follow_up_resolved: {
+        detail: "The post-handover follow-up was closed with a clear resolution summary on the live record.",
+        title: "Post-handover follow-up resolved"
+      },
+      handover_review_saved: {
+        detail: "The manager review was saved after completion and recorded whether aftercare follow-up is required.",
+        title: "Post-handover review saved"
       },
       handover_blocker_logged: {
         detail: "A live execution blocker was attached to the scheduled handover record to keep snag or field risk visible.",
@@ -449,6 +513,18 @@ function describeHandoverAuditEvent(
         detail: "تم إغلاق يوم التسليم بملخص إتمام مضبوط وربطه بالسجل الحي.",
         title: "إتمام التسليم"
       },
+      handover_post_completion_follow_up_opened: {
+        detail: "تم فتح حد متابعة ما بعد التسليم على السجل المكتمل مع تعيين مالك وموعد واضحين.",
+        title: "فتح متابعة ما بعد التسليم"
+      },
+      handover_post_completion_follow_up_resolved: {
+        detail: "تم إغلاق متابعة ما بعد التسليم بملخص حل واضح.",
+        title: "إغلاق متابعة ما بعد التسليم"
+      },
+      handover_review_saved: {
+        detail: "تم حفظ مراجعة المدير بعد التسليم وتحديد حاجة الحالة إلى متابعة لاحقة.",
+        title: "حفظ مراجعة ما بعد التسليم"
+      },
       handover_blocker_logged: {
         detail: "تم تسجيل عائق تنفيذ حي لإبقاء المخاطر الميدانية أو الـ snag ظاهرة قبل يوم التسليم.",
         title: "تسجيل عائق تنفيذ"
@@ -506,6 +582,18 @@ function describeHandoverAuditEvent(
       handover_execution_started: {
         detail: "The scheduled record was promoted into a live handover-day execution state.",
         title: "Execution started"
+      },
+      handover_post_completion_follow_up_opened: {
+        detail: "A post-handover follow-up boundary was opened on the completed record with explicit ownership and due time.",
+        title: "Post-handover follow-up opened"
+      },
+      handover_post_completion_follow_up_resolved: {
+        detail: "The post-handover follow-up was resolved with a clear resolution summary.",
+        title: "Post-handover follow-up resolved"
+      },
+      handover_review_saved: {
+        detail: "The manager review was recorded after completion and marked whether aftercare follow-up is required.",
+        title: "Post-handover review saved"
       },
       handover_customer_delivery_prepared: {
         detail: "The approved appointment-confirmation update was prepared for later dispatch without contacting the customer yet.",

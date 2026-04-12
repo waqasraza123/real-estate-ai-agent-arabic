@@ -14,6 +14,9 @@ import { HandoverCustomerUpdateDeliveryForm } from "@/components/handover-custom
 import { HandoverCustomerUpdateDispatchReadyForm } from "@/components/handover-customer-update-dispatch-ready-form";
 import { HandoverExecutionStartForm } from "@/components/handover-execution-start-form";
 import { HandoverMilestoneForm } from "@/components/handover-milestone-form";
+import { HandoverPostCompletionFollowUpForm } from "@/components/handover-post-completion-follow-up-form";
+import { HandoverPostCompletionFollowUpResolutionForm } from "@/components/handover-post-completion-follow-up-resolution-form";
+import { HandoverReviewForm } from "@/components/handover-review-form";
 import { HandoverTaskStatusForm } from "@/components/handover-task-status-form";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
@@ -25,6 +28,8 @@ import {
   getPersistedHandoverBlockerDisplay,
   getPersistedHandoverCustomerUpdateDisplay,
   getPersistedHandoverMilestoneDisplay,
+  getPersistedHandoverPostCompletionFollowUpDisplay,
+  getPersistedHandoverReviewDisplay,
   buildPersistedHandoverTimeline,
   getPersistedHandoverDisplay,
   getPersistedHandoverStatusLabel
@@ -47,6 +52,8 @@ export default async function HandoverPage(props: PageProps) {
     const taskItems = getPersistedHandoverDisplay(locale, persistedHandoverCase);
     const milestoneItems = getPersistedHandoverMilestoneDisplay(locale, persistedHandoverCase);
     const customerUpdateItems = getPersistedHandoverCustomerUpdateDisplay(locale, persistedHandoverCase);
+    const reviewItem = getPersistedHandoverReviewDisplay(locale, persistedHandoverCase);
+    const postCompletionFollowUpItem = getPersistedHandoverPostCompletionFollowUpDisplay(locale, persistedHandoverCase);
     const appointmentHoldMilestone = milestoneItems.find((milestone) => milestone.type === "handover_appointment_hold");
     const appointmentConfirmationUpdate = customerUpdateItems.find((customerUpdate) => customerUpdate.type === "appointment_confirmation");
 
@@ -191,6 +198,111 @@ export default async function HandoverPage(props: PageProps) {
                 returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
                 status={persistedHandoverCase.status}
               />
+            </div>
+          </Panel>
+        </div>
+
+        <div className="two-column-grid">
+          <Panel title={locale === "ar" ? "مراجعة ما بعد التسليم" : "Post-handover review"}>
+            <div className="page-stack">
+              <p className="panel-summary">
+                {locale === "ar"
+                  ? "بعد اكتمال يوم التسليم، احفظ مراجعة المدير وحدد ما إذا كانت الحالة تحتاج إلى متابعة ما بعد التسليم."
+                  : "After the handover day is complete, save the manager review and decide whether the case needs post-handover follow-up."}
+              </p>
+              {reviewItem ? (
+                <div className="detail-grid">
+                  <div>
+                    <p className="detail-label">{locale === "ar" ? "النتيجة الحالية" : "Current outcome"}</p>
+                    <p>{reviewItem.outcomeLabel}</p>
+                  </div>
+                  <div>
+                    <p className="detail-label">{locale === "ar" ? "آخر تحديث" : "Last updated"}</p>
+                    <p>{reviewItem.updatedAt}</p>
+                  </div>
+                </div>
+              ) : null}
+              <HandoverReviewForm
+                handoverCaseId={persistedHandoverCase.handoverCaseId}
+                locale={locale}
+                outcome={reviewItem?.outcome ?? "accepted"}
+                returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                summary={reviewItem?.summary ?? ""}
+              />
+            </div>
+          </Panel>
+
+          <Panel title={locale === "ar" ? "متابعة ما بعد التسليم" : "Post-handover follow-up"}>
+            <div className="page-stack">
+              <p className="panel-summary">
+                {locale === "ar"
+                  ? "استخدم هذا الحد إذا كشفت المراجعة المكتملة عن عنصر متابعة لاحق بعد إغلاق يوم التسليم."
+                  : "Use this boundary when the completed review reveals an aftercare item that must stay visible after handover closure."}
+              </p>
+              {postCompletionFollowUpItem ? (
+                <div className="page-stack">
+                  <div className="detail-grid">
+                    <div>
+                      <p className="detail-label">{locale === "ar" ? "الحالة" : "Status"}</p>
+                      <StatusBadge tone={postCompletionFollowUpItem.statusTone}>{postCompletionFollowUpItem.statusLabel}</StatusBadge>
+                    </div>
+                    <div>
+                      <p className="detail-label">{locale === "ar" ? "الموعد" : "Due time"}</p>
+                      <p>{postCompletionFollowUpItem.dueAt}</p>
+                    </div>
+                    <div>
+                      <p className="detail-label">{locale === "ar" ? "المالك" : "Owner"}</p>
+                      <p>{postCompletionFollowUpItem.ownerName}</p>
+                    </div>
+                    <div>
+                      <p className="detail-label">{locale === "ar" ? "آخر تحديث" : "Last updated"}</p>
+                      <p>{postCompletionFollowUpItem.updatedAt}</p>
+                    </div>
+                  </div>
+                  <p>{postCompletionFollowUpItem.summary}</p>
+                  {postCompletionFollowUpItem.resolutionSummary ? (
+                    <div className="detail-grid">
+                      <div>
+                        <p className="detail-label">{locale === "ar" ? "ملخص الحل" : "Resolution summary"}</p>
+                        <p>{postCompletionFollowUpItem.resolutionSummary}</p>
+                      </div>
+                      <div>
+                        <p className="detail-label">{locale === "ar" ? "أُغلقت في" : "Resolved at"}</p>
+                        <p>{postCompletionFollowUpItem.resolvedAt}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {reviewItem?.outcome === "follow_up_required" ? (
+                <>
+                  <HandoverPostCompletionFollowUpForm
+                    dueAt={postCompletionFollowUpItem?.dueAtInput ?? ""}
+                    handoverCaseId={persistedHandoverCase.handoverCaseId}
+                    locale={locale}
+                    ownerName={postCompletionFollowUpItem?.ownerName ?? persistedHandoverCase.ownerName}
+                    returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                    status={postCompletionFollowUpItem?.status ?? "open"}
+                    summary={postCompletionFollowUpItem?.summary ?? ""}
+                  />
+                  {postCompletionFollowUpItem ? (
+                    <HandoverPostCompletionFollowUpResolutionForm
+                      followUpId={postCompletionFollowUpItem.followUpId}
+                      handoverCaseId={persistedHandoverCase.handoverCaseId}
+                      locale={locale}
+                      resolutionSummary={postCompletionFollowUpItem.resolutionSummary ?? ""}
+                      returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                      status={postCompletionFollowUpItem.status}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <p className="panel-summary">
+                  {locale === "ar"
+                    ? "تظهر متابعة ما بعد التسليم بعد حفظ مراجعة تطلب المتابعة على سجل مكتمل."
+                    : "Post-handover follow-up opens after a saved review that requires follow-up on a completed record."}
+                </p>
+              )}
             </div>
           </Panel>
         </div>

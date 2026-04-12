@@ -3,6 +3,7 @@ import type {
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
   CreateHandoverBlockerInput,
+  CreateHandoverPostCompletionFollowUpInput,
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
@@ -14,6 +15,8 @@ import type {
   PersistedCaseSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
+  ResolveHandoverPostCompletionFollowUpInput,
+  SaveHandoverReviewInput,
   ScheduleVisitInput,
   StartHandoverExecutionInput,
   UpdateAutomationStatusInput,
@@ -179,6 +182,34 @@ export async function startHandoverExecution(handoverCaseId: string, input: Star
 
 export async function completeHandover(handoverCaseId: string, input: CompleteHandoverInput) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/completion`, {
+    method: "PATCH",
+    payload: input
+  });
+}
+
+export async function saveHandoverReview(handoverCaseId: string, input: SaveHandoverReviewInput) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/review`, {
+    method: "PATCH",
+    payload: input
+  });
+}
+
+export async function createHandoverPostCompletionFollowUp(
+  handoverCaseId: string,
+  input: CreateHandoverPostCompletionFollowUpInput
+) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up`, {
+    method: "PATCH",
+    payload: input
+  });
+}
+
+export async function resolveHandoverPostCompletionFollowUp(
+  handoverCaseId: string,
+  followUpId: string,
+  input: ResolveHandoverPostCompletionFollowUpInput
+) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up/${followUpId}`, {
     method: "PATCH",
     payload: input
   });
