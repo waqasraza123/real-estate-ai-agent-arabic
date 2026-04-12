@@ -58,7 +58,7 @@ describe("lead capture api", () => {
     expect(detailResponse.json().handoverCase).toBeNull();
   });
 
-  it("promotes a document-complete case into persisted handover intake and updates readiness tasks", async () => {
+  it("promotes a document-complete case into persisted handover intake with milestone planning and customer update approval", async () => {
     const createResponse = await app.inject({
       method: "POST",
       payload: {
@@ -134,8 +134,12 @@ describe("lead capture api", () => {
 
     expect(handoverDetailResponse.statusCode).toBe(200);
     expect(handoverDetailResponse.json().tasks).toHaveLength(3);
+    expect(handoverDetailResponse.json().milestones).toHaveLength(3);
+    expect(handoverDetailResponse.json().customerUpdates).toHaveLength(3);
 
     const firstTaskId = handoverDetailResponse.json().tasks[0]?.taskId;
+    const readinessMilestoneId = handoverDetailResponse.json().milestones[0]?.milestoneId;
+    const readinessCustomerUpdateId = handoverDetailResponse.json().customerUpdates[0]?.customerUpdateId;
 
     const taskUpdateResponse = await app.inject({
       method: "PATCH",
@@ -148,6 +152,52 @@ describe("lead capture api", () => {
     expect(taskUpdateResponse.statusCode).toBe(200);
     expect(taskUpdateResponse.json().status).toBe("internal_tasks_open");
     expect(taskUpdateResponse.json().tasks[0]?.status).toBe("blocked");
+
+    const earlyCustomerApprovalResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        status: "approved"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${readinessCustomerUpdateId}`
+    });
+
+    expect(earlyCustomerApprovalResponse.statusCode).toBe(409);
+    expect(earlyCustomerApprovalResponse.json().error).toBe("handover_customer_update_not_ready");
+
+    const milestoneUpdateResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        ownerName: "Customer Care Desk",
+        status: "ready",
+        targetAt: "2026-04-18T09:00:00.000Z"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/milestones/${readinessMilestoneId}`
+    });
+
+    expect(milestoneUpdateResponse.statusCode).toBe(200);
+    expect(
+      milestoneUpdateResponse.json().milestones.find((milestone: { milestoneId: string }) => milestone.milestoneId === readinessMilestoneId)?.status
+    ).toBe("ready");
+    expect(
+      milestoneUpdateResponse.json().customerUpdates.find(
+        (customerUpdate: { customerUpdateId: string }) => customerUpdate.customerUpdateId === readinessCustomerUpdateId
+      )?.status
+    ).toBe("ready_for_approval");
+
+    const customerApprovalResponse = await app.inject({
+      method: "PATCH",
+      payload: {
+        status: "approved"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${readinessCustomerUpdateId}`
+    });
+
+    expect(customerApprovalResponse.statusCode).toBe(200);
+    expect(
+      customerApprovalResponse.json().customerUpdates.find(
+        (customerUpdate: { customerUpdateId: string }) => customerUpdate.customerUpdateId === readinessCustomerUpdateId
+      )?.status
+    ).toBe("approved");
 
     const refreshedCaseResponse = await app.inject({
       method: "GET",

@@ -12,7 +12,7 @@
 - Shared packages implemented are `domain`, `i18n`, `ui`, `testing`, `contracts`, `database`, and `workflows`
 - Root tooling now includes `pnpm` workspaces, `turbo`, TypeScript base config, ESLint, Vitest, Playwright, and a versioned pre-push safety system
 - The web application is now a hybrid Next.js App Router shell: premium seeded Phase 1 surfaces remain available, while the lead intake, lead detail, scheduling, documents, and manager routes can use persisted alpha data from `apps/api`
-- The API application is a Fastify service with schema-validated website lead intake, qualification, visit scheduling, follow-up-plan mutation, automation control, document state mutation, manager-readable case list and case detail endpoints, and persisted handover-intake plus readiness-task endpoints
+- The API application is a Fastify service with schema-validated website lead intake, qualification, visit scheduling, follow-up-plan mutation, automation control, document state mutation, manager-readable case list and case detail endpoints, and persisted handover intake, milestone-planning, customer-update-boundary, and readiness-task endpoints
 - The worker application is a narrow background follow-up processor that polls the local alpha queue, opens overdue manager interventions, and respects per-case automation pause or resume state
 - The current persisted alpha store uses Drizzle over local `PGlite` for safe Phase 2 and early Phase 3 development without introducing remote infrastructure
 - `integrations`, `analytics`, and `config` remain planned and unimplemented
@@ -36,6 +36,7 @@
 - Early Phase 3 is now live locally through persisted document request tracking, queue-backed follow-up interventions, automation pause or resume controls, and manager follow-up reset actions
 - Phase 4: handover command center
 - The first persisted Phase 4 intake boundary is now live locally: manager-approved promotion from document-complete cases into handover intake with readiness-task tracking
+- The next persisted Phase 4 planning boundary is now live locally: manager-visible milestone planning and approval-only customer-update readiness states on each handover record
 - Phase 5: hardening and enterprise controls
 
 ## Completed Major Slices
@@ -53,6 +54,7 @@
 - Added the first persisted document workflow slice with seeded document requirements, status updates, audit events, and live document-center rendering
 - Added `apps/worker` plus queue-backed overdue follow-up processing, persisted manager interventions, automation pause or resume controls, and manager follow-up reset actions
 - Added the first persisted handover slice with manager-approved intake creation, seeded readiness tasks, handover audit events, and live handover-task status updates
+- Added the next persisted handover slice with milestone planning, customer-update approval boundaries, linked audit events, and live handover milestone/customer-boundary controls
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -70,7 +72,7 @@
 - Website lead intake is the first persistence-backed workflow boundary before qualification, scheduling, or follow-up automation are introduced
 - The first background-automation slice uses a local `PGlite` queue model in `apps/worker` before Redis or BullMQ are introduced
 - The web app intentionally falls back to seeded demo data when `apps/api` is unavailable so the premium shell remains buildable and demo-safe
-- The first persisted handover boundary starts only from document-complete cases and stops at intake plus readiness tracking; milestone automation remains deferred
+- The first persisted handover boundary starts only from document-complete cases and now includes milestone planning plus approval-only customer-update readiness, while outbound sending and completion automation remain deferred
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
 - Normal `git push` runs `scripts/verify-push.sh` via `.githooks/pre-push`
@@ -86,7 +88,7 @@
 - Deeper qualification policy logic and approval boundaries beyond the current structured alpha form
 - Redis or BullMQ-backed durable job orchestration beyond the current local alpha worker
 - Leasing-specific rejection reasons and policy rules beyond the current shared document-request model
-- Handover milestone scheduling, customer communication, snag tracking, and completion workflows beyond the current intake plus readiness-task boundary
+- Real outbound customer communication, snag tracking, appointment execution, and completion workflows beyond the current handover planning and approval boundary
 
 ## Risks / Watchouts
 - Arabic UX can degrade quickly if RTL support is not designed from the foundation
@@ -97,7 +99,7 @@
 - The web shell must not drift into mixed fixture and persisted state without an explicit boundary during Phase 2
 - The local `PGlite` alpha store is a development convenience and must not be mistaken for the long-term production deployment model
 - The current local queue model is intentionally transitional and must not be mistaken for the long-term distributed worker architecture
-- Phase 4 should not be overextended prematurely; the current handover slice is intentionally limited to intake and readiness tracking, not the full milestone engine
+- Phase 4 should not be overextended prematurely; the current handover slice is intentionally limited to intake, milestone planning, and approval-only customer boundaries, not full outbound or completion automation
 
 ## Standard Verification
 - `git status --short`

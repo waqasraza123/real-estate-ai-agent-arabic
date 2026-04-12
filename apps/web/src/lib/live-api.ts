@@ -1,4 +1,5 @@
 import type {
+  ApproveHandoverCustomerUpdateInput,
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
@@ -10,6 +11,7 @@ import type {
   ScheduleVisitInput,
   UpdateAutomationStatusInput,
   UpdateDocumentRequestInput,
+  UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
 
@@ -140,6 +142,31 @@ export async function updateHandoverTask(handoverCaseId: string, handoverTaskId:
     method: "PATCH",
     payload: input
   });
+}
+
+export async function updateHandoverMilestone(
+  handoverCaseId: string,
+  milestoneId: string,
+  input: UpdateHandoverMilestoneInput
+) {
+  return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/milestones/${milestoneId}`, {
+    method: "PATCH",
+    payload: input
+  });
+}
+
+export async function approveHandoverCustomerUpdate(
+  handoverCaseId: string,
+  customerUpdateId: string,
+  input: ApproveHandoverCustomerUpdateInput
+) {
+  return requestJson<PersistedHandoverCaseDetail>(
+    `/v1/handover-cases/${handoverCaseId}/customer-updates/${customerUpdateId}`,
+    {
+      method: "PATCH",
+      payload: input
+    }
+  );
 }
 
 export function getWebApiBaseUrl() {

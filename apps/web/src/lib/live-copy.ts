@@ -5,6 +5,10 @@ import type {
   DocumentRequestType,
   FollowUpStatus,
   HandoverCaseStatus,
+  HandoverCustomerUpdateStatus,
+  HandoverCustomerUpdateType,
+  HandoverMilestoneStatus,
+  HandoverMilestoneType,
   HandoverTaskStatus,
   HandoverTaskType,
   ManagerInterventionSeverity,
@@ -198,6 +202,79 @@ export function getHandoverIntakeCopy(locale: SupportedLocale) {
   };
 }
 
+export function getHandoverMilestoneCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "حفظ المحطة",
+      ownerName: "مالك المحطة",
+      status: "الحالة",
+      summary: "خطط محطات التسليم التالية وحدد جاهزية كل محطة قبل اعتماد أي تواصل مع العميل.",
+      targetAt: "التاريخ المستهدف",
+      title: "خطة محطات التسليم"
+    };
+  }
+
+  return {
+    action: "Save milestone",
+    ownerName: "Milestone owner",
+    status: "Status",
+    summary: "Plan the next handover milestones and make each checkpoint explicit before any customer-facing update is approved.",
+    targetAt: "Target date",
+    title: "Handover milestone plan"
+  };
+}
+
+export function getHandoverMilestoneStatusLabel(locale: SupportedLocale, status: HandoverMilestoneStatus) {
+  const labels = {
+    ar: {
+      blocked: "معطلة",
+      planned: "مخططة",
+      ready: "جاهزة"
+    },
+    en: {
+      blocked: "Blocked",
+      planned: "Planned",
+      ready: "Ready"
+    }
+  } as const;
+
+  return labels[locale][status];
+}
+
+export function getHandoverMilestoneTypeDetail(locale: SupportedLocale, type: HandoverMilestoneType) {
+  const details = {
+    ar: {
+      customer_scheduling_window: "حدد النافذة الداخلية التي يصبح فيها التنسيق مع العميل آمناً وواضحاً.",
+      handover_appointment_hold: "احتفظ بمحطة داخلية لموعد التسليم المتوقع قبل أي تأكيد نهائي.",
+      readiness_gate: "أغلق مراجعة الجاهزية الأولية قبل التفكير في أي تواصل خارجي."
+    },
+    en: {
+      customer_scheduling_window: "Plan the internal window when customer scheduling becomes safe and operationally clear.",
+      handover_appointment_hold: "Hold the expected handover appointment checkpoint internally before any final confirmation.",
+      readiness_gate: "Close the initial readiness review before any customer-facing communication is approved."
+    }
+  } as const;
+
+  return details[locale][type];
+}
+
+export function getHandoverMilestoneTypeLabel(locale: SupportedLocale, type: HandoverMilestoneType) {
+  const labels = {
+    ar: {
+      customer_scheduling_window: "نافذة جدولة العميل",
+      handover_appointment_hold: "حجز موعد التسليم داخلياً",
+      readiness_gate: "بوابة الجاهزية الأولى"
+    },
+    en: {
+      customer_scheduling_window: "Customer scheduling window",
+      handover_appointment_hold: "Internal appointment hold",
+      readiness_gate: "Initial readiness gate"
+    }
+  } as const;
+
+  return labels[locale][type];
+}
+
 export function getHandoverTaskStatusLabel(locale: SupportedLocale, status: HandoverTaskStatus) {
   const labels = {
     ar: {
@@ -213,6 +290,73 @@ export function getHandoverTaskStatusLabel(locale: SupportedLocale, status: Hand
   } as const;
 
   return labels[locale][status];
+}
+
+export function getHandoverCustomerUpdateApprovalCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "اعتماد الحد",
+      helper: "الاعتماد هنا يفتح التحديث كرسالة مسموح بها لاحقاً، لكنه لا يرسل أي شيء إلى العميل.",
+      title: "حدود تواصل العميل"
+    };
+  }
+
+  return {
+    action: "Approve boundary",
+    helper: "Approval here only marks the update as allowed for later communication. It does not send anything to the customer.",
+    title: "Customer-update boundaries"
+  };
+}
+
+export function getHandoverCustomerUpdateStatusLabel(locale: SupportedLocale, status: HandoverCustomerUpdateStatus) {
+  const labels = {
+    ar: {
+      approved: "معتمد",
+      blocked: "محجوب",
+      ready_for_approval: "جاهز للاعتماد"
+    },
+    en: {
+      approved: "Approved",
+      blocked: "Blocked",
+      ready_for_approval: "Ready for approval"
+    }
+  } as const;
+
+  return labels[locale][status];
+}
+
+export function getHandoverCustomerUpdateTypeDetail(locale: SupportedLocale, type: HandoverCustomerUpdateType) {
+  const details = {
+    ar: {
+      appointment_confirmation: "حد داخلي لتأكيد موعد التسليم عندما تصبح المحطة النهائية جاهزة.",
+      readiness_update: "حد مبكر لمشاركة تقدم الجاهزية مع العميل عند اكتمال المراجعة الأولية.",
+      scheduling_invite: "حد واضح لتوجيه دعوة جدولة التسليم عندما تجهز النافذة التشغيلية."
+    },
+    en: {
+      appointment_confirmation: "Internal boundary for confirming the handover appointment once the final checkpoint is ready.",
+      readiness_update: "Early boundary for sharing readiness progress with the customer after the initial gate is ready.",
+      scheduling_invite: "Clear boundary for offering customer scheduling once the operational window is ready."
+    }
+  } as const;
+
+  return details[locale][type];
+}
+
+export function getHandoverCustomerUpdateTypeLabel(locale: SupportedLocale, type: HandoverCustomerUpdateType) {
+  const labels = {
+    ar: {
+      appointment_confirmation: "تأكيد موعد التسليم",
+      readiness_update: "تحديث الجاهزية الأولي",
+      scheduling_invite: "دعوة جدولة التسليم"
+    },
+    en: {
+      appointment_confirmation: "Appointment confirmation",
+      readiness_update: "Initial readiness update",
+      scheduling_invite: "Scheduling invite"
+    }
+  } as const;
+
+  return labels[locale][type];
 }
 
 export function getHandoverTaskTypeDetail(locale: SupportedLocale, type: HandoverTaskType) {

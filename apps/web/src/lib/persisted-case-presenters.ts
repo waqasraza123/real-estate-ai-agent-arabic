@@ -15,6 +15,12 @@ import {
   getDocumentRequestTypeLabel,
   getFollowUpStatusLabel,
   getHandoverCaseStatusLabel,
+  getHandoverCustomerUpdateStatusLabel,
+  getHandoverCustomerUpdateTypeDetail,
+  getHandoverCustomerUpdateTypeLabel,
+  getHandoverMilestoneStatusLabel,
+  getHandoverMilestoneTypeDetail,
+  getHandoverMilestoneTypeLabel,
   getHandoverTaskStatusLabel,
   getHandoverTaskTypeDetail,
   getHandoverTaskTypeLabel,
@@ -127,6 +133,35 @@ export function getPersistedHandoverDisplay(locale: SupportedLocale, handoverCas
     type: task.type,
     updatedAt: new Date(task.updatedAt).toLocaleString(locale),
     summary: getHandoverTaskTypeDetail(locale, task.type)
+  }));
+}
+
+export function getPersistedHandoverMilestoneDisplay(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail) {
+  return handoverCase.milestones.map((milestone) => ({
+    milestoneId: milestone.milestoneId,
+    ownerName: milestone.ownerName,
+    status: milestone.status,
+    statusLabel: getHandoverMilestoneStatusLabel(locale, milestone.status),
+    statusTone: getHandoverMilestoneTone(milestone.status),
+    summary: getHandoverMilestoneTypeDetail(locale, milestone.type),
+    targetAt: new Date(milestone.targetAt).toLocaleString(locale),
+    targetAtInput: milestone.targetAt.slice(0, 16),
+    title: getHandoverMilestoneTypeLabel(locale, milestone.type),
+    type: milestone.type,
+    updatedAt: new Date(milestone.updatedAt).toLocaleString(locale)
+  }));
+}
+
+export function getPersistedHandoverCustomerUpdateDisplay(locale: SupportedLocale, handoverCase: PersistedHandoverCaseDetail) {
+  return handoverCase.customerUpdates.map((customerUpdate) => ({
+    customerUpdateId: customerUpdate.customerUpdateId,
+    status: customerUpdate.status,
+    statusLabel: getHandoverCustomerUpdateStatusLabel(locale, customerUpdate.status),
+    statusTone: getHandoverCustomerUpdateTone(customerUpdate.status),
+    summary: getHandoverCustomerUpdateTypeDetail(locale, customerUpdate.type),
+    title: getHandoverCustomerUpdateTypeLabel(locale, customerUpdate.type),
+    type: customerUpdate.type,
+    updatedAt: new Date(customerUpdate.updatedAt).toLocaleString(locale)
   }));
 }
 
@@ -243,6 +278,14 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
         detail: "The case was approved into handover intake and the initial readiness checklist was opened.",
         title: "Handover intake started"
       },
+      handover_customer_update_approved: {
+        detail: "A customer-facing handover boundary was approved without sending any live outbound message.",
+        title: "Customer boundary approved"
+      },
+      handover_milestone_updated: {
+        detail: "A milestone target or state changed, and the linked customer-update boundary was recalculated.",
+        title: "Milestone plan updated"
+      },
       handover_task_updated: {
         detail: "One of the handover readiness items changed state and updated the linked case timeline.",
         title: "Handover task updated"
@@ -283,6 +326,14 @@ function describeHandoverAuditEvent(
       handover_intake_created: {
         detail: `تم إنشاء سجل تسليم حي للحالة وربطه بالمسؤول ${handoverCase.ownerName}.`,
         title: "إنشاء سجل التسليم"
+      },
+      handover_customer_update_approved: {
+        detail: "تم اعتماد حد تواصل مخصص للعميل دون إرسال أي رسالة فعلية.",
+        title: "اعتماد حد تواصل"
+      },
+      handover_milestone_updated: {
+        detail: "تم تحديث محطة داخلية وإعادة احتساب حالة حد التواصل المرتبط بها.",
+        title: "تحديث محطة التسليم"
       },
       handover_task_updated: {
         detail: "تم تغيير حالة أحد عناصر الجاهزية الداخلية.",
@@ -334,6 +385,34 @@ function getDocumentTone(status: PersistedDocumentRequest["status"]): "success" 
 
 function getHandoverTaskTone(status: PersistedHandoverCaseDetail["tasks"][number]["status"]): "success" | "critical" | "warning" {
   if (status === "complete") {
+    return "success";
+  }
+
+  if (status === "blocked") {
+    return "critical";
+  }
+
+  return "warning";
+}
+
+function getHandoverMilestoneTone(
+  status: PersistedHandoverCaseDetail["milestones"][number]["status"]
+): "success" | "critical" | "warning" {
+  if (status === "ready") {
+    return "success";
+  }
+
+  if (status === "blocked") {
+    return "critical";
+  }
+
+  return "warning";
+}
+
+function getHandoverCustomerUpdateTone(
+  status: PersistedHandoverCaseDetail["customerUpdates"][number]["status"]
+): "success" | "critical" | "warning" {
+  if (status === "approved") {
     return "success";
   }
 

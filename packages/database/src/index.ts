@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { PGlite } from "@electric-sql/pglite";
 import type {
+  ApproveHandoverCustomerUpdateInput,
   AutomationStatus,
   CaseStage,
   CreateHandoverIntakeInput,
@@ -11,6 +12,10 @@ import type {
   DocumentRequestType,
   FollowUpStatus,
   HandoverCaseStatus,
+  HandoverCustomerUpdateStatus,
+  HandoverCustomerUpdateType,
+  HandoverMilestoneStatus,
+  HandoverMilestoneType,
   HandoverTaskStatus,
   HandoverTaskType,
   ManageCaseFollowUpInput,
@@ -21,6 +26,8 @@ import type {
   PersistedCaseSummary,
   PersistedDocumentRequest,
   PersistedHandoverCaseDetail,
+  PersistedHandoverCustomerUpdate,
+  PersistedHandoverMilestone,
   PersistedHandoverTask,
   PersistedLinkedHandoverCase,
   PersistedManagerIntervention,
@@ -28,6 +35,7 @@ import type {
   QualificationReadiness,
   ScheduleVisitInput,
   SupportedLocale,
+  UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -37,6 +45,16 @@ import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 const defaultOwnerName = "Revenue Ops Queue";
 const defaultDocumentTypes: DocumentRequestType[] = ["government_id", "proof_of_funds", "employment_letter"];
 const defaultHandoverTaskTypes: HandoverTaskType[] = ["unit_readiness_review", "customer_document_pack", "access_preparation"];
+const defaultHandoverMilestoneTypes: HandoverMilestoneType[] = [
+  "readiness_gate",
+  "customer_scheduling_window",
+  "handover_appointment_hold"
+];
+const defaultHandoverCustomerUpdateTypes: HandoverCustomerUpdateType[] = [
+  "readiness_update",
+  "scheduling_invite",
+  "appointment_confirmation"
+];
 const followUpWatchJobType = "follow_up_watch";
 
 const leads = pgTable("leads", {
@@ -122,6 +140,30 @@ const handoverTasks = pgTable("handover_tasks", {
     .references(() => handoverCases.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey(),
   ownerName: text("owner_name").notNull(),
+  status: text("status").notNull(),
+  type: text("type").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
+const handoverMilestones = pgTable("handover_milestones", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  handoverCaseId: uuid("handover_case_id")
+    .notNull()
+    .references(() => handoverCases.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey(),
+  ownerName: text("owner_name").notNull(),
+  status: text("status").notNull(),
+  targetAt: timestamp("target_at", { mode: "string", withTimezone: true }).notNull(),
+  type: text("type").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
+const handoverCustomerUpdates = pgTable("handover_customer_updates", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  handoverCaseId: uuid("handover_case_id")
+    .notNull()
+    .references(() => handoverCases.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey(),
   status: text("status").notNull(),
   type: text("type").notNull(),
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
@@ -222,6 +264,25 @@ export interface LeadCaptureStore {
       status: DocumentRequestStatus;
     }
   ): Promise<PersistedCaseDetail | null>;
+  updateHandoverCustomerUpdateStatus(
+    handoverCaseId: string,
+    customerUpdateId: string,
+    input: ApproveHandoverCustomerUpdateInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
+  updateHandoverMilestone(
+    handoverCaseId: string,
+    milestoneId: string,
+    input: UpdateHandoverMilestoneInput & {
+      nextAction: string;
+      nextActionDueAt: string;
+      nextCustomerUpdateStatus: HandoverCustomerUpdateStatus;
+      nextHandoverStatus: HandoverCaseStatus;
+    }
+  ): Promise<PersistedHandoverCaseDetail | null>;
   updateHandoverTaskStatus(
     handoverCaseId: string,
     handoverTaskId: string,
@@ -245,6 +306,8 @@ export async function createAlphaLeadCaptureStore(options?: {
       cases,
       documentRequests,
       handoverCases,
+      handoverCustomerUpdates,
+      handoverMilestones,
       handoverTasks,
       leads,
       managerInterventions,
@@ -330,6 +393,26 @@ export async function createAlphaLeadCaptureStore(options?: {
       updated_at timestamptz not null default now()
     );
 
+    create table if not exists handover_milestones (
+      id uuid primary key,
+      handover_case_id uuid not null references handover_cases(id) on delete cascade,
+      type text not null,
+      status text not null,
+      owner_name text not null,
+      target_at timestamptz not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create table if not exists handover_customer_updates (
+      id uuid primary key,
+      handover_case_id uuid not null references handover_cases(id) on delete cascade,
+      type text not null,
+      status text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
     create table if not exists manager_interventions (
       id uuid primary key,
       case_id uuid not null references cases(id) on delete cascade,
@@ -365,6 +448,8 @@ export async function createAlphaLeadCaptureStore(options?: {
     create index if not exists visits_case_id_idx on visits (case_id, scheduled_at desc);
     create index if not exists document_requests_case_id_idx on document_requests (case_id, created_at asc);
     create index if not exists handover_tasks_case_id_idx on handover_tasks (handover_case_id, due_at asc);
+    create index if not exists handover_milestones_case_id_idx on handover_milestones (handover_case_id, target_at asc);
+    create index if not exists handover_customer_updates_case_id_idx on handover_customer_updates (handover_case_id, created_at asc);
     create index if not exists audit_events_case_id_idx on audit_events (case_id, created_at asc);
     create index if not exists manager_interventions_case_id_idx on manager_interventions (case_id, created_at desc);
     create index if not exists manager_interventions_open_case_idx on manager_interventions (case_id, status);
@@ -399,7 +484,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [taskRecords, eventRecords] = await Promise.all([
+    const [taskRecords, milestoneRecords, customerUpdateRecords, eventRecords] = await Promise.all([
       db
         .select({
           createdAt: handoverTasks.createdAt,
@@ -413,6 +498,30 @@ export async function createAlphaLeadCaptureStore(options?: {
         .from(handoverTasks)
         .where(eq(handoverTasks.handoverCaseId, handoverCaseId))
         .orderBy(asc(handoverTasks.dueAt)),
+      db
+        .select({
+          createdAt: handoverMilestones.createdAt,
+          milestoneId: handoverMilestones.id,
+          ownerName: handoverMilestones.ownerName,
+          status: handoverMilestones.status,
+          targetAt: handoverMilestones.targetAt,
+          type: handoverMilestones.type,
+          updatedAt: handoverMilestones.updatedAt
+        })
+        .from(handoverMilestones)
+        .where(eq(handoverMilestones.handoverCaseId, handoverCaseId))
+        .orderBy(asc(handoverMilestones.targetAt)),
+      db
+        .select({
+          createdAt: handoverCustomerUpdates.createdAt,
+          customerUpdateId: handoverCustomerUpdates.id,
+          status: handoverCustomerUpdates.status,
+          type: handoverCustomerUpdates.type,
+          updatedAt: handoverCustomerUpdates.updatedAt
+        })
+        .from(handoverCustomerUpdates)
+        .where(eq(handoverCustomerUpdates.handoverCaseId, handoverCaseId))
+        .orderBy(asc(handoverCustomerUpdates.createdAt)),
       db
         .select({
           createdAt: auditEvents.createdAt,
@@ -432,8 +541,10 @@ export async function createAlphaLeadCaptureStore(options?: {
       })),
       caseId: baseRecord.caseId,
       createdAt: baseRecord.createdAt,
+      customerUpdates: customerUpdateRecords.map((customerUpdate) => hydrateHandoverCustomerUpdate(customerUpdate)),
       customerName: baseRecord.customerName,
       handoverCaseId: baseRecord.handoverCaseId,
+      milestones: milestoneRecords.map((milestone) => hydrateHandoverMilestone(milestone)),
       ownerName: baseRecord.ownerName,
       preferredLocale: toSupportedLocale(baseRecord.preferredLocale),
       projectInterest: baseRecord.projectInterest,
@@ -1209,6 +1320,30 @@ export async function createAlphaLeadCaptureStore(options?: {
           }))
         );
 
+        await transaction.insert(handoverMilestones).values(
+          defaultHandoverMilestoneTypes.map((milestoneType, index) => ({
+            createdAt: updatedAt,
+            handoverCaseId: createdHandoverCaseId,
+            id: randomUUID(),
+            ownerName: nextOwnerName,
+            status: "planned",
+            targetAt: createFutureTimestamp(updatedAt, (index + 1) * 24),
+            type: milestoneType,
+            updatedAt
+          }))
+        );
+
+        await transaction.insert(handoverCustomerUpdates).values(
+          defaultHandoverCustomerUpdateTypes.map((customerUpdateType) => ({
+            createdAt: updatedAt,
+            handoverCaseId: createdHandoverCaseId,
+            id: randomUUID(),
+            status: "blocked",
+            type: customerUpdateType,
+            updatedAt
+          }))
+        );
+
         await transaction
           .update(cases)
           .set({
@@ -1309,6 +1444,170 @@ export async function createAlphaLeadCaptureStore(options?: {
 
       return getPersistedCaseDetail(caseId);
     },
+    async updateHandoverCustomerUpdateStatus(handoverCaseId, customerUpdateId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const customerUpdate = handoverRecord.customerUpdates.find((item) => item.customerUpdateId === customerUpdateId);
+
+      if (!customerUpdate) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(handoverCustomerUpdates)
+          .set({
+            status: input.status,
+            updatedAt
+          })
+          .where(and(eq(handoverCustomerUpdates.handoverCaseId, handoverCaseId), eq(handoverCustomerUpdates.id, customerUpdateId)));
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_customer_update_approved",
+          id: randomUUID(),
+          payload: {
+            customerUpdateId,
+            handoverCaseId,
+            status: input.status,
+            type: customerUpdate.type
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
+    async updateHandoverMilestone(handoverCaseId, milestoneId, input) {
+      const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
+
+      if (!handoverRecord) {
+        return null;
+      }
+
+      const milestoneRecord = handoverRecord.milestones.find((milestone) => milestone.milestoneId === milestoneId);
+
+      if (!milestoneRecord) {
+        return null;
+      }
+
+      const caseRecord = await getPersistedCaseDetail(handoverRecord.caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const linkedCustomerUpdateType = mapMilestoneTypeToCustomerUpdateType(milestoneRecord.type);
+      const linkedCustomerUpdate = handoverRecord.customerUpdates.find((customerUpdate) => customerUpdate.type === linkedCustomerUpdateType);
+
+      if (!linkedCustomerUpdate) {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const nextOwnerName = input.ownerName ?? milestoneRecord.ownerName;
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(handoverMilestones)
+          .set({
+            ownerName: nextOwnerName,
+            status: input.status,
+            targetAt: input.targetAt,
+            updatedAt
+          })
+          .where(and(eq(handoverMilestones.handoverCaseId, handoverCaseId), eq(handoverMilestones.id, milestoneId)));
+
+        await transaction
+          .update(handoverCustomerUpdates)
+          .set({
+            status: input.nextCustomerUpdateStatus,
+            updatedAt
+          })
+          .where(and(eq(handoverCustomerUpdates.handoverCaseId, handoverCaseId), eq(handoverCustomerUpdates.id, linkedCustomerUpdate.customerUpdateId)));
+
+        await transaction
+          .update(handoverCases)
+          .set({
+            status: input.nextHandoverStatus,
+            updatedAt
+          })
+          .where(eq(handoverCases.id, handoverCaseId));
+
+        await transaction
+          .update(cases)
+          .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
+            stage: "handover_initiated",
+            updatedAt
+          })
+          .where(eq(cases.id, handoverRecord.caseId));
+
+        await transaction.insert(auditEvents).values({
+          caseId: handoverRecord.caseId,
+          createdAt: updatedAt,
+          eventType: "handover_milestone_updated",
+          id: randomUUID(),
+          payload: {
+            customerUpdateId: linkedCustomerUpdate.customerUpdateId,
+            customerUpdateStatus: input.nextCustomerUpdateStatus,
+            handoverCaseId,
+            milestoneId,
+            ownerName: nextOwnerName,
+            status: input.status,
+            targetAt: input.targetAt,
+            type: milestoneRecord.type
+          }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          caseId: handoverRecord.caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt
+        });
+      });
+
+      return getHandoverCaseDetail(handoverCaseId);
+    },
     async updateHandoverTaskStatus(handoverCaseId, handoverTaskId, input) {
       const handoverRecord = await getHandoverCaseDetail(handoverCaseId);
 
@@ -1403,25 +1702,43 @@ function deriveDocumentWorkflowNextAction(documentRequests: PersistedDocumentReq
   return locale === "ar" ? "متابعة المستندات المطلوبة مع العميل" : "Track the outstanding document requests with the prospect";
 }
 
-function deriveHandoverCaseStatus(tasks: PersistedHandoverTask[]): HandoverCaseStatus {
-  if (tasks.every((task) => task.status === "complete")) {
+function deriveHandoverCaseStatus(tasks: PersistedHandoverTask[], milestones: PersistedHandoverMilestone[]): HandoverCaseStatus {
+  const schedulingMilestone = milestones.find((milestone) => milestone.type === "customer_scheduling_window");
+
+  if (tasks.every((task) => task.status === "complete") && schedulingMilestone?.status === "ready") {
     return "customer_scheduling_ready";
   }
 
-  if (tasks.some((task) => task.status !== "open")) {
+  if (tasks.some((task) => task.status !== "open") || milestones.some((milestone) => milestone.status !== "planned")) {
     return "internal_tasks_open";
   }
 
   return "pending_readiness";
 }
 
-function getHandoverCaseNextAction(locale: SupportedLocale, status: HandoverCaseStatus, tasks: PersistedHandoverTask[]) {
-  if (status === "customer_scheduling_ready") {
-    return locale === "ar" ? "جدولة موعد التسليم مع العميل" : "Schedule the customer handover appointment";
+function getHandoverCaseNextAction(
+  locale: SupportedLocale,
+  status: HandoverCaseStatus,
+  tasks: PersistedHandoverTask[],
+  milestones: PersistedHandoverMilestone[],
+  customerUpdates: PersistedHandoverCustomerUpdate[]
+) {
+  if (customerUpdates.some((customerUpdate) => customerUpdate.status === "ready_for_approval")) {
+    return locale === "ar" ? "اعتماد التحديث التالي المخصص للعميل قبل الإرسال" : "Approve the next customer-facing update before it can be sent";
   }
 
-  if (tasks.some((task) => task.status === "blocked")) {
+  if (status === "customer_scheduling_ready") {
+    return locale === "ar"
+      ? "تجهيز حدود التواصل الخاصة بموعد التسليم مع العميل"
+      : "Prepare the customer scheduling communication boundary for handover";
+  }
+
+  if (tasks.some((task) => task.status === "blocked") || milestones.some((milestone) => milestone.status === "blocked")) {
     return locale === "ar" ? "معالجة عناصر الجاهزية المعطلة قبل تحديد الموعد" : "Resolve blocked readiness items before scheduling";
+  }
+
+  if (tasks.every((task) => task.status === "complete") && milestones.some((milestone) => milestone.status === "planned")) {
+    return locale === "ar" ? "تخطيط محطات التسليم التالية وحدود تواصل العميل" : "Plan the remaining handover milestones and customer-update boundaries";
   }
 
   if (status === "internal_tasks_open") {
@@ -1431,18 +1748,36 @@ function getHandoverCaseNextAction(locale: SupportedLocale, status: HandoverCase
   return locale === "ar" ? "بدء قائمة جاهزية التسليم مع الفريق الداخلي" : "Start the handover readiness checklist with the internal team";
 }
 
-function getHandoverCaseNextActionDueAt(status: HandoverCaseStatus, tasks: PersistedHandoverTask[]) {
+function getHandoverCaseNextActionDueAt(
+  status: HandoverCaseStatus,
+  tasks: PersistedHandoverTask[],
+  milestones: PersistedHandoverMilestone[],
+  customerUpdates: PersistedHandoverCustomerUpdate[]
+) {
   const blockedTask = tasks.find((task) => task.status === "blocked");
+  const blockedMilestone = milestones.find((milestone) => milestone.status === "blocked");
 
-  if (status === "customer_scheduling_ready") {
-    return createFutureTimestamp(new Date().toISOString(), 48);
+  if (customerUpdates.some((customerUpdate) => customerUpdate.status === "ready_for_approval")) {
+    return createFutureTimestamp(new Date().toISOString(), 6);
   }
 
-  if (blockedTask) {
+  if (status === "customer_scheduling_ready") {
+    return createFutureTimestamp(new Date().toISOString(), 24);
+  }
+
+  if (blockedTask || blockedMilestone) {
     return createFutureTimestamp(new Date().toISOString(), 8);
   }
 
   return createFutureTimestamp(new Date().toISOString(), 24);
+}
+
+function deriveCustomerUpdateStatusFromMilestone(status: HandoverMilestoneStatus): HandoverCustomerUpdateStatus {
+  if (status === "ready") {
+    return "ready_for_approval";
+  }
+
+  return "blocked";
 }
 
 function hydrateHandoverTask(value: {
@@ -1461,6 +1796,42 @@ function hydrateHandoverTask(value: {
     status: toHandoverTaskStatus(value.status),
     taskId: value.taskId,
     type: toHandoverTaskType(value.type),
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydrateHandoverMilestone(value: {
+  createdAt: string;
+  milestoneId: string;
+  ownerName: string;
+  status: string;
+  targetAt: string;
+  type: string;
+  updatedAt: string;
+}): PersistedHandoverMilestone {
+  return {
+    createdAt: value.createdAt,
+    milestoneId: value.milestoneId,
+    ownerName: value.ownerName,
+    status: toHandoverMilestoneStatus(value.status),
+    targetAt: value.targetAt,
+    type: toHandoverMilestoneType(value.type),
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydrateHandoverCustomerUpdate(value: {
+  createdAt: string;
+  customerUpdateId: string;
+  status: string;
+  type: string;
+  updatedAt: string;
+}): PersistedHandoverCustomerUpdate {
+  return {
+    createdAt: value.createdAt,
+    customerUpdateId: value.customerUpdateId,
+    status: toHandoverCustomerUpdateStatus(value.status),
+    type: toHandoverCustomerUpdateType(value.type),
     updatedAt: value.updatedAt
   };
 }
@@ -1547,6 +1918,38 @@ function toHandoverCaseStatus(value: string): HandoverCaseStatus {
   throw new Error(`unsupported_handover_case_status:${value}`);
 }
 
+function toHandoverCustomerUpdateStatus(value: string): HandoverCustomerUpdateStatus {
+  if (value === "blocked" || value === "ready_for_approval" || value === "approved") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_customer_update_status:${value}`);
+}
+
+function toHandoverCustomerUpdateType(value: string): HandoverCustomerUpdateType {
+  if (value === "readiness_update" || value === "scheduling_invite" || value === "appointment_confirmation") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_customer_update_type:${value}`);
+}
+
+function toHandoverMilestoneStatus(value: string): HandoverMilestoneStatus {
+  if (value === "planned" || value === "blocked" || value === "ready") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_milestone_status:${value}`);
+}
+
+function toHandoverMilestoneType(value: string): HandoverMilestoneType {
+  if (value === "readiness_gate" || value === "customer_scheduling_window" || value === "handover_appointment_hold") {
+    return value;
+  }
+
+  throw new Error(`unsupported_handover_milestone_type:${value}`);
+}
+
 function toHandoverTaskStatus(value: string): HandoverTaskStatus {
   if (value === "open" || value === "blocked" || value === "complete") {
     return value;
@@ -1611,4 +2014,22 @@ function toSupportedLocale(value: string): SupportedLocale {
   throw new Error(`unsupported_locale:${value}`);
 }
 
-export { deriveDocumentWorkflowNextAction, deriveHandoverCaseStatus, getHandoverCaseNextAction, getHandoverCaseNextActionDueAt };
+function mapMilestoneTypeToCustomerUpdateType(type: HandoverMilestoneType): HandoverCustomerUpdateType {
+  if (type === "readiness_gate") {
+    return "readiness_update";
+  }
+
+  if (type === "customer_scheduling_window") {
+    return "scheduling_invite";
+  }
+
+  return "appointment_confirmation";
+}
+
+export {
+  deriveCustomerUpdateStatusFromMilestone,
+  deriveDocumentWorkflowNextAction,
+  deriveHandoverCaseStatus,
+  getHandoverCaseNextAction,
+  getHandoverCaseNextActionDueAt
+};

@@ -4,6 +4,8 @@ import { getDemoHandoverCaseById, getLocalizedText, type SupportedLocale } from 
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
 
+import { HandoverCustomerUpdateApprovalForm } from "@/components/handover-customer-update-approval-form";
+import { HandoverMilestoneForm } from "@/components/handover-milestone-form";
 import { HandoverTaskStatusForm } from "@/components/handover-task-status-form";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
@@ -11,6 +13,8 @@ import { StatefulStack } from "@/components/stateful-stack";
 import { TimelinePanel } from "@/components/timeline-panel";
 import {
   buildCaseReferenceCode,
+  getPersistedHandoverCustomerUpdateDisplay,
+  getPersistedHandoverMilestoneDisplay,
   buildPersistedHandoverTimeline,
   getPersistedHandoverDisplay,
   getPersistedHandoverStatusLabel
@@ -28,6 +32,8 @@ export default async function HandoverPage(props: PageProps) {
 
   if (persistedHandoverCase) {
     const taskItems = getPersistedHandoverDisplay(locale, persistedHandoverCase);
+    const milestoneItems = getPersistedHandoverMilestoneDisplay(locale, persistedHandoverCase);
+    const customerUpdateItems = getPersistedHandoverCustomerUpdateDisplay(locale, persistedHandoverCase);
 
     return (
       <div className="page-stack">
@@ -93,6 +99,73 @@ export default async function HandoverPage(props: PageProps) {
             )}
           />
         </Panel>
+
+        <div className="two-column-grid">
+          <Panel title={locale === "ar" ? "خطة المحطات" : "Milestone plan"}>
+            <StatefulStack
+              emptySummary={locale === "ar" ? "لم يتم إنشاء أي محطات بعد." : "No handover milestones have been planned yet."}
+              emptyTitle={locale === "ar" ? "لا توجد محطات" : "No milestones"}
+              items={milestoneItems}
+              renderItem={(milestone) => (
+                <article key={milestone.milestoneId} className="document-row document-row-live">
+                  <div>
+                    <div className="row-between">
+                      <h3>{milestone.title}</h3>
+                      <StatusBadge tone={milestone.statusTone}>{milestone.statusLabel}</StatusBadge>
+                    </div>
+                    <p>{milestone.summary}</p>
+                    <p className="case-link-meta">{milestone.ownerName}</p>
+                    <p className="case-link-meta">{milestone.targetAt}</p>
+                  </div>
+                  <div className="document-row-actions">
+                    <HandoverMilestoneForm
+                      handoverCaseId={persistedHandoverCase.handoverCaseId}
+                      locale={locale}
+                      milestoneId={milestone.milestoneId}
+                      ownerName={milestone.ownerName}
+                      returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                      status={milestone.status}
+                      targetAt={milestone.targetAtInput}
+                    />
+                  </div>
+                </article>
+              )}
+            />
+          </Panel>
+
+          <Panel title={locale === "ar" ? "حدود تواصل العميل" : "Customer-update boundaries"}>
+            <StatefulStack
+              emptySummary={
+                locale === "ar"
+                  ? "لن تظهر حدود التحديث إلا بعد إنشاء سجل التسليم الحي."
+                  : "Update boundaries only appear after the live handover record exists."
+              }
+              emptyTitle={locale === "ar" ? "لا توجد حدود" : "No update boundaries"}
+              items={customerUpdateItems}
+              renderItem={(customerUpdate) => (
+                <article key={customerUpdate.customerUpdateId} className="document-row document-row-live">
+                  <div>
+                    <div className="row-between">
+                      <h3>{customerUpdate.title}</h3>
+                      <StatusBadge tone={customerUpdate.statusTone}>{customerUpdate.statusLabel}</StatusBadge>
+                    </div>
+                    <p>{customerUpdate.summary}</p>
+                    <p className="case-link-meta">{customerUpdate.updatedAt}</p>
+                  </div>
+                  <div className="document-row-actions">
+                    <HandoverCustomerUpdateApprovalForm
+                      customerUpdateId={customerUpdate.customerUpdateId}
+                      handoverCaseId={persistedHandoverCase.handoverCaseId}
+                      locale={locale}
+                      returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
+                      status={customerUpdate.status}
+                    />
+                  </div>
+                </article>
+              )}
+            />
+          </Panel>
+        </div>
 
         <TimelinePanel events={buildPersistedHandoverTimeline(persistedHandoverCase)} locale={locale} />
       </div>

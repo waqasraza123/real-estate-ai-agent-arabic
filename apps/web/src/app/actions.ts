@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  approveHandoverCustomerUpdateInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
   manageCaseFollowUpInputSchema,
@@ -12,12 +13,14 @@ import {
   supportedLocaleSchema,
   updateAutomationStatusInputSchema,
   updateDocumentRequestInputSchema,
+  updateHandoverMilestoneInputSchema,
   updateHandoverTaskStatusInputSchema
 } from "@real-estate-ai/contracts";
 
 import { initialFormActionState, type FormActionState } from "@/lib/form-action-state";
 import {
   WebApiError,
+  approveHandoverCustomerUpdate,
   createHandoverIntake,
   createWebsiteLead,
   manageCaseFollowUp,
@@ -25,6 +28,7 @@ import {
   scheduleVisit,
   updateAutomationStatus,
   updateDocumentRequest,
+  updateHandoverMilestone,
   updateHandoverTask
 } from "@/lib/live-api";
 
@@ -320,6 +324,87 @@ export async function updateHandoverTaskStatusAction(_: FormActionState, formDat
       status: "success"
     };
   } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function updateHandoverMilestoneAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const handoverCaseId = formData.get("handoverCaseId");
+  const milestoneId = formData.get("milestoneId");
+  const returnPath = formData.get("returnPath");
+  const targetAt = formData.get("targetAt");
+
+  if (typeof handoverCaseId !== "string" || typeof milestoneId !== "string" || typeof returnPath !== "string" || typeof targetAt !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = updateHandoverMilestoneInputSchema.safeParse({
+    ownerName: normalizeOptionalString(formData.get("ownerName")),
+    status: formData.get("status"),
+    targetAt: toIsoDateTimeOrEmpty(targetAt)
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await updateHandoverMilestone(handoverCaseId, milestoneId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message: locale === "ar" ? "تم تحديث محطة التسليم وحدود الجاهزية المرتبطة بها." : "The handover milestone and its readiness boundary were updated.",
+      status: "success"
+    };
+  } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function approveHandoverCustomerUpdateAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const customerUpdateId = formData.get("customerUpdateId");
+  const handoverCaseId = formData.get("handoverCaseId");
+  const returnPath = formData.get("returnPath");
+
+  if (typeof customerUpdateId !== "string" || typeof handoverCaseId !== "string" || typeof returnPath !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = approveHandoverCustomerUpdateInputSchema.safeParse({
+    status: formData.get("status")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedHandoverCase = await approveHandoverCustomerUpdate(handoverCaseId, customerUpdateId, result.data);
+    revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
+
+    return {
+      message: locale === "ar" ? "تم اعتماد حد التواصل المخصص للعميل." : "The customer-facing handover update boundary was approved.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لا يمكن اعتماد هذا التحديث قبل أن تصبح المحطة المرتبطة به جاهزة."
+            : "This customer update cannot be approved until its linked milestone is ready.",
+        status: "error"
+      };
+    }
+
     return getActionError(locale, error);
   }
 }
