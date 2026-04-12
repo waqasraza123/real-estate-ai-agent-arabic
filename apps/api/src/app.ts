@@ -2,13 +2,18 @@ import Fastify from "fastify";
 
 import {
   approveHandoverCustomerUpdateInputSchema,
-  canOperatorRolePerform,
   completeHandoverInputSchema,
   confirmHandoverAppointmentInputSchema,
   createHandoverBlockerInputSchema,
   createHandoverPostCompletionFollowUpInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
+  updateHandoverArchiveStatusInputSchema,
+  updateAutomationStatusInputSchema,
+  updateDocumentRequestInputSchema,
+  updateHandoverBlockerInputSchema,
+  updateHandoverMilestoneInputSchema,
+  updateHandoverTaskStatusInputSchema,
   markHandoverCustomerUpdateDispatchReadyInputSchema,
   manageCaseFollowUpInputSchema,
   planHandoverAppointmentInputSchema,
@@ -18,17 +23,7 @@ import {
   saveHandoverArchiveReviewInputSchema,
   saveHandoverReviewInputSchema,
   scheduleVisitInputSchema,
-  operatorRoleSchema,
-  startHandoverExecutionInputSchema,
-  getRequiredOperatorRoles,
-  type OperatorPermission,
-  type OperatorRole,
-  updateHandoverArchiveStatusInputSchema,
-  updateAutomationStatusInputSchema,
-  updateDocumentRequestInputSchema,
-  updateHandoverBlockerInputSchema,
-  updateHandoverMilestoneInputSchema,
-  updateHandoverTaskStatusInputSchema
+  startHandoverExecutionInputSchema
 } from "@real-estate-ai/contracts";
 import type { LeadCaptureStore } from "@real-estate-ai/database";
 import {
@@ -60,6 +55,8 @@ import {
   updatePersistedHandoverMilestone,
   updatePersistedHandoverTask
 } from "@real-estate-ai/workflows";
+
+import { requireOperatorPermission, requireOperatorWorkspace } from "./operator-session";
 
 export function buildApiApp(dependencies: {
   store: LeadCaptureStore;
@@ -112,6 +109,10 @@ export function buildApiApp(dependencies: {
       handoverCaseId: string;
     };
   }>("/v1/handover-cases/:handoverCaseId", async (request, reply) => {
+    if (!requireOperatorWorkspace(request, reply, "handover")) {
+      return reply;
+    }
+
     const handoverCase = await getPersistedHandoverCaseDetail(dependencies.store, request.params.handoverCaseId);
 
     if (!handoverCase) {
@@ -180,12 +181,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/cases/:caseId/follow-up-plan", async (request, reply) => {
     const permission = "manage_case_follow_up";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = manageCaseFollowUpInputSchema.safeParse(request.body);
@@ -215,12 +212,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/cases/:caseId/automation", async (request, reply) => {
     const permission = "manage_case_automation";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = updateAutomationStatusInputSchema.safeParse(request.body);
@@ -248,6 +241,12 @@ export function buildApiApp(dependencies: {
       caseId: string;
     };
   }>("/v1/cases/:caseId/handover-intake", async (request, reply) => {
+    const permission = "manage_handover_intake";
+
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
+    }
+
     const result = createHandoverIntakeInputSchema.safeParse(request.body);
 
     if (!result.success) {
@@ -316,12 +315,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/appointment", async (request, reply) => {
     const permission = "manage_handover_appointments";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = planHandoverAppointmentInputSchema.safeParse(request.body);
@@ -362,12 +357,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/appointment/:appointmentId/confirmation", async (request, reply) => {
     const permission = "manage_handover_appointments";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = confirmHandoverAppointmentInputSchema.safeParse(request.body);
@@ -413,12 +404,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/customer-updates/:customerUpdateId/delivery", async (request, reply) => {
     const permission = "manage_handover_customer_updates";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = prepareHandoverCustomerUpdateDeliveryInputSchema.safeParse(request.body);
@@ -464,12 +451,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/customer-updates/:customerUpdateId/dispatch-ready", async (request, reply) => {
     const permission = "manage_handover_customer_updates";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = markHandoverCustomerUpdateDispatchReadyInputSchema.safeParse(request.body);
@@ -514,12 +497,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/blockers", async (request, reply) => {
     const permission = "manage_handover_blockers";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = createHandoverBlockerInputSchema.safeParse(request.body);
@@ -560,12 +539,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/blockers/:blockerId", async (request, reply) => {
     const permission = "manage_handover_blockers";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = updateHandoverBlockerInputSchema.safeParse(request.body);
@@ -600,12 +575,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/execution", async (request, reply) => {
     const permission = "manage_handover_execution";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = startHandoverExecutionInputSchema.safeParse(request.body);
@@ -645,12 +616,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/review", async (request, reply) => {
     const permission = "manage_handover_governance";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = saveHandoverReviewInputSchema.safeParse(request.body);
@@ -690,12 +657,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/archive-review", async (request, reply) => {
     const permission = "manage_handover_governance";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = saveHandoverArchiveReviewInputSchema.safeParse(request.body);
@@ -735,12 +698,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/archive-status", async (request, reply) => {
     const permission = "manage_handover_governance";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = updateHandoverArchiveStatusInputSchema.safeParse(request.body);
@@ -780,12 +739,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/post-completion-follow-up", async (request, reply) => {
     const permission = "manage_handover_governance";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = createHandoverPostCompletionFollowUpInputSchema.safeParse(request.body);
@@ -830,12 +785,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/post-completion-follow-up/:followUpId", async (request, reply) => {
     const permission = "manage_handover_governance";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = resolveHandoverPostCompletionFollowUpInputSchema.safeParse(request.body);
@@ -880,12 +831,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/completion", async (request, reply) => {
     const permission = "manage_handover_execution";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = completeHandoverInputSchema.safeParse(request.body);
@@ -926,12 +873,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/milestones/:milestoneId", async (request, reply) => {
     const permission = "manage_handover_milestones";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = updateHandoverMilestoneInputSchema.safeParse(request.body);
@@ -967,12 +910,8 @@ export function buildApiApp(dependencies: {
   }>("/v1/handover-cases/:handoverCaseId/customer-updates/:customerUpdateId", async (request, reply) => {
     const permission = "manage_handover_customer_updates";
 
-    if (!hasRequiredOperatorRole(request.headers["x-operator-role"], permission)) {
-      return reply.status(403).send({
-        error: "insufficient_role",
-        permission,
-        requiredRoles: getRequiredOperatorRoles(permission)
-      });
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
     }
 
     const result = approveHandoverCustomerUpdateInputSchema.safeParse(request.body);
@@ -1016,6 +955,12 @@ export function buildApiApp(dependencies: {
       handoverTaskId: string;
     };
   }>("/v1/handover-cases/:handoverCaseId/tasks/:handoverTaskId", async (request, reply) => {
+    const permission = "manage_handover_tasks";
+
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
+    }
+
     const result = updateHandoverTaskStatusInputSchema.safeParse(request.body);
 
     if (!result.success) {
@@ -1042,17 +987,4 @@ export function buildApiApp(dependencies: {
   });
 
   return app;
-}
-
-function hasRequiredOperatorRole(headerValue: string | string[] | undefined, permission: OperatorPermission) {
-  const resolvedRole = resolveOperatorRole(headerValue);
-
-  return canOperatorRolePerform(permission, resolvedRole);
-}
-
-function resolveOperatorRole(headerValue: string | string[] | undefined): OperatorRole {
-  const candidate = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-  const parsedRole = operatorRoleSchema.safeParse(candidate);
-
-  return parsedRole.success ? parsedRole.data : "handover_manager";
 }

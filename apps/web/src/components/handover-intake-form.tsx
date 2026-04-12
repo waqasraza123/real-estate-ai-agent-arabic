@@ -10,8 +10,10 @@ import { FormSubmitButton } from "@/components/form-submit-button";
 import { getHandoverIntakeCopy } from "@/lib/live-copy";
 
 export function HandoverIntakeForm(props: {
+  canManage: boolean;
   caseId: string;
   defaultOwnerName: string;
+  disabledLabel: string;
   locale: SupportedLocale;
   returnPath: string;
 }) {
@@ -27,16 +29,21 @@ export function HandoverIntakeForm(props: {
       <div className="field-grid">
         <label className="field-stack">
           <span>{copy.ownerName}</span>
-          <input className="input-shell" defaultValue={props.defaultOwnerName} name="ownerName" type="text" />
+          <input className="input-shell" defaultValue={props.defaultOwnerName} disabled={!props.canManage} name="ownerName" type="text" />
         </label>
         <label className="field-stack field-span-full">
           <span>{copy.readinessSummary}</span>
-          <textarea className="textarea-shell" name="readinessSummary" required rows={4} />
+          <textarea className="textarea-shell" disabled={!props.canManage} name="readinessSummary" required rows={4} />
         </label>
       </div>
 
       <div className="form-actions-row">
-        <FormSubmitButton idleLabel={copy.action} pendingLabel={props.locale === "ar" ? "جارٍ البدء..." : "Starting..."} />
+        <FormSubmitButton
+          disabled={!props.canManage}
+          disabledLabel={props.disabledLabel}
+          idleLabel={copy.action}
+          pendingLabel={props.locale === "ar" ? "جارٍ البدء..." : "Starting..."}
+        />
         <p className={cx("form-feedback", state.status === "error" && "form-feedback-error", state.status === "success" && "form-feedback-success")}>
           {state.message}
         </p>

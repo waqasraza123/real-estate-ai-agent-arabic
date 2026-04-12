@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 import type {
   ApproveHandoverCustomerUpdateInput,
   CompleteHandoverInput,
@@ -28,6 +30,10 @@ import type {
   UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
+import { operatorSessionCookieName, operatorSessionHeaderName } from "@real-estate-ai/contracts";
+import { createOperatorSessionToken, verifyOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
+
+import { defaultOperatorRole } from "@/lib/operator-role";
 
 const defaultApiBaseUrl = "http://127.0.0.1:4000";
 
@@ -87,7 +93,7 @@ export async function listPersistedCasesFromApi() {
 
 export async function manageCaseFollowUp(caseId: string, input: ManageCaseFollowUpInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedCaseDetail>(`/v1/cases/${caseId}/follow-up-plan`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "POST",
     payload: input
   });
@@ -141,7 +147,7 @@ export async function tryListPersistedCases() {
 
 export async function updateAutomationStatus(caseId: string, input: UpdateAutomationStatusInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedCaseDetail>(`/v1/cases/${caseId}/automation`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "POST",
     payload: input
   });
@@ -163,7 +169,7 @@ export async function updateHandoverTask(handoverCaseId: string, handoverTaskId:
 
 export async function createHandoverBlocker(handoverCaseId: string, input: CreateHandoverBlockerInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/blockers`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "POST",
     payload: input
   });
@@ -176,7 +182,7 @@ export async function updateHandoverBlocker(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/blockers/${blockerId}`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -188,7 +194,7 @@ export async function startHandoverExecution(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/execution`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -196,7 +202,7 @@ export async function startHandoverExecution(
 
 export async function completeHandover(handoverCaseId: string, input: CompleteHandoverInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/completion`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -204,7 +210,7 @@ export async function completeHandover(handoverCaseId: string, input: CompleteHa
 
 export async function saveHandoverReview(handoverCaseId: string, input: SaveHandoverReviewInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/review`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -216,7 +222,7 @@ export async function saveHandoverArchiveReview(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/archive-review`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -228,7 +234,7 @@ export async function createHandoverPostCompletionFollowUp(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -241,7 +247,7 @@ export async function resolveHandoverPostCompletionFollowUp(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up/${followUpId}`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -253,7 +259,7 @@ export async function updateHandoverArchiveStatus(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/archive-status`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -266,7 +272,7 @@ export async function updateHandoverMilestone(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/milestones/${milestoneId}`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -281,7 +287,7 @@ export async function approveHandoverCustomerUpdate(
   return requestJson<PersistedHandoverCaseDetail>(
     `/v1/handover-cases/${handoverCaseId}/customer-updates/${customerUpdateId}`,
     {
-      headers: getOperatorRoleHeaders(operatorRole),
+      headers: await getOperatorSessionHeaders(operatorRole),
       method: "PATCH",
       payload: input
     }
@@ -294,7 +300,7 @@ export async function planHandoverAppointment(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/appointment`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -307,7 +313,7 @@ export async function confirmHandoverAppointment(
   operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/appointment/${appointmentId}/confirmation`, {
-    headers: getOperatorRoleHeaders(operatorRole),
+    headers: await getOperatorSessionHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -322,7 +328,7 @@ export async function prepareHandoverCustomerUpdateDelivery(
   return requestJson<PersistedHandoverCaseDetail>(
     `/v1/handover-cases/${handoverCaseId}/customer-updates/${customerUpdateId}/delivery`,
     {
-      headers: getOperatorRoleHeaders(operatorRole),
+      headers: await getOperatorSessionHeaders(operatorRole),
       method: "PATCH",
       payload: input
     }
@@ -338,7 +344,7 @@ export async function markHandoverCustomerUpdateDispatchReady(
   return requestJson<PersistedHandoverCaseDetail>(
     `/v1/handover-cases/${handoverCaseId}/customer-updates/${customerUpdateId}/dispatch-ready`,
     {
-      headers: getOperatorRoleHeaders(operatorRole),
+      headers: await getOperatorSessionHeaders(operatorRole),
       method: "PATCH",
       payload: input
     }
@@ -352,10 +358,12 @@ export function getWebApiBaseUrl() {
 }
 
 async function requestJson<T>(path: string, options?: ApiRequestOptions) {
+  const operatorSessionHeaders = await getOperatorSessionHeaders();
   const requestInit: RequestInit = {
     cache: options?.cache ?? "no-store",
     headers: {
       "content-type": "application/json",
+      ...operatorSessionHeaders,
       ...(options?.headers ?? {})
     },
     method: options?.method ?? "GET",
@@ -377,6 +385,19 @@ async function requestJson<T>(path: string, options?: ApiRequestOptions) {
   return responseBody as T;
 }
 
-function getOperatorRoleHeaders(operatorRole?: OperatorRole) {
-  return operatorRole ? { "x-operator-role": operatorRole } : undefined;
+async function getOperatorSessionHeaders(operatorRole?: OperatorRole) {
+  if (operatorRole) {
+    return {
+      [operatorSessionHeaderName]: createOperatorSessionToken(operatorRole).token
+    };
+  }
+
+  const cookieStore = await cookies();
+  const storedSessionToken = cookieStore.get(operatorSessionCookieName)?.value;
+
+  return {
+    [operatorSessionHeaderName]: verifyOperatorSessionToken(storedSessionToken)
+      ? (storedSessionToken as string)
+      : createOperatorSessionToken(defaultOperatorRole).token
+  };
 }

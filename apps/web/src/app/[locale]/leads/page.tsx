@@ -1,10 +1,12 @@
 import Link from "next/link";
 
+import { canOperatorRoleAccessWorkspace } from "@real-estate-ai/contracts";
 import { demoDataset, getLocalizedText, type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { EmptyState, Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import {
   buildCaseReferenceCode,
   formatCaseLastChange,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/persisted-case-presenters";
 import { getInterventionCountLabel } from "@/lib/live-copy";
 import { tryListPersistedCases } from "@/lib/live-api";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +29,30 @@ interface PageProps {
 export default async function LeadsPage(props: PageProps) {
   const { locale } = await props.params;
   const messages = getMessages(locale);
+  const currentOperatorRole = await getCurrentOperatorRole();
+  const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", currentOperatorRole);
+
+  if (!canOperatorRoleAccessWorkspace("sales", currentOperatorRole)) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.app.phaseLabel} summary={messages.leads.summary} title={messages.leads.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/manager`}
+          actionLabel={locale === "ar" ? "العودة إلى مركز القيادة" : "Return to the command center"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "هذه الصفحة مخصصة لمساحة المبيعات في وضع الجلسة المحلي الموثوق. استخدم مسارات التسليم أو مركز القيادة المناسب لدورك الحالي."
+              : "This route is reserved for the sales workspace in trusted local session mode. Use the handover workspace or the command center that matches your current role."
+          }
+          title={locale === "ar" ? "وصول المبيعات مطلوب" : "Sales workspace required"}
+          workspace="sales"
+        />
+      </div>
+    );
+  }
+
   const persistedCases = await tryListPersistedCases();
   const columnLabels = {
     currentOwner: messages.common.currentOwner,
@@ -81,9 +108,11 @@ export default async function LeadsPage(props: PageProps) {
                                 <StatusBadge tone={handoverDisplay.statusTone}>{handoverDisplay.statusLabel}</StatusBadge>
                                 <StatusBadge>{handoverDisplay.surfaceLabel}</StatusBadge>
                               </div>
-                              <Link className="inline-link" href={`/${locale}/handover/${handoverDisplay.handoverCaseId}`}>
-                                {locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
-                              </Link>
+                              {canAccessHandoverWorkspace ? (
+                                <Link className="inline-link" href={`/${locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                                  {locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
+                                </Link>
+                              ) : null}
                             </div>
                           ) : (
                             <span className="case-link-meta">{locale === "ar" ? "غير متاح" : "Not active"}</span>

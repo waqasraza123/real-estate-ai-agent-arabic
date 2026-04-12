@@ -1,26 +1,24 @@
 import {
   canOperatorRolePerform,
+  canOperatorRoleAccessWorkspace,
   getRequiredOperatorRoles,
   insufficientRoleErrorSchema,
-  operatorRoleSchema,
+  type OperatorWorkspace,
   type InsufficientRoleError,
   type OperatorPermission,
   type OperatorRole
 } from "@real-estate-ai/contracts";
 import type { SupportedLocale } from "@real-estate-ai/domain";
 
-export const operatorRoleCookieName = "operator_role";
 export const defaultOperatorRole: OperatorRole = "handover_manager";
 export const operatorRoleOptions: OperatorRole[] = ["sales_manager", "handover_coordinator", "handover_manager", "admin"];
 
-export function getOperatorRoleFromCookie(value: string | undefined): OperatorRole {
-  const result = operatorRoleSchema.safeParse(value);
-
-  return result.success ? result.data : defaultOperatorRole;
-}
-
 export function canCurrentOperatorPerform(permission: OperatorPermission, operatorRole: OperatorRole) {
   return canOperatorRolePerform(permission, operatorRole);
+}
+
+export function canCurrentOperatorAccessWorkspace(workspace: OperatorWorkspace, operatorRole: OperatorRole) {
+  return canOperatorRoleAccessWorkspace(workspace, operatorRole);
 }
 
 export function getOperatorPermissionGuardNote(locale: SupportedLocale, permission: OperatorPermission) {
@@ -56,6 +54,25 @@ export function getOperatorRoleLabel(locale: SupportedLocale, role: OperatorRole
   } as const;
 
   return labels[locale][role];
+}
+
+export function getOperatorWorkspaceLabel(locale: SupportedLocale, workspace: OperatorWorkspace) {
+  const labels = {
+    ar: {
+      handover: "مساحة التسليم",
+      manager_handover: "قيادة التسليم",
+      manager_revenue: "قيادة الإيرادات",
+      sales: "مساحة المبيعات"
+    },
+    en: {
+      handover: "handover workspace",
+      manager_handover: "handover command center",
+      manager_revenue: "revenue command center",
+      sales: "sales workspace"
+    }
+  } as const;
+
+  return labels[locale][workspace];
 }
 
 function joinRoleLabels(locale: SupportedLocale, roleLabels: string[]) {

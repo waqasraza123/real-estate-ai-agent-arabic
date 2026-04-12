@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { canOperatorRoleAccessWorkspace } from "@real-estate-ai/contracts";
 import { getDemoCaseById, type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
@@ -8,6 +9,8 @@ import { CaseRouteTabs } from "@/components/case-route-tabs";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
 import { VisitSchedulingForm } from "@/components/visit-scheduling-form";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
 import { buildCaseReferenceCode } from "@/lib/persisted-case-presenters";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
 
@@ -19,8 +22,31 @@ interface PageProps {
 
 export default async function SchedulePage(props: PageProps) {
   const { locale, caseId } = await props.params;
-  const persistedCase = await tryGetPersistedCaseDetail(caseId);
   const messages = getMessages(locale);
+  const currentOperatorRole = await getCurrentOperatorRole();
+
+  if (!canOperatorRoleAccessWorkspace("sales", currentOperatorRole)) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.schedule.title} summary={messages.schedule.summary} title={messages.schedule.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/manager`}
+          actionLabel={locale === "ar" ? "العودة إلى مركز القيادة" : "Return to the command center"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "جدولة الزيارات الفعلية تظل داخل مساحة المبيعات المحلية حتى يتم إدخال نموذج صلاحيات أوسع."
+              : "Live visit scheduling remains inside the local sales workspace until a broader identity model is introduced."
+          }
+          title={locale === "ar" ? "الجدولة مقصورة على المبيعات" : "Scheduling is limited to sales"}
+          workspace="sales"
+        />
+      </div>
+    );
+  }
+
+  const persistedCase = await tryGetPersistedCaseDetail(caseId);
 
   if (persistedCase) {
     return (

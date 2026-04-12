@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { operatorSessionHeaderName, type OperatorRole } from "@real-estate-ai/contracts";
+import { createOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
+
 import { buildApiApp } from "./app";
 
 import { createAlphaLeadCaptureStore } from "@real-estate-ai/database";
+
+function withOperatorSession(role: OperatorRole) {
+  return {
+    [operatorSessionHeaderName]: createOperatorSessionToken(role).token
+  };
+}
 
 describe("lead capture api", () => {
   let store: Awaited<ReturnType<typeof createAlphaLeadCaptureStore>>;
@@ -115,6 +124,7 @@ describe("lead capture api", () => {
     }
 
     const handoverIntakeResponse = await app.inject({
+      headers: withOperatorSession("handover_manager"),
       method: "POST",
       payload: {
         ownerName: "Handover Desk Riyadh",
@@ -130,6 +140,7 @@ describe("lead capture api", () => {
     const handoverCaseId = handoverIntakeResponse.json().handoverCase.handoverCaseId;
 
     const handoverDetailResponse = await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
       method: "GET",
       url: `/v1/handover-cases/${handoverCaseId}`
     });
@@ -157,6 +168,7 @@ describe("lead capture api", () => {
     )?.customerUpdateId;
 
     const taskUpdateResponse = await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
       method: "PATCH",
       payload: {
         status: "blocked"
@@ -240,6 +252,7 @@ describe("lead capture api", () => {
     ).toBe("approved");
 
     const firstTaskCompletionResponse = await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
       method: "PATCH",
       payload: {
         status: "complete"
@@ -256,6 +269,7 @@ describe("lead capture api", () => {
 
     for (const taskId of remainingTaskIds) {
       const taskCompleteResponse = await app.inject({
+        headers: withOperatorSession("handover_coordinator"),
         method: "PATCH",
         payload: {
           status: "complete"
@@ -790,6 +804,7 @@ describe("lead capture api", () => {
     const createdCase = liveCaseResponse.json();
 
     const invalidAutomationResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
       method: "POST",
       payload: {
         status: "stopped"
@@ -800,6 +815,7 @@ describe("lead capture api", () => {
     expect(invalidAutomationResponse.statusCode).toBe(400);
 
     const earlyHandoverResponse = await app.inject({
+      headers: withOperatorSession("handover_manager"),
       method: "POST",
       payload: {
         readinessSummary: "Attempt to skip document completion."
@@ -840,6 +856,35 @@ describe("lead capture api", () => {
     expect(completedSummary?.handoverCase?.status).toBe("completed");
     expect(completedSummary?.handoverClosure?.status).toBe("closure_review_required");
   }, 50000);
+
+  it("requires a trusted operator session for handover detail access", async () => {
+    const planningRecord = await createPlanningBoundaryHandoverRecord(app);
+
+    const unauthorizedResponse = await app.inject({
+      method: "GET",
+      url: `/v1/handover-cases/${planningRecord.handoverCaseId}`
+    });
+
+    expect(unauthorizedResponse.statusCode).toBe(401);
+
+    const forbiddenResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "GET",
+      url: `/v1/handover-cases/${planningRecord.handoverCaseId}`
+    });
+
+    expect(forbiddenResponse.statusCode).toBe(403);
+    expect(forbiddenResponse.json().error).toBe("insufficient_workspace");
+
+    const allowedResponse = await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
+      method: "GET",
+      url: `/v1/handover-cases/${planningRecord.handoverCaseId}`
+    });
+
+    expect(allowedResponse.statusCode).toBe(200);
+    expect(allowedResponse.json().handoverCaseId).toBe(planningRecord.handoverCaseId);
+  });
 
   it("enforces role-aware governance on post-completion and archive boundaries", async () => {
     const completedHandoverRecord = await createCompletedHandoverRecord(app);
@@ -1479,6 +1524,7 @@ async function createPlanningBoundaryHandoverRecord(app: ReturnType<typeof build
   }
 
   const handoverIntakeResponse = await app.inject({
+    headers: withOperatorSession("handover_manager"),
     method: "POST",
     payload: {
       ownerName: "Handover Desk Riyadh",
@@ -1489,6 +1535,7 @@ async function createPlanningBoundaryHandoverRecord(app: ReturnType<typeof build
 
   const handoverCaseId = handoverIntakeResponse.json().handoverCase.handoverCaseId;
   const handoverDetailResponse = await app.inject({
+    headers: withOperatorSession("handover_coordinator"),
     method: "GET",
     url: `/v1/handover-cases/${handoverCaseId}`
   });
@@ -1514,6 +1561,7 @@ async function createPlanningBoundaryHandoverRecord(app: ReturnType<typeof build
 
   for (const task of handoverDetail.tasks) {
     await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
       method: "PATCH",
       payload: {
         status: "complete"
@@ -1602,6 +1650,7 @@ async function createScheduledHandoverRecord(app: ReturnType<typeof buildApiApp>
   }
 
   const handoverIntakeResponse = await app.inject({
+    headers: withOperatorSession("handover_manager"),
     method: "POST",
     payload: {
       ownerName: "Handover Desk Riyadh",
@@ -1612,6 +1661,7 @@ async function createScheduledHandoverRecord(app: ReturnType<typeof buildApiApp>
 
   const handoverCaseId = handoverIntakeResponse.json().handoverCase.handoverCaseId;
   const handoverDetailResponse = await app.inject({
+    headers: withOperatorSession("handover_coordinator"),
     method: "GET",
     url: `/v1/handover-cases/${handoverCaseId}`
   });
@@ -1637,6 +1687,7 @@ async function createScheduledHandoverRecord(app: ReturnType<typeof buildApiApp>
 
   for (const task of handoverDetail.tasks) {
     await app.inject({
+      headers: withOperatorSession("handover_coordinator"),
       method: "PATCH",
       payload: {
         status: "complete"

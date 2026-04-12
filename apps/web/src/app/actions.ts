@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
+  operatorSessionCookieName,
   operatorRoleSchema,
   approveHandoverCustomerUpdateInputSchema,
   completeHandoverInputSchema,
@@ -36,10 +37,9 @@ import { initialFormActionState, type FormActionState } from "@/lib/form-action-
 import {
   defaultOperatorRole,
   getInsufficientRoleError,
-  getOperatorPermissionGuardNote,
-  getOperatorRoleFromCookie,
-  operatorRoleCookieName
+  getOperatorPermissionGuardNote
 } from "@/lib/operator-role";
+import { createSignedOperatorSession, getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   WebApiError,
   approveHandoverCustomerUpdate,
@@ -72,10 +72,13 @@ export async function setOperatorRoleAction(formData: FormData) {
   const returnPathValue = formData.get("returnPath");
   const returnPath = typeof returnPathValue === "string" && returnPathValue.startsWith("/") ? returnPathValue : "/en";
   const cookieStore = await cookies();
+  const operatorRole = roleResult.success ? roleResult.data : defaultOperatorRole;
 
-  cookieStore.set(operatorRoleCookieName, roleResult.success ? roleResult.data : defaultOperatorRole, {
+  cookieStore.set(operatorSessionCookieName, createSignedOperatorSession(operatorRole), {
+    httpOnly: true,
     maxAge: 60 * 60 * 8,
     path: "/",
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax"
   });
 
@@ -1147,9 +1150,7 @@ function normalizeOptionalString(value: FormDataEntryValue | null) {
 }
 
 async function getOperatorRole() {
-  const cookieStore = await cookies();
-
-  return getOperatorRoleFromCookie(cookieStore.get(operatorRoleCookieName)?.value);
+  return getCurrentOperatorRole();
 }
 
 function revalidatePaths(locale: "en" | "ar", returnPath: string, caseId: string, handoverCaseId?: string) {

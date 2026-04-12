@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { canOperatorRoleAccessWorkspace } from "@real-estate-ai/contracts";
 import { getDemoCaseById, type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel } from "@real-estate-ai/ui";
@@ -8,6 +9,8 @@ import { CaseRouteTabs } from "@/components/case-route-tabs";
 import { MessageThread } from "@/components/message-thread";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
 import { buildCaseReferenceCode, buildPersistedConversation } from "@/lib/persisted-case-presenters";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
 
@@ -19,8 +22,31 @@ interface PageProps {
 
 export default async function ConversationPage(props: PageProps) {
   const { locale, caseId } = await props.params;
-  const persistedCase = await tryGetPersistedCaseDetail(caseId);
   const messages = getMessages(locale);
+  const currentOperatorRole = await getCurrentOperatorRole();
+
+  if (!canOperatorRoleAccessWorkspace("sales", currentOperatorRole)) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.conversation.title} summary={messages.conversation.summary} title={messages.conversation.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/manager`}
+          actionLabel={locale === "ar" ? "العودة إلى السطح المتاح" : "Return to an allowed surface"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "وحدة المحادثة الحية مقيدة بمساحة المبيعات في وضع الجلسة المحلي الموثوق."
+              : "The live conversation console is restricted to the sales workspace in trusted local session mode."
+          }
+          title={locale === "ar" ? "مساحة المبيعات مطلوبة" : "Sales workspace required"}
+          workspace="sales"
+        />
+      </div>
+    );
+  }
+
+  const persistedCase = await tryGetPersistedCaseDetail(caseId);
 
   if (persistedCase) {
     return (

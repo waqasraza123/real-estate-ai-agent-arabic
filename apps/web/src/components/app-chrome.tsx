@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import type { OperatorRole } from "@real-estate-ai/contracts";
+import { canOperatorRoleAccessWorkspace } from "@real-estate-ai/contracts";
 import type { SupportedLocale } from "@real-estate-ai/domain";
 import type { AppMessages } from "@real-estate-ai/i18n";
 import { getLocaleLabel, toggleLocale } from "@real-estate-ai/i18n";
@@ -25,24 +26,30 @@ export function AppChrome(props: {
     {
       href: `/${props.locale}`,
       label: props.messages.navigation.landing,
-      summary: props.messages.app.shellNote
+      summary: props.messages.app.shellNote,
+      visible: true
     },
     {
       href: `/${props.locale}/dashboard`,
       label: props.messages.navigation.dashboard,
-      summary: props.messages.dashboard.title
+      summary: props.messages.dashboard.title,
+      visible: true
     },
     {
       href: `/${props.locale}/leads`,
       label: props.messages.navigation.leads,
-      summary: props.messages.leads.title
+      summary: props.messages.leads.title,
+      visible: canOperatorRoleAccessWorkspace("sales", props.currentOperatorRole)
     },
     {
       href: `/${props.locale}/manager`,
       label: props.messages.navigation.manager,
-      summary: props.messages.manager.title
+      summary: props.messages.manager.title,
+      visible:
+        canOperatorRoleAccessWorkspace("manager_revenue", props.currentOperatorRole) ||
+        canOperatorRoleAccessWorkspace("manager_handover", props.currentOperatorRole)
     }
-  ];
+  ].filter((item) => item.visible);
 
   return (
     <div className="chrome-shell" data-testid="app-chrome">

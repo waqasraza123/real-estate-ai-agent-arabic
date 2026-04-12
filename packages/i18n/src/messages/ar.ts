@@ -57,7 +57,7 @@ export const arMessages = {
     switchLanguage: "تبديل اللغة",
     operatorRole: "دور المشغل",
     applyRole: "تطبيق الدور",
-    roleGuardNote: "ضوابط المتابعة والتنفيذ والإغلاق الحساسة تعتمد على دور المشغل المحلي.",
+    roleGuardNote: "الضوابط الحساسة تعتمد الآن على جلسة مشغل محلية موثوقة مع حدود واضحة للدور ومساحة العمل.",
     skipToContent: "تخطي إلى المحتوى الرئيسي",
     primaryNavigation: "التنقل الرئيسي",
     demoState: "بيانات تجريبية فقط",

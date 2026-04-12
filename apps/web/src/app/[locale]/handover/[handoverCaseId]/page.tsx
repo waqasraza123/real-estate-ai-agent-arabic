@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
+import { canOperatorRoleAccessWorkspace, canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
 import { getDemoHandoverCaseById, getLocalizedText } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
@@ -26,11 +25,11 @@ import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
 import { TimelinePanel } from "@/components/timeline-panel";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import {
   getOperatorPermissionGuardNote,
-  getOperatorRoleFromCookie,
-  operatorRoleCookieName
 } from "@/lib/operator-role";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildCaseReferenceCode,
   getPersistedHandoverAppointmentDisplay,
@@ -54,9 +53,30 @@ interface PageProps {
 export default async function HandoverPage(props: PageProps) {
   const { locale, handoverCaseId } = await props.params;
   const messages = getMessages(locale);
+  const currentOperatorRole = await getCurrentOperatorRole();
+
+  if (!canOperatorRoleAccessWorkspace("handover", currentOperatorRole)) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.handover.title} summary={messages.handover.summary} title={messages.handover.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/manager`}
+          actionLabel={locale === "ar" ? "فتح السطح المتاح" : "Open an allowed surface"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "سجل التسليم الحي متاح فقط لمساحة التسليم المحلية الموثوقة. إذا كنت تحتاج متابعة الحالة التجارية فارجع إلى مساحة المبيعات."
+              : "The live handover record is available only inside the trusted local handover workspace. Return to the sales surface if you need the commercial case context instead."
+          }
+          title={locale === "ar" ? "مساحة التسليم مطلوبة" : "Handover workspace required"}
+          workspace="handover"
+        />
+      </div>
+    );
+  }
+
   const persistedHandoverCase = await tryGetPersistedHandoverCaseDetail(handoverCaseId);
-  const cookieStore = await cookies();
-  const currentOperatorRole = getOperatorRoleFromCookie(cookieStore.get(operatorRoleCookieName)?.value);
 
   if (persistedHandoverCase) {
     const appointmentItem = getPersistedHandoverAppointmentDisplay(locale, persistedHandoverCase);
@@ -85,11 +105,13 @@ export default async function HandoverPage(props: PageProps) {
             : (["ready"] as const);
     const canManageExecution = canOperatorRolePerform("manage_handover_execution", currentOperatorRole);
     const canManageBlockers = canOperatorRolePerform("manage_handover_blockers", currentOperatorRole);
+    const canManageHandoverTasks = canOperatorRolePerform("manage_handover_tasks", currentOperatorRole);
     const canManageMilestones = canOperatorRolePerform("manage_handover_milestones", currentOperatorRole);
     const canManageAppointments = canOperatorRolePerform("manage_handover_appointments", currentOperatorRole);
     const canManageCustomerUpdates = canOperatorRolePerform("manage_handover_customer_updates", currentOperatorRole);
     const executionGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_execution");
     const blockerGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_blockers");
+    const taskGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_tasks");
     const milestoneGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_milestones");
     const appointmentGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_appointments");
     const customerUpdateGuardNote = getOperatorPermissionGuardNote(locale, "manage_handover_customer_updates");
@@ -142,6 +164,7 @@ export default async function HandoverPage(props: PageProps) {
         </div>
 
         <Panel title={messages.common.handoverReadiness}>
+          <p className="field-note">{taskGuardNote}</p>
           <StatefulStack
             emptySummary={messages.states.emptyMilestonesSummary}
             emptyTitle={messages.states.emptyMilestonesTitle}
@@ -157,6 +180,8 @@ export default async function HandoverPage(props: PageProps) {
                 <div className="document-row-actions">
                   <StatusBadge tone={task.statusTone}>{task.statusLabel}</StatusBadge>
                   <HandoverTaskStatusForm
+                    canManage={canManageHandoverTasks}
+                    disabledLabel={locale === "ar" ? "يتطلب دور تنسيق التسليم" : "Handover coordination role required"}
                     handoverCaseId={persistedHandoverCase.handoverCaseId}
                     handoverTaskId={task.taskId}
                     locale={locale}

@@ -2,9 +2,12 @@ import { z } from "zod";
 
 export const supportedLocaleSchema = z.enum(["en", "ar"]);
 export const operatorRoleSchema = z.enum(["sales_manager", "handover_coordinator", "handover_manager", "admin"]);
+export const operatorWorkspaceSchema = z.enum(["sales", "handover", "manager_revenue", "manager_handover"]);
 export const operatorPermissionSchema = z.enum([
   "manage_case_follow_up",
   "manage_case_automation",
+  "manage_handover_intake",
+  "manage_handover_tasks",
   "manage_handover_milestones",
   "manage_handover_appointments",
   "manage_handover_customer_updates",
@@ -12,6 +15,12 @@ export const operatorPermissionSchema = z.enum([
   "manage_handover_execution",
   "manage_handover_governance"
 ]);
+export const operatorSessionPayloadSchema = z.object({
+  expiresAt: z.iso.datetime(),
+  issuedAt: z.iso.datetime(),
+  role: operatorRoleSchema,
+  version: z.literal(1)
+});
 export const leadSourceSchema = z.enum(["website"]);
 export const caseStageSchema = z.enum(["new", "qualified", "visit_scheduled", "documents_in_progress", "handover_initiated"]);
 export const followUpStatusSchema = z.enum(["on_track", "attention"]);
@@ -183,6 +192,11 @@ export const insufficientRoleErrorSchema = z.object({
   error: z.literal("insufficient_role"),
   permission: operatorPermissionSchema,
   requiredRoles: z.array(operatorRoleSchema).min(1)
+});
+export const insufficientWorkspaceErrorSchema = z.object({
+  error: z.literal("insufficient_workspace"),
+  requiredWorkspaces: z.array(operatorWorkspaceSchema).min(1),
+  workspace: operatorWorkspaceSchema
 });
 
 export const persistedQualificationSnapshotSchema = z.object({
@@ -421,6 +435,8 @@ export type ManagerInterventionStatus = z.infer<typeof managerInterventionStatus
 export type ManagerInterventionType = z.infer<typeof managerInterventionTypeSchema>;
 export type OperatorPermission = z.infer<typeof operatorPermissionSchema>;
 export type OperatorRole = z.infer<typeof operatorRoleSchema>;
+export type OperatorSessionPayload = z.infer<typeof operatorSessionPayloadSchema>;
+export type OperatorWorkspace = z.infer<typeof operatorWorkspaceSchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseSummary = z.infer<typeof persistedCaseSummarySchema>;
 export type PersistedDocumentRequest = z.infer<typeof persistedDocumentRequestSchema>;
@@ -456,17 +472,40 @@ export type UpdateHandoverArchiveStatusInput = z.infer<typeof updateHandoverArch
 export type UpdateHandoverBlockerInput = z.infer<typeof updateHandoverBlockerInputSchema>;
 export type UpdateHandoverTaskStatusInput = z.infer<typeof updateHandoverTaskStatusInputSchema>;
 export type InsufficientRoleError = z.infer<typeof insufficientRoleErrorSchema>;
+export type InsufficientWorkspaceError = z.infer<typeof insufficientWorkspaceErrorSchema>;
+
+export const operatorSessionCookieName = "operator_session";
+export const operatorSessionHeaderName = "x-operator-session";
+export const localOperatorSessionSecretEnvironmentKey = "LOCAL_OPERATOR_SESSION_SECRET";
+export const localOperatorSessionDurationSeconds = 60 * 60 * 8;
+
+const operatorWorkspaceAccess = {
+  admin: ["sales", "handover", "manager_revenue", "manager_handover"],
+  handover_coordinator: ["handover"],
+  handover_manager: ["sales", "handover", "manager_handover"],
+  sales_manager: ["sales", "manager_revenue"]
+} as const satisfies Record<OperatorRole, readonly OperatorWorkspace[]>;
 
 const operatorPermissionRequirements = {
   manage_case_automation: ["sales_manager", "handover_manager", "admin"],
   manage_case_follow_up: ["sales_manager", "handover_manager", "admin"],
+  manage_handover_intake: ["handover_manager", "admin"],
   manage_handover_appointments: ["handover_coordinator", "handover_manager", "admin"],
   manage_handover_blockers: ["handover_coordinator", "handover_manager", "admin"],
   manage_handover_customer_updates: ["handover_manager", "admin"],
   manage_handover_execution: ["handover_manager", "admin"],
   manage_handover_milestones: ["handover_coordinator", "handover_manager", "admin"],
+  manage_handover_tasks: ["handover_coordinator", "handover_manager", "admin"],
   manage_handover_governance: ["handover_manager", "admin"]
 } as const satisfies Record<OperatorPermission, readonly OperatorRole[]>;
+
+export function getAccessibleOperatorWorkspaces(operatorRole: OperatorRole): OperatorWorkspace[] {
+  return [...operatorWorkspaceAccess[operatorRole]];
+}
+
+export function canOperatorRoleAccessWorkspace(workspace: OperatorWorkspace, operatorRole: OperatorRole) {
+  return getAccessibleOperatorWorkspaces(operatorRole).includes(workspace);
+}
 
 export function getRequiredOperatorRoles(permission: OperatorPermission): OperatorRole[] {
   return [...operatorPermissionRequirements[permission]];

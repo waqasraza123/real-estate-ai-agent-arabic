@@ -49,6 +49,7 @@
 - The next persisted Phase 5 control boundary is now live locally: role-aware restrictions now protect manager follow-up, automation, execution blockers, and execution-day transitions with visible UI guardrails and API-enforced permissions
 - The next persisted Phase 5 control boundary is now live locally: role-aware restrictions now protect milestone planning, appointment planning or confirmation, and customer-update approval or delivery boundaries with shared permissions and visible UI guardrails
 - The next persisted Phase 5 workspace boundary is now live locally: manager and list surfaces now separate active handover work into planning, execution, and closure views using case-summary handover state plus the current local operator role
+- The next persisted Phase 5 session boundary is now live locally: the web shell issues signed local operator sessions, handover detail routes require a trusted session plus workspace access, and manager plus handover entry surfaces are now guarded by shared workspace rules
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -77,6 +78,7 @@
 - Added the next persisted Phase 5 control slice with shared permission definitions, API-enforced restrictions on follow-up, automation, blocker, and execution actions, disabled UI controls with role guard notes, and production-server smoke stability for Playwright
 - Added the next persisted Phase 5 control slice with shared planning permissions, API-enforced restrictions on milestones, appointments, and customer-update delivery boundaries, disabled UI controls with role guard notes, and integration coverage for restricted vs allowed planning actions
 - Added the next persisted Phase 5 workspace slice with active handover summary state on case-list contracts, role-aware manager queues for planning, execution, and closure surfaces, and lead-list handover workflow visibility beyond closure-only status
+- Added the next persisted Phase 5 session slice with shared signed local operator-session contracts, trusted handover-detail access checks, workspace-gated manager and handover routes, and the remaining intake and task mutations moved behind explicit handover permissions
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -105,13 +107,16 @@
 - Administrative archive review can only start after the handover record is completed, the manager review exists, and any required aftercare follow-up is resolved
 - Archive status is a manual admin boundary on the completed record with `held`, `ready`, and `archived` states; it does not trigger any external archive system
 - Case summaries now expose a derived `handoverClosure` signal for manager and list surfaces instead of requiring full handover-detail fetches to render closure state
-- The first local authorization boundary uses a cookie-backed operator role in the web shell and an `x-operator-role` API header; this is a deliberate local-control bridge until real authentication and authorization are implemented
+- The local authorization boundary now uses a signed `operator_session` cookie in the web shell and a signed `x-operator-session` header as the primary trusted path to the API
+- The raw `x-operator-role` header still exists as a local alpha compatibility fallback inside the API integration boundary and should be removed once the harness is fully migrated
 - Post-completion review, aftercare follow-up, archive review, and archive status changes are now explicitly limited to `handover_manager` and `admin` roles
 - Follow-up-plan and automation controls are now limited to managerial roles in the local control model, while blocker updates are limited to handover-execution roles and execution-day transitions are limited to `handover_manager` and `admin`
 - Milestone planning and appointment controls are now limited to handover coordination roles, while customer-update approval, delivery preparation, and dispatch-ready promotion are limited to `handover_manager` and `admin`
 - Shared operator-permission definitions now live in `packages/contracts` so the web shell and API enforce the same local role model
 - Case summaries now expose the linked active handover record so manager and list views can render planning and execution surfaces without fetching full handover detail
 - The manager workspace now separates revenue follow-up, handover planning, handover execution, and handover closure as distinct local-control surfaces keyed off the current operator role
+- Shared operator-workspace definitions now live in `packages/contracts`, with sales, handover, revenue-manager, and handover-manager access separated explicitly at the route and API boundary level
+- Handover intake is now explicitly limited to `handover_manager` and `admin`, while live handover task status updates are now limited to handover coordination roles
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - Playwright smoke verification now runs against a production Next server because the dev-server path was intermittently unstable on the handover route in this environment
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
@@ -120,7 +125,7 @@
 
 ## Deferred / Not Yet Implemented
 - Authentication and authorization
-- Real identity, sessions, and server-trusted role assignment beyond the current local operator-role control mode
+- Real identity, durable sessions, and server-trusted role assignment beyond the current signed local operator-session control mode
 - External integrations
 - Dashboards and analytics
 - Agent orchestration and workflow automation
@@ -141,7 +146,8 @@
 - The local `PGlite` alpha store is a development convenience and must not be mistaken for the long-term production deployment model
 - The current local queue model is intentionally transitional and must not be mistaken for the long-term distributed worker architecture
 - Phase 4 should not be overextended prematurely; the current handover slice is intentionally limited to intake, milestone planning, approval-only customer boundaries, internal appointment confirmation, dispatch-ready preparation, blocker tracking, explicit execution start, controlled completion, aftercare, and a narrow admin-closure boundary, not live provider sending, external archiving, or downstream automation
-- The current operator-role boundary is intentionally local and convenience-oriented; it proves permission flows and UI behavior but must not be mistaken for full production authentication
+- The current signed operator-session boundary is intentionally local and transitional; it proves trusted session handling and workspace access patterns but must not be mistaken for full production authentication
+- The legacy raw-role compatibility path in the API should not linger after the local harness fully adopts signed sessions
 
 ## Standard Verification
 - `git status --short`

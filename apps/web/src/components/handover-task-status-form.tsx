@@ -10,6 +10,8 @@ import { FormSubmitButton } from "@/components/form-submit-button";
 import { getHandoverTaskStatusLabel } from "@/lib/live-copy";
 
 export function HandoverTaskStatusForm(props: {
+  canManage: boolean;
+  disabledLabel: string;
   handoverCaseId: string;
   handoverTaskId: string;
   locale: SupportedLocale;
@@ -26,7 +28,7 @@ export function HandoverTaskStatusForm(props: {
       <input name="locale" type="hidden" value={props.locale} />
       <input name="returnPath" type="hidden" value={props.returnPath} />
 
-      <select className="select-shell" defaultValue={props.status} name="status">
+      <select className="select-shell" defaultValue={props.status} disabled={!props.canManage} name="status">
         {statusOptions.map((statusOption) => (
           <option key={statusOption} value={statusOption}>
             {getHandoverTaskStatusLabel(props.locale, statusOption)}
@@ -34,7 +36,12 @@ export function HandoverTaskStatusForm(props: {
         ))}
       </select>
 
-      <FormSubmitButton idleLabel={props.locale === "ar" ? "حفظ" : "Save"} pendingLabel={props.locale === "ar" ? "جارٍ الحفظ..." : "Saving..."} />
+      <FormSubmitButton
+        disabled={!props.canManage}
+        disabledLabel={props.disabledLabel}
+        idleLabel={props.locale === "ar" ? "حفظ" : "Save"}
+        pendingLabel={props.locale === "ar" ? "جارٍ الحفظ..." : "Saving..."}
+      />
 
       <p className={cx("form-feedback", state.status === "error" && "form-feedback-error", state.status === "success" && "form-feedback-success")}>
         {state.message}

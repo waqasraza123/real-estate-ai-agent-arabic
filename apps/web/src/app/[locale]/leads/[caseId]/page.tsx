@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
+import { canOperatorRoleAccessWorkspace, canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
 import { getDemoCaseById, getLocalizedText } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
@@ -15,11 +14,9 @@ import { QualificationForm } from "@/components/qualification-form";
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
 import { TimelinePanel } from "@/components/timeline-panel";
-import {
-  getOperatorPermissionGuardNote,
-  getOperatorRoleFromCookie,
-  operatorRoleCookieName
-} from "@/lib/operator-role";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
+import { getOperatorPermissionGuardNote } from "@/lib/operator-role";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildCaseReferenceCode,
   buildPersistedTimeline,
@@ -44,10 +41,31 @@ interface PageProps {
 
 export default async function LeadProfilePage(props: PageProps) {
   const { locale, caseId } = await props.params;
-  const persistedCase = await tryGetPersistedCaseDetail(caseId);
   const messages = getMessages(locale);
-  const cookieStore = await cookies();
-  const currentOperatorRole = getOperatorRoleFromCookie(cookieStore.get(operatorRoleCookieName)?.value);
+  const currentOperatorRole = await getCurrentOperatorRole();
+
+  if (!canOperatorRoleAccessWorkspace("sales", currentOperatorRole)) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.profile.title} summary={messages.profile.summary} title={messages.profile.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/manager`}
+          actionLabel={locale === "ar" ? "فتح السطح المتاح" : "Open an available surface"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "ملفات العملاء الحية تظل ضمن مساحة المبيعات المحلية. يمكن لدورك الحالي متابعة العمل عبر مركز القيادة أو سجل التسليم المرتبط."
+              : "Live lead profiles remain inside the local sales workspace. Your current role can continue through the command center or the linked handover record instead."
+          }
+          title={locale === "ar" ? "ملف العميل غير متاح لهذا الدور" : "Lead profile unavailable for this role"}
+          workspace="sales"
+        />
+      </div>
+    );
+  }
+
+  const persistedCase = await tryGetPersistedCaseDetail(caseId);
 
   if (persistedCase) {
     const qualificationSummary = getPersistedQualificationSummary(locale, persistedCase);
@@ -56,6 +74,7 @@ export default async function LeadProfilePage(props: PageProps) {
     const followUpManagerCopy = getFollowUpManagerCopy(locale);
     const canManageFollowUp = canOperatorRolePerform("manage_case_follow_up", currentOperatorRole);
     const canManageAutomation = canOperatorRolePerform("manage_case_automation", currentOperatorRole);
+    const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", currentOperatorRole);
     const followUpGuardNote = getOperatorPermissionGuardNote(locale, "manage_case_follow_up");
     const automationGuardNote = getOperatorPermissionGuardNote(locale, "manage_case_automation");
 
@@ -168,9 +187,11 @@ export default async function LeadProfilePage(props: PageProps) {
               </div>
               <StatusBadge tone="success">{getPersistedHandoverStatusLabel(locale, persistedCase.handoverCase)}</StatusBadge>
             </div>
-            <Link className="inline-link" href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
-              {locale === "ar" ? "فتح صفحة التسليم" : "Open handover page"}
-            </Link>
+            {canAccessHandoverWorkspace ? (
+              <Link className="inline-link" href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
+                {locale === "ar" ? "فتح صفحة التسليم" : "Open handover page"}
+              </Link>
+            ) : null}
           </Panel>
         ) : null}
 

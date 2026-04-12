@@ -57,7 +57,7 @@ export const enMessages = {
     switchLanguage: "Switch language",
     operatorRole: "Operator role",
     applyRole: "Apply role",
-    roleGuardNote: "Sensitive follow-up, execution, and closure controls depend on the local operator role.",
+    roleGuardNote: "Sensitive controls now depend on a trusted local operator session with role and workspace boundaries.",
     skipToContent: "Skip to main content",
     primaryNavigation: "Primary navigation",
     demoState: "Demo data only",

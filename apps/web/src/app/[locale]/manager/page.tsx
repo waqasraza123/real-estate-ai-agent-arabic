@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 
-import { canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
+import { canOperatorRoleAccessWorkspace, canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
 import { demoDataset, getLocalizedText } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
+import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import {
   buildCaseReferenceCode,
   formatCaseLastChange,
@@ -19,7 +19,8 @@ import {
 } from "@/lib/persisted-case-presenters";
 import { getInterventionCountLabel } from "@/lib/live-copy";
 import { tryListPersistedCases } from "@/lib/live-api";
-import { getOperatorRoleFromCookie, getOperatorRoleLabel, operatorRoleCookieName } from "@/lib/operator-role";
+import { getCurrentOperatorRole } from "@/lib/operator-session";
+import { getOperatorRoleLabel } from "@/lib/operator-role";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,33 @@ interface PageProps {
 export default async function ManagerPage(props: PageProps) {
   const { locale } = await props.params;
   const messages = getMessages(locale);
+  const currentOperatorRole = await getCurrentOperatorRole();
+  const canAccessRevenueManagerWorkspace = canOperatorRoleAccessWorkspace("manager_revenue", currentOperatorRole);
+  const canAccessHandoverManagerWorkspace = canOperatorRoleAccessWorkspace("manager_handover", currentOperatorRole);
+  const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", currentOperatorRole);
+
+  if (!canAccessRevenueManagerWorkspace && !canAccessHandoverManagerWorkspace) {
+    return (
+      <div className="page-stack">
+        <ScreenIntro badge={messages.app.phaseLabel} summary={messages.manager.summary} title={messages.manager.title} />
+        <WorkspaceAccessPanel
+          actionHref={`/${locale}/dashboard`}
+          actionLabel={locale === "ar" ? "العودة إلى اللوحة" : "Return to the dashboard"}
+          locale={locale}
+          operatorRole={currentOperatorRole}
+          summary={
+            locale === "ar"
+              ? "مركز القيادة الإداري مخصص للأدوار التي تدير طوابير الإيرادات أو حدود قيادة التسليم في وضع الجلسة المحلي الموثوق."
+              : "The manager command center is reserved for roles that own revenue queues or handover command boundaries in trusted local session mode."
+          }
+          title={locale === "ar" ? "مركز القيادة غير متاح لهذا الدور" : "Command center unavailable for this role"}
+          workspace="manager_handover"
+        />
+      </div>
+    );
+  }
+
   const persistedCases = await tryListPersistedCases();
-  const cookieStore = await cookies();
-  const currentOperatorRole = getOperatorRoleFromCookie(cookieStore.get(operatorRoleCookieName)?.value);
   const canManageFollowUp = canOperatorRolePerform("manage_case_follow_up", currentOperatorRole);
   const canManagePlanning =
     canOperatorRolePerform("manage_handover_milestones", currentOperatorRole) ||
@@ -175,7 +200,8 @@ export default async function ManagerPage(props: PageProps) {
           </div>
 
           <div className="two-column-grid">
-            <Panel title={locale === "ar" ? "طابور متابعة الإيرادات" : "Revenue follow-up queue"}>
+            {canAccessRevenueManagerWorkspace ? (
+              <Panel title={locale === "ar" ? "طابور متابعة الإيرادات" : "Revenue follow-up queue"}>
               <StatefulStack
                 emptySummary={messages.states.emptyAlertsSummary}
                 emptyTitle={messages.states.emptyAlertsTitle}
@@ -210,7 +236,7 @@ export default async function ManagerPage(props: PageProps) {
                         <Link className="inline-link" href={`/${locale}/leads/${caseItem.caseId}`}>
                           {locale === "ar" ? "فتح الحالة" : "Open case"}
                         </Link>
-                        {handoverDisplay ? (
+                        {handoverDisplay && canAccessHandoverWorkspace ? (
                           <Link className="inline-link" href={`/${locale}/handover/${handoverDisplay.handoverCaseId}`}>
                             {locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
                           </Link>
@@ -220,10 +246,11 @@ export default async function ManagerPage(props: PageProps) {
                   );
                 }}
               />
-            </Panel>
+              </Panel>
+            ) : null}
           </div>
 
-          {canManagePlanning ? (
+          {canAccessHandoverManagerWorkspace && canManagePlanning ? (
             <Panel title={locale === "ar" ? "طابور تخطيط التسليم" : "Handover planning queue"}>
               <StatefulStack
                 emptySummary={
@@ -260,7 +287,7 @@ export default async function ManagerPage(props: PageProps) {
           ) : null}
 
           <div className="two-column-grid">
-            {canManageExecution ? (
+            {canAccessHandoverManagerWorkspace && canManageExecution ? (
               <Panel title={locale === "ar" ? "طابور تنفيذ التسليم" : "Handover execution queue"}>
                 <StatefulStack
                   emptySummary={
@@ -296,7 +323,7 @@ export default async function ManagerPage(props: PageProps) {
               </Panel>
             ) : null}
 
-            {canManageClosure ? (
+            {canAccessHandoverManagerWorkspace && canManageClosure ? (
               <Panel title={locale === "ar" ? "طابور إغلاق التسليم" : "Handover closure queue"}>
                 <StatefulStack
                   emptySummary={

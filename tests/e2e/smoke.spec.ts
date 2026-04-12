@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { operatorSessionCookieName } from "@real-estate-ai/contracts";
+import { createOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
 import { smokeRoutes } from "@real-estate-ai/testing";
 
 test("landing shell renders in English", async ({ page }) => {
@@ -45,4 +47,22 @@ test("manager shell renders the command-center fallback", async ({ page }) => {
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Manager command center");
   await expect(page.getByText("Cases that need manager action")).toBeVisible();
+});
+
+test("sales manager cannot open the handover workspace directly", async ({ context, page }) => {
+  await context.addCookies([
+    {
+      domain: "127.0.0.1",
+      httpOnly: true,
+      name: operatorSessionCookieName,
+      path: "/",
+      sameSite: "Lax",
+      value: createOperatorSessionToken("sales_manager").token
+    }
+  ]);
+
+  await page.goto(smokeRoutes.handover);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Handover workspace");
+  await expect(page.getByText("Handover workspace required")).toBeVisible();
 });
