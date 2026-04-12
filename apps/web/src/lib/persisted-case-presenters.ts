@@ -15,6 +15,7 @@ import {
   getDocumentRequestTypeLabel,
   getFollowUpStatusLabel,
   getHandoverAppointmentStatusLabel,
+  getHandoverClosureStateLabel,
   getHandoverArchiveOutcomeLabel,
   getHandoverArchiveStatusLabel,
   getHandoverBlockerSeverityLabel,
@@ -326,6 +327,27 @@ export function getPersistedSourceLabel(locale: SupportedLocale) {
 
 export function getPersistedFollowUpLabel(locale: SupportedLocale, caseSummary: PersistedCaseDetail | PersistedCaseSummary) {
   return getFollowUpStatusLabel(locale, caseSummary.followUpStatus);
+}
+
+export function getPersistedHandoverClosureDisplay(locale: SupportedLocale, caseSummary: PersistedCaseDetail | PersistedCaseSummary) {
+  if (!caseSummary.handoverClosure) {
+    return null;
+  }
+
+  const statusTone: "success" | "warning" =
+    caseSummary.handoverClosure.status === "archived"
+      ? "success"
+      : caseSummary.handoverClosure.status === "ready_to_archive"
+        ? "success"
+        : "warning";
+
+  return {
+    handoverCaseId: caseSummary.handoverClosure.handoverCaseId,
+    status: caseSummary.handoverClosure.status,
+    statusLabel: getHandoverClosureStateLabel(locale, caseSummary.handoverClosure.status),
+    statusTone,
+    updatedAt: new Date(caseSummary.handoverClosure.updatedAt).toLocaleString(locale)
+  };
 }
 
 function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, locale: SupportedLocale, variant: "detail" | "title") {

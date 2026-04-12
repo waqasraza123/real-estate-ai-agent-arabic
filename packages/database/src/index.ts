@@ -7,6 +7,7 @@ import type {
   CaseStage,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
+  HandoverClosureState,
   HandoverArchiveOutcome,
   HandoverArchiveStatus,
   CreateHandoverPostCompletionFollowUpInput,
@@ -41,6 +42,7 @@ import type {
   PersistedHandoverArchiveStatus,
   PersistedHandoverBlocker,
   PersistedHandoverCaseDetail,
+  PersistedHandoverClosureSummary,
   PersistedHandoverCustomerUpdate,
   PersistedHandoverMilestone,
   PersistedHandoverPostCompletionFollowUp,
@@ -968,6 +970,89 @@ export async function createAlphaLeadCaptureStore(options?: {
     };
   };
 
+  const listHandoverClosureSummaries = async (caseIds: string[]) => {
+    const caseIdsWithValues = caseIds.filter(Boolean);
+
+    if (caseIdsWithValues.length === 0) {
+      return new Map<string, PersistedHandoverClosureSummary>();
+    }
+
+    const linkedHandoverRecords = await db
+      .select({
+        caseId: handoverCases.caseId,
+        handoverCaseId: handoverCases.id,
+        status: handoverCases.status,
+        updatedAt: handoverCases.updatedAt
+      })
+      .from(handoverCases)
+      .where(inArray(handoverCases.caseId, caseIdsWithValues));
+
+    if (linkedHandoverRecords.length === 0) {
+      return new Map<string, PersistedHandoverClosureSummary>();
+    }
+
+    const handoverCaseIds = linkedHandoverRecords.map((record) => record.handoverCaseId);
+    const [reviewRecords, followUpRecords, archiveReviewRecords, archiveStatusRecords] = await Promise.all([
+      db
+        .select({
+          handoverCaseId: handoverReviews.handoverCaseId,
+          outcome: handoverReviews.outcome,
+          updatedAt: handoverReviews.updatedAt
+        })
+        .from(handoverReviews)
+        .where(inArray(handoverReviews.handoverCaseId, handoverCaseIds)),
+      db
+        .select({
+          handoverCaseId: handoverPostCompletionFollowUps.handoverCaseId,
+          status: handoverPostCompletionFollowUps.status,
+          updatedAt: handoverPostCompletionFollowUps.updatedAt
+        })
+        .from(handoverPostCompletionFollowUps)
+        .where(inArray(handoverPostCompletionFollowUps.handoverCaseId, handoverCaseIds)),
+      db
+        .select({
+          handoverCaseId: handoverArchiveReviews.handoverCaseId,
+          outcome: handoverArchiveReviews.outcome,
+          updatedAt: handoverArchiveReviews.updatedAt
+        })
+        .from(handoverArchiveReviews)
+        .where(inArray(handoverArchiveReviews.handoverCaseId, handoverCaseIds)),
+      db
+        .select({
+          handoverCaseId: handoverArchiveStatuses.handoverCaseId,
+          status: handoverArchiveStatuses.status,
+          updatedAt: handoverArchiveStatuses.updatedAt
+        })
+        .from(handoverArchiveStatuses)
+        .where(inArray(handoverArchiveStatuses.handoverCaseId, handoverCaseIds))
+    ]);
+
+    const reviewMap = new Map(reviewRecords.map((record) => [record.handoverCaseId, record]));
+    const followUpMap = new Map(followUpRecords.map((record) => [record.handoverCaseId, record]));
+    const archiveReviewMap = new Map(archiveReviewRecords.map((record) => [record.handoverCaseId, record]));
+    const archiveStatusMap = new Map(archiveStatusRecords.map((record) => [record.handoverCaseId, record]));
+
+    return new Map(
+      linkedHandoverRecords
+        .map((record) => {
+          const summary = deriveHandoverClosureSummary(
+            {
+              handoverCaseId: record.handoverCaseId,
+              status: toHandoverCaseStatus(record.status),
+              updatedAt: record.updatedAt
+            },
+            reviewMap.get(record.handoverCaseId),
+            followUpMap.get(record.handoverCaseId),
+            archiveReviewMap.get(record.handoverCaseId),
+            archiveStatusMap.get(record.handoverCaseId)
+          );
+
+          return summary ? [record.caseId, summary] : null;
+        })
+        .filter((entry): entry is [string, PersistedHandoverClosureSummary] => entry !== null)
+    );
+  };
+
   const getPersistedCaseDetail = async (caseId: string): Promise<PersistedCaseDetail | null> => {
     const persistedCase = await db
       .select({
@@ -999,7 +1084,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [caseAuditEvents, qualificationRecord, currentVisit, persistedDocumentRequests, persistedInterventions, linkedHandoverCase] =
+    const [caseAuditEvents, qualificationRecord, currentVisit, persistedDocumentRequests, persistedInterventions, linkedHandoverCase, handoverClosureMap] =
       await Promise.all([
         db
           .select({
@@ -1067,7 +1152,8 @@ export async function createAlphaLeadCaptureStore(options?: {
           })
           .from(handoverCases)
           .where(eq(handoverCases.caseId, caseId))
-          .limit(1)
+          .limit(1),
+        listHandoverClosureSummaries([caseId])
       ]);
 
     const hydratedInterventions = persistedInterventions.map((intervention) => hydrateManagerIntervention(intervention));
@@ -1100,6 +1186,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       })),
       email: caseRecord.email,
       followUpStatus: toFollowUpStatus(caseRecord.nextActionDueAt),
+      handoverClosure: handoverClosureMap.get(caseId) ?? null,
       handoverCase: linkedHandoverCase[0] ? hydrateLinkedHandoverCase(linkedHandoverCase[0]) : null,
       managerInterventions: hydratedInterventions,
       message: caseRecord.message,
@@ -1368,6 +1455,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         createdAt: createdCase.createdAt,
         customerName: createdCase.customerName,
         followUpStatus: toFollowUpStatus(createdCase.nextActionDueAt),
+        handoverClosure: null,
         leadId: createdCase.leadId,
         nextAction: createdCase.nextAction,
         nextActionDueAt: createdCase.nextActionDueAt,
@@ -1406,7 +1494,11 @@ export async function createAlphaLeadCaptureStore(options?: {
         .innerJoin(leads, eq(cases.leadId, leads.id))
         .orderBy(desc(cases.createdAt));
 
-      const openInterventionCounts = await listOpenInterventionCounts(persistedCases.map((caseRecord) => caseRecord.caseId));
+      const caseIds = persistedCases.map((caseRecord) => caseRecord.caseId);
+      const [openInterventionCounts, handoverClosureSummaries] = await Promise.all([
+        listOpenInterventionCounts(caseIds),
+        listHandoverClosureSummaries(caseIds)
+      ]);
 
       return persistedCases.map((caseRecord) => ({
         automationStatus: toAutomationStatus(caseRecord.automationStatus),
@@ -1414,6 +1506,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         createdAt: caseRecord.createdAt,
         customerName: caseRecord.customerName,
         followUpStatus: toFollowUpStatus(caseRecord.nextActionDueAt),
+        handoverClosure: handoverClosureSummaries.get(caseRecord.caseId) ?? null,
         nextAction: caseRecord.nextAction,
         nextActionDueAt: caseRecord.nextActionDueAt,
         openInterventionsCount: openInterventionCounts.get(caseRecord.caseId) ?? 0,
@@ -3409,6 +3502,84 @@ function deriveCustomerUpdateStatusFromMilestone(status: HandoverMilestoneStatus
   }
 
   return "blocked";
+}
+
+function deriveHandoverClosureSummary(
+  handoverCase: {
+    handoverCaseId: string;
+    status: HandoverCaseStatus;
+    updatedAt: string;
+  },
+  review:
+    | {
+        outcome: string;
+        updatedAt: string;
+      }
+    | undefined,
+  postCompletionFollowUp:
+    | {
+        status: string;
+        updatedAt: string;
+      }
+    | undefined,
+  archiveReview:
+    | {
+        outcome: string;
+        updatedAt: string;
+      }
+    | undefined,
+  archiveStatus:
+    | {
+        status: string;
+        updatedAt: string;
+      }
+    | undefined
+): PersistedHandoverClosureSummary | null {
+  if (handoverCase.status !== "completed") {
+    return null;
+  }
+
+  const reviewOutcome = review ? toHandoverReviewOutcome(review.outcome) : null;
+  const followUpStatus = postCompletionFollowUp ? toHandoverPostCompletionFollowUpStatus(postCompletionFollowUp.status) : null;
+  const archiveReviewOutcome = archiveReview ? toHandoverArchiveOutcome(archiveReview.outcome) : null;
+  const archiveBoundaryStatus = archiveStatus ? toHandoverArchiveStatus(archiveStatus.status) : null;
+  const reviewUpdatedAt = review?.updatedAt ?? handoverCase.updatedAt;
+  const archiveReviewUpdatedAt = archiveReview?.updatedAt ?? reviewUpdatedAt;
+  const archiveStatusUpdatedAt = archiveStatus?.updatedAt ?? archiveReviewUpdatedAt;
+
+  let status: HandoverClosureState = "closure_review_required";
+  let updatedAt = handoverCase.updatedAt;
+
+  if (!reviewOutcome) {
+    status = "closure_review_required";
+  } else if (reviewOutcome === "follow_up_required" && followUpStatus !== "resolved") {
+    status = "aftercare_open";
+    updatedAt = postCompletionFollowUp?.updatedAt ?? reviewUpdatedAt;
+  } else if (archiveBoundaryStatus === "archived") {
+    status = "archived";
+    updatedAt = archiveStatusUpdatedAt;
+  } else if (archiveBoundaryStatus === "ready") {
+    status = "ready_to_archive";
+    updatedAt = archiveStatusUpdatedAt;
+  } else if (archiveBoundaryStatus === "held") {
+    status = "held";
+    updatedAt = archiveStatusUpdatedAt;
+  } else if (archiveReviewOutcome === "ready_to_archive") {
+    status = "ready_to_archive";
+    updatedAt = archiveReviewUpdatedAt;
+  } else if (archiveReviewOutcome === "hold_for_review") {
+    status = "held";
+    updatedAt = archiveReviewUpdatedAt;
+  } else {
+    status = "closure_review_required";
+    updatedAt = reviewUpdatedAt;
+  }
+
+  return {
+    handoverCaseId: handoverCase.handoverCaseId,
+    status,
+    updatedAt
+  };
 }
 
 function hydrateHandoverTask(value: {

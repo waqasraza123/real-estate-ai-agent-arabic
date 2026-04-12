@@ -43,6 +43,7 @@
 - The next persisted Phase 4 execution-day boundary is now live locally: scheduled handover records can move into a real in-progress state and then close through a controlled completion summary without provider callbacks
 - The next persisted Phase 4 aftercare boundary is now live locally: completed handover records can capture a manager review and one explicit post-handover follow-up boundary with owner, due time, and resolution summary
 - The next persisted Phase 4 admin-closure boundary is now live locally: completed handover records can capture an archive review plus manual held, ready-to-archive, and archived statuses without external archive automation
+- The next persisted Phase 4 manager-visibility boundary is now live locally: manager workspace and lead-list surfaces now expose derived handover closure signals for closure review required, aftercare open, held, ready-to-archive, and archived states
 - Phase 5: hardening and enterprise controls
 
 ## Completed Major Slices
@@ -67,6 +68,7 @@
 - Added the next persisted handover slice with explicit execution start, controlled completion, persisted execution timestamps, completion summaries, linked audit events, and live handover-day controls
 - Added the next persisted handover slice with post-completion manager review, explicit aftercare follow-up tracking, resolution summaries, linked audit events, and live post-handover controls
 - Added the next persisted handover slice with administrative closure review, archive hold or ready decisions, manual archived status, linked audit events, and live archive-boundary controls
+- Added the next persisted manager-visibility slice with derived handover-closure signals in case summaries, manager workspace metrics, closure queues, lead-list badges, and integration-tested list visibility for archived records
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -94,6 +96,7 @@
 - Post-handover follow-up is explicitly gated by a saved review outcome that requires follow-up
 - Administrative archive review can only start after the handover record is completed, the manager review exists, and any required aftercare follow-up is resolved
 - Archive status is a manual admin boundary on the completed record with `held`, `ready`, and `archived` states; it does not trigger any external archive system
+- Case summaries now expose a derived `handoverClosure` signal for manager and list surfaces instead of requiring full handover-detail fetches to render closure state
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
 - Normal `git push` runs `scripts/verify-push.sh` via `.githooks/pre-push`

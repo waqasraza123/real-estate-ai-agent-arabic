@@ -46,6 +46,7 @@ describe("lead capture api", () => {
     expect(createdCase.ownerName).toBe("Revenue Ops Queue");
     expect(createdCase.followUpStatus).toBe("on_track");
     expect(createdCase.automationStatus).toBe("active");
+    expect(createdCase.handoverClosure).toBeNull();
 
     const detailResponse = await app.inject({
       method: "GET",
@@ -649,6 +650,17 @@ describe("lead capture api", () => {
     expect(refreshedCaseResponse.statusCode).toBe(200);
     expect(refreshedCaseResponse.json().handoverCase.status).toBe("completed");
     expect(refreshedCaseResponse.json().handoverCase.handoverCaseId).toBe(handoverCaseId);
+    expect(refreshedCaseResponse.json().handoverClosure.status).toBe("archived");
+
+    const caseListResponse = await app.inject({
+      method: "GET",
+      url: "/v1/cases"
+    });
+
+    expect(caseListResponse.statusCode).toBe(200);
+    expect(
+      caseListResponse.json().cases.find((caseItem: { caseId: string }) => caseItem.caseId === createdCase.caseId)?.handoverClosure?.status
+    ).toBe("archived");
   }, 50000);
 
   it("rejects invalid payloads and invalid handover promotion attempts", async () => {

@@ -11,7 +11,8 @@ import {
   formatDueAt,
   getPersistedAutomationLabel,
   getPersistedCaseStageLabel,
-  getPersistedFollowUpLabel
+  getPersistedFollowUpLabel,
+  getPersistedHandoverClosureDisplay
 } from "@/lib/persisted-case-presenters";
 import { getInterventionCountLabel } from "@/lib/live-copy";
 import { tryListPersistedCases } from "@/lib/live-api";
@@ -27,6 +28,7 @@ export default async function LeadsPage(props: PageProps) {
   const messages = getMessages(locale);
   const persistedCases = await tryListPersistedCases();
   const columnLabels = {
+    closure: locale === "ar" ? "إغلاق التسليم" : "Handover closure",
     currentOwner: messages.common.currentOwner,
     dueAt: locale === "ar" ? "موعد الخطوة التالية" : "Next action due",
     lastChange: messages.common.lastChange,
@@ -49,6 +51,7 @@ export default async function LeadsPage(props: PageProps) {
                 <tr>
                   <th>{columnLabels.lead}</th>
                   <th>{columnLabels.stage}</th>
+                  <th>{columnLabels.closure}</th>
                   <th>{columnLabels.currentOwner}</th>
                   <th>{columnLabels.nextAction}</th>
                   <th>{columnLabels.dueAt}</th>
@@ -57,34 +60,52 @@ export default async function LeadsPage(props: PageProps) {
               </thead>
               <tbody>
                 {persistedCases.map((caseItem) => (
-                  <tr key={caseItem.caseId}>
-                    <td data-column-label={columnLabels.lead}>
-                      <Link className="table-link" href={`/${locale}/leads/${caseItem.caseId}`}>
-                        <strong>{caseItem.customerName}</strong>
-                        <span>{buildCaseReferenceCode(caseItem.caseId)}</span>
-                      </Link>
-                    </td>
-                    <td data-column-label={columnLabels.stage}>
-                      <StatusBadge>{getPersistedCaseStageLabel(locale, caseItem.stage)}</StatusBadge>
-                    </td>
-                    <td data-column-label={columnLabels.currentOwner}>{caseItem.ownerName}</td>
-                    <td data-column-label={columnLabels.nextAction}>
-                      <div className="stack-tight">
-                        <span>{caseItem.nextAction}</span>
-                        <div className="status-row-wrap">
-                          <StatusBadge>{getPersistedAutomationLabel(locale, caseItem.automationStatus)}</StatusBadge>
-                          {caseItem.openInterventionsCount > 0 ? (
-                            <StatusBadge tone="warning">{getInterventionCountLabel(locale, caseItem.openInterventionsCount)}</StatusBadge>
-                          ) : null}
-                        </div>
-                        <StatusBadge tone={caseItem.followUpStatus === "attention" ? "critical" : "success"}>
-                          {getPersistedFollowUpLabel(locale, caseItem)}
-                        </StatusBadge>
-                      </div>
-                    </td>
-                    <td data-column-label={columnLabels.dueAt}>{formatDueAt(caseItem, locale)}</td>
-                    <td data-column-label={columnLabels.lastChange}>{formatCaseLastChange(caseItem, locale)}</td>
-                  </tr>
+                  (() => {
+                    const closureDisplay = getPersistedHandoverClosureDisplay(locale, caseItem);
+
+                    return (
+                      <tr key={caseItem.caseId}>
+                        <td data-column-label={columnLabels.lead}>
+                          <Link className="table-link" href={`/${locale}/leads/${caseItem.caseId}`}>
+                            <strong>{caseItem.customerName}</strong>
+                            <span>{buildCaseReferenceCode(caseItem.caseId)}</span>
+                          </Link>
+                        </td>
+                        <td data-column-label={columnLabels.stage}>
+                          <StatusBadge>{getPersistedCaseStageLabel(locale, caseItem.stage)}</StatusBadge>
+                        </td>
+                        <td data-column-label={columnLabels.closure}>
+                          {closureDisplay ? (
+                            <div className="stack-tight">
+                              <StatusBadge tone={closureDisplay.statusTone}>{closureDisplay.statusLabel}</StatusBadge>
+                              <Link className="inline-link" href={`/${locale}/handover/${closureDisplay.handoverCaseId}`}>
+                                {locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
+                              </Link>
+                            </div>
+                          ) : (
+                            <span className="case-link-meta">{locale === "ar" ? "غير متاح" : "Not active"}</span>
+                          )}
+                        </td>
+                        <td data-column-label={columnLabels.currentOwner}>{caseItem.ownerName}</td>
+                        <td data-column-label={columnLabels.nextAction}>
+                          <div className="stack-tight">
+                            <span>{caseItem.nextAction}</span>
+                            <div className="status-row-wrap">
+                              <StatusBadge>{getPersistedAutomationLabel(locale, caseItem.automationStatus)}</StatusBadge>
+                              {caseItem.openInterventionsCount > 0 ? (
+                                <StatusBadge tone="warning">{getInterventionCountLabel(locale, caseItem.openInterventionsCount)}</StatusBadge>
+                              ) : null}
+                            </div>
+                            <StatusBadge tone={caseItem.followUpStatus === "attention" ? "critical" : "success"}>
+                              {getPersistedFollowUpLabel(locale, caseItem)}
+                            </StatusBadge>
+                          </div>
+                        </td>
+                        <td data-column-label={columnLabels.dueAt}>{formatDueAt(caseItem, locale)}</td>
+                        <td data-column-label={columnLabels.lastChange}>{formatCaseLastChange(caseItem, locale)}</td>
+                      </tr>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>
@@ -96,6 +117,7 @@ export default async function LeadsPage(props: PageProps) {
                 <tr>
                   <th>{columnLabels.lead}</th>
                   <th>{columnLabels.stage}</th>
+                  <th>{columnLabels.closure}</th>
                   <th>{columnLabels.currentOwner}</th>
                   <th>{columnLabels.nextAction}</th>
                   <th>{columnLabels.lastChange}</th>
@@ -112,6 +134,9 @@ export default async function LeadsPage(props: PageProps) {
                     </td>
                     <td data-column-label={columnLabels.stage}>
                       <StatusBadge>{getLocalizedText(caseItem.stage, locale)}</StatusBadge>
+                    </td>
+                    <td data-column-label={columnLabels.closure}>
+                      <span className="case-link-meta">{locale === "ar" ? "غير متاح" : "Not active"}</span>
                     </td>
                     <td data-column-label={columnLabels.currentOwner}>{caseItem.owner}</td>
                     <td data-column-label={columnLabels.nextAction}>{getLocalizedText(caseItem.nextAction, locale)}</td>

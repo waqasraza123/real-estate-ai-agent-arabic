@@ -5,6 +5,7 @@ import type {
   DocumentRequestType,
   FollowUpStatus,
   HandoverAppointmentStatus,
+  HandoverClosureState,
   HandoverArchiveOutcome,
   HandoverArchiveStatus,
   HandoverBlockerSeverity,
@@ -165,6 +166,27 @@ export function getFollowUpStatusLabel(locale: SupportedLocale, status: FollowUp
     en: {
       attention: "Needs attention",
       on_track: "On track"
+    }
+  } as const;
+
+  return labels[locale][status];
+}
+
+export function getHandoverClosureStateLabel(locale: SupportedLocale, status: HandoverClosureState) {
+  const labels = {
+    ar: {
+      aftercare_open: "متابعة ما بعد التسليم مفتوحة",
+      archived: "مؤرشف",
+      closure_review_required: "مراجعة الإغلاق مطلوبة",
+      held: "معلق إدارياً",
+      ready_to_archive: "جاهز للأرشفة"
+    },
+    en: {
+      aftercare_open: "Aftercare open",
+      archived: "Archived",
+      closure_review_required: "Closure review required",
+      held: "Admin hold",
+      ready_to_archive: "Ready to archive"
     }
   } as const;
 
