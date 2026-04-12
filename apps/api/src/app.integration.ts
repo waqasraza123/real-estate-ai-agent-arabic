@@ -46,6 +46,7 @@ describe("lead capture api", () => {
     expect(createdCase.ownerName).toBe("Revenue Ops Queue");
     expect(createdCase.followUpStatus).toBe("on_track");
     expect(createdCase.automationStatus).toBe("active");
+    expect(createdCase.handoverCase).toBeNull();
     expect(createdCase.handoverClosure).toBeNull();
 
     const detailResponse = await app.inject({
@@ -809,6 +810,36 @@ describe("lead capture api", () => {
     expect(earlyHandoverResponse.statusCode).toBe(409);
     expect(earlyHandoverResponse.json().error).toBe("documents_incomplete_for_handover");
   });
+
+  it("lists active handover summaries across planning, execution, and closure surfaces", async () => {
+    const planningRecord = await createPlanningBoundaryHandoverRecord(app);
+    const scheduledRecord = await createScheduledHandoverRecord(app);
+    const completedRecord = await createCompletedHandoverRecord(app);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/v1/cases"
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+
+    const persistedCases = listResponse.json().cases;
+    const planningSummary = persistedCases.find((caseItem: { caseId: string }) => caseItem.caseId === planningRecord.caseId);
+    const scheduledSummary = persistedCases.find((caseItem: { caseId: string }) => caseItem.caseId === scheduledRecord.caseId);
+    const completedSummary = persistedCases.find((caseItem: { caseId: string }) => caseItem.caseId === completedRecord.caseId);
+
+    expect(planningSummary?.handoverCase?.handoverCaseId).toBe(planningRecord.handoverCaseId);
+    expect(["pending_readiness", "internal_tasks_open", "customer_scheduling_ready"]).toContain(planningSummary?.handoverCase?.status);
+    expect(planningSummary?.handoverClosure).toBeNull();
+
+    expect(scheduledSummary?.handoverCase?.handoverCaseId).toBe(scheduledRecord.handoverCaseId);
+    expect(scheduledSummary?.handoverCase?.status).toBe("scheduled");
+    expect(scheduledSummary?.handoverClosure).toBeNull();
+
+    expect(completedSummary?.handoverCase?.handoverCaseId).toBe(completedRecord.handoverCaseId);
+    expect(completedSummary?.handoverCase?.status).toBe("completed");
+    expect(completedSummary?.handoverClosure?.status).toBe("closure_review_required");
+  }, 50000);
 
   it("enforces role-aware governance on post-completion and archive boundaries", async () => {
     const completedHandoverRecord = await createCompletedHandoverRecord(app);

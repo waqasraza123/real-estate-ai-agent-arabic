@@ -334,6 +334,7 @@ export const persistedCaseSummarySchema = z.object({
   createdAt: z.iso.datetime(),
   customerName: z.string(),
   followUpStatus: followUpStatusSchema,
+  handoverCase: persistedLinkedHandoverCaseSchema.nullable(),
   handoverClosure: persistedHandoverClosureSummarySchema.nullable(),
   nextAction: z.string(),
   nextActionDueAt: z.iso.datetime(),

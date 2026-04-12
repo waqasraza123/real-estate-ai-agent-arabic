@@ -350,6 +350,60 @@ export function getPersistedHandoverClosureDisplay(locale: SupportedLocale, case
   };
 }
 
+export function getPersistedHandoverWorkspaceDisplay(locale: SupportedLocale, caseSummary: PersistedCaseDetail | PersistedCaseSummary) {
+  if (caseSummary.handoverClosure) {
+    const closureDisplay = getPersistedHandoverClosureDisplay(locale, caseSummary);
+
+    if (!closureDisplay) {
+      return null;
+    }
+
+    return {
+      handoverCaseId: closureDisplay.handoverCaseId,
+      statusLabel: closureDisplay.statusLabel,
+      statusTone: closureDisplay.statusTone,
+      surface: "closure" as const,
+      surfaceLabel: locale === "ar" ? "الإغلاق" : "Closure",
+      updatedAt: closureDisplay.updatedAt
+    };
+  }
+
+  if (!caseSummary.handoverCase) {
+    return null;
+  }
+
+  const surface = getPersistedHandoverWorkspaceSurface(caseSummary);
+
+  if (!surface) {
+    return null;
+  }
+
+  return {
+    handoverCaseId: caseSummary.handoverCase.handoverCaseId,
+    statusLabel: getHandoverCaseStatusLabel(locale, caseSummary.handoverCase.status),
+    statusTone: getPersistedHandoverCaseTone(caseSummary.handoverCase.status),
+    surface,
+    surfaceLabel: getPersistedHandoverWorkspaceSurfaceLabel(locale, surface),
+    updatedAt: new Date(caseSummary.handoverCase.updatedAt).toLocaleString(locale)
+  };
+}
+
+export function getPersistedHandoverWorkspaceSurface(caseSummary: PersistedCaseDetail | PersistedCaseSummary) {
+  if (caseSummary.handoverClosure) {
+    return "closure" as const;
+  }
+
+  if (!caseSummary.handoverCase) {
+    return null;
+  }
+
+  if (caseSummary.handoverCase.status === "scheduled" || caseSummary.handoverCase.status === "in_progress") {
+    return "execution" as const;
+  }
+
+  return "planning" as const;
+}
+
 function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, locale: SupportedLocale, variant: "detail" | "title") {
   const descriptions = {
     ar: {
@@ -756,6 +810,35 @@ function getHandoverMilestoneTone(
   }
 
   return "warning";
+}
+
+function getPersistedHandoverCaseTone(status: NonNullable<PersistedCaseDetail["handoverCase"]>["status"]) {
+  if (status === "customer_scheduling_ready" || status === "completed") {
+    return "success" as const;
+  }
+
+  if (status === "in_progress") {
+    return "critical" as const;
+  }
+
+  return "warning" as const;
+}
+
+function getPersistedHandoverWorkspaceSurfaceLabel(locale: SupportedLocale, surface: "planning" | "execution" | "closure") {
+  const labels = {
+    ar: {
+      closure: "الإغلاق",
+      execution: "التنفيذ",
+      planning: "التخطيط"
+    },
+    en: {
+      closure: "Closure",
+      execution: "Execution",
+      planning: "Planning"
+    }
+  } as const;
+
+  return labels[locale][surface];
 }
 
 function getHandoverCustomerUpdateTone(

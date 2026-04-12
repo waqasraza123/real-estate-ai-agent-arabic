@@ -1053,6 +1053,39 @@ export async function createAlphaLeadCaptureStore(options?: {
     );
   };
 
+  const listLinkedHandoverCases = async (caseIds: string[]) => {
+    const caseIdsWithValues = caseIds.filter(Boolean);
+
+    if (caseIdsWithValues.length === 0) {
+      return new Map<string, PersistedLinkedHandoverCase>();
+    }
+
+    const linkedHandoverRecords = await db
+      .select({
+        caseId: handoverCases.caseId,
+        createdAt: handoverCases.createdAt,
+        handoverCaseId: handoverCases.id,
+        ownerName: handoverCases.ownerName,
+        status: handoverCases.status,
+        updatedAt: handoverCases.updatedAt
+      })
+      .from(handoverCases)
+      .where(inArray(handoverCases.caseId, caseIdsWithValues));
+
+    return new Map(
+      linkedHandoverRecords.map((record) => [
+        record.caseId,
+        hydrateLinkedHandoverCase({
+          createdAt: record.createdAt,
+          handoverCaseId: record.handoverCaseId,
+          ownerName: record.ownerName,
+          status: record.status,
+          updatedAt: record.updatedAt
+        })
+      ])
+    );
+  };
+
   const getPersistedCaseDetail = async (caseId: string): Promise<PersistedCaseDetail | null> => {
     const persistedCase = await db
       .select({
@@ -1455,6 +1488,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         createdAt: createdCase.createdAt,
         customerName: createdCase.customerName,
         followUpStatus: toFollowUpStatus(createdCase.nextActionDueAt),
+        handoverCase: null,
         handoverClosure: null,
         leadId: createdCase.leadId,
         nextAction: createdCase.nextAction,
@@ -1495,8 +1529,9 @@ export async function createAlphaLeadCaptureStore(options?: {
         .orderBy(desc(cases.createdAt));
 
       const caseIds = persistedCases.map((caseRecord) => caseRecord.caseId);
-      const [openInterventionCounts, handoverClosureSummaries] = await Promise.all([
+      const [openInterventionCounts, linkedHandoverCases, handoverClosureSummaries] = await Promise.all([
         listOpenInterventionCounts(caseIds),
+        listLinkedHandoverCases(caseIds),
         listHandoverClosureSummaries(caseIds)
       ]);
 
@@ -1506,6 +1541,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         createdAt: caseRecord.createdAt,
         customerName: caseRecord.customerName,
         followUpStatus: toFollowUpStatus(caseRecord.nextActionDueAt),
+        handoverCase: linkedHandoverCases.get(caseRecord.caseId) ?? null,
         handoverClosure: handoverClosureSummaries.get(caseRecord.caseId) ?? null,
         nextAction: caseRecord.nextAction,
         nextActionDueAt: caseRecord.nextActionDueAt,

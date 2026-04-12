@@ -39,3 +39,10 @@ test("handover shell renders milestone readiness", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Handover workspace");
   await expect(page.getByText("blocked", { exact: true })).toBeVisible();
 });
+
+test("manager shell renders the command-center fallback", async ({ page }) => {
+  await page.goto(smokeRoutes.manager);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Manager command center");
+  await expect(page.getByText("Cases that need manager action")).toBeVisible();
+});
