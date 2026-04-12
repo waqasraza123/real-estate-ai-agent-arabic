@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
+  operatorRoleSchema,
   approveHandoverCustomerUpdateInputSchema,
   completeHandoverInputSchema,
   confirmHandoverAppointmentInputSchema,
@@ -31,6 +33,7 @@ import {
 } from "@real-estate-ai/contracts";
 
 import { initialFormActionState, type FormActionState } from "@/lib/form-action-state";
+import { defaultOperatorRole, getOperatorRoleFromCookie, operatorRoleCookieName } from "@/lib/operator-role";
 import {
   WebApiError,
   approveHandoverCustomerUpdate,
@@ -57,6 +60,21 @@ import {
   updateHandoverMilestone,
   updateHandoverTask
 } from "@/lib/live-api";
+
+export async function setOperatorRoleAction(formData: FormData) {
+  const roleResult = operatorRoleSchema.safeParse(formData.get("operatorRole"));
+  const returnPathValue = formData.get("returnPath");
+  const returnPath = typeof returnPathValue === "string" && returnPathValue.startsWith("/") ? returnPathValue : "/en";
+  const cookieStore = await cookies();
+
+  cookieStore.set(operatorRoleCookieName, roleResult.success ? roleResult.data : defaultOperatorRole, {
+    maxAge: 60 * 60 * 8,
+    path: "/",
+    sameSite: "lax"
+  });
+
+  redirect(returnPath);
+}
 
 export async function createHandoverIntakeAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
   const locale = getLocale(formData.get("locale"));
@@ -557,7 +575,7 @@ export async function saveHandoverReviewAction(_: FormActionState, formData: For
   }
 
   try {
-    const updatedHandoverCase = await saveHandoverReview(handoverCaseId, result.data);
+    const updatedHandoverCase = await saveHandoverReview(handoverCaseId, result.data, await getOperatorRole());
     revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
 
     return {
@@ -604,7 +622,7 @@ export async function saveHandoverArchiveReviewAction(_: FormActionState, formDa
   }
 
   try {
-    const updatedHandoverCase = await saveHandoverArchiveReview(handoverCaseId, result.data);
+    const updatedHandoverCase = await saveHandoverArchiveReview(handoverCaseId, result.data, await getOperatorRole());
     revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
 
     return {
@@ -657,7 +675,7 @@ export async function createHandoverPostCompletionFollowUpAction(
   }
 
   try {
-    const updatedHandoverCase = await createHandoverPostCompletionFollowUp(handoverCaseId, result.data);
+    const updatedHandoverCase = await createHandoverPostCompletionFollowUp(handoverCaseId, result.data, await getOperatorRole());
     revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
 
     return {
@@ -708,7 +726,12 @@ export async function resolveHandoverPostCompletionFollowUpAction(
   }
 
   try {
-    const updatedHandoverCase = await resolveHandoverPostCompletionFollowUp(handoverCaseId, followUpId, result.data);
+    const updatedHandoverCase = await resolveHandoverPostCompletionFollowUp(
+      handoverCaseId,
+      followUpId,
+      result.data,
+      await getOperatorRole()
+    );
     revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
 
     return {
@@ -755,7 +778,7 @@ export async function updateHandoverArchiveStatusAction(_: FormActionState, form
   }
 
   try {
-    const updatedHandoverCase = await updateHandoverArchiveStatus(handoverCaseId, result.data);
+    const updatedHandoverCase = await updateHandoverArchiveStatus(handoverCaseId, result.data, await getOperatorRole());
     revalidateHandoverPaths(locale, returnPath, updatedHandoverCase.caseId, updatedHandoverCase.handoverCaseId);
 
     return {
@@ -1054,6 +1077,16 @@ export async function markHandoverCustomerUpdateDispatchReadyAction(
 }
 
 function getActionError(locale: "en" | "ar", error: unknown): FormActionState {
+  if (error instanceof WebApiError && error.status === 403) {
+    return {
+      message:
+        locale === "ar"
+          ? "هذا الإجراء يتطلب دور مدير التسليم أو المشرف في وضع التحكم المحلي."
+          : "This action requires the handover manager or admin role in local control mode.",
+      status: "error"
+    };
+  }
+
   if (error instanceof WebApiError && error.status >= 500) {
     return {
       message:
@@ -1091,6 +1124,12 @@ function getValidationMessage(locale: "en" | "ar") {
 
 function normalizeOptionalString(value: FormDataEntryValue | null) {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+async function getOperatorRole() {
+  const cookieStore = await cookies();
+
+  return getOperatorRoleFromCookie(cookieStore.get(operatorRoleCookieName)?.value);
 }
 
 function revalidatePaths(locale: "en" | "ar", returnPath: string, caseId: string, handoverCaseId?: string) {

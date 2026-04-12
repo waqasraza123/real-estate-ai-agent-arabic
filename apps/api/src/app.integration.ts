@@ -710,4 +710,364 @@ describe("lead capture api", () => {
     expect(earlyHandoverResponse.statusCode).toBe(409);
     expect(earlyHandoverResponse.json().error).toBe("documents_incomplete_for_handover");
   });
+
+  it("enforces role-aware governance on post-completion and archive boundaries", async () => {
+    const completedHandoverRecord = await createCompletedHandoverRecord(app);
+
+    const forbiddenReviewResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_coordinator"
+      },
+      method: "PATCH",
+      payload: {
+        outcome: "follow_up_required",
+        summary: "A coordinator attempted to save a governance review without manager-level authority."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/review`
+    });
+
+    expect(forbiddenReviewResponse.statusCode).toBe(403);
+    expect(forbiddenReviewResponse.json().error).toBe("insufficient_role");
+
+    const allowedReviewResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_manager"
+      },
+      method: "PATCH",
+      payload: {
+        outcome: "follow_up_required",
+        summary: "Manager review requires one explicit aftercare item before the record can move into archive review."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/review`
+    });
+
+    expect(allowedReviewResponse.statusCode).toBe(200);
+    expect(allowedReviewResponse.json().review.outcome).toBe("follow_up_required");
+
+    const forbiddenFollowUpCreateResponse = await app.inject({
+      headers: {
+        "x-operator-role": "sales_manager"
+      },
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-27T10:00:00.000Z",
+        ownerName: "Aftercare Desk",
+        status: "open",
+        summary: "A sales manager attempted to open a handover aftercare record without the required governance role."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/post-completion-follow-up`
+    });
+
+    expect(forbiddenFollowUpCreateResponse.statusCode).toBe(403);
+
+    const allowedFollowUpCreateResponse = await app.inject({
+      headers: {
+        "x-operator-role": "admin"
+      },
+      method: "PATCH",
+      payload: {
+        dueAt: "2026-04-27T10:00:00.000Z",
+        ownerName: "Aftercare Desk",
+        status: "open",
+        summary: "The customer requested one final utilities orientation follow-up after completion."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/post-completion-follow-up`
+    });
+
+    expect(allowedFollowUpCreateResponse.statusCode).toBe(200);
+    expect(allowedFollowUpCreateResponse.json().postCompletionFollowUp.status).toBe("open");
+
+    const followUpId = allowedFollowUpCreateResponse.json().postCompletionFollowUp.followUpId;
+
+    const forbiddenFollowUpResolveResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_coordinator"
+      },
+      method: "PATCH",
+      payload: {
+        resolutionSummary: "A coordinator attempted to resolve the aftercare item without the required governance role.",
+        status: "resolved"
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/post-completion-follow-up/${followUpId}`
+    });
+
+    expect(forbiddenFollowUpResolveResponse.statusCode).toBe(403);
+
+    const allowedFollowUpResolveResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_manager"
+      },
+      method: "PATCH",
+      payload: {
+        resolutionSummary: "The aftercare desk completed the final utilities orientation and cleared the follow-up boundary.",
+        status: "resolved"
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/post-completion-follow-up/${followUpId}`
+    });
+
+    expect(allowedFollowUpResolveResponse.statusCode).toBe(200);
+    expect(allowedFollowUpResolveResponse.json().postCompletionFollowUp.status).toBe("resolved");
+
+    const forbiddenArchiveReviewResponse = await app.inject({
+      headers: {
+        "x-operator-role": "sales_manager"
+      },
+      method: "PATCH",
+      payload: {
+        outcome: "ready_to_archive",
+        summary: "A sales manager attempted to save the archive review without the handover governance role."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/archive-review`
+    });
+
+    expect(forbiddenArchiveReviewResponse.statusCode).toBe(403);
+
+    const allowedArchiveReviewResponse = await app.inject({
+      headers: {
+        "x-operator-role": "admin"
+      },
+      method: "PATCH",
+      payload: {
+        outcome: "ready_to_archive",
+        summary: "Admin closure review confirms the completed and reviewed record is ready to archive."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/archive-review`
+    });
+
+    expect(allowedArchiveReviewResponse.statusCode).toBe(200);
+    expect(allowedArchiveReviewResponse.json().archiveReview.outcome).toBe("ready_to_archive");
+
+    const forbiddenArchiveStatusResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_coordinator"
+      },
+      method: "PATCH",
+      payload: {
+        status: "ready",
+        summary: "A coordinator attempted to move the record into the archive-ready state."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/archive-status`
+    });
+
+    expect(forbiddenArchiveStatusResponse.statusCode).toBe(403);
+
+    const allowedArchiveStatusResponse = await app.inject({
+      headers: {
+        "x-operator-role": "handover_manager"
+      },
+      method: "PATCH",
+      payload: {
+        status: "ready",
+        summary: "Manager moved the reviewed record into the archive-ready state."
+      },
+      url: `/v1/handover-cases/${completedHandoverRecord.handoverCaseId}/archive-status`
+    });
+
+    expect(allowedArchiveStatusResponse.statusCode).toBe(200);
+    expect(allowedArchiveStatusResponse.json().archiveStatus.status).toBe("ready");
+  }, 50000);
 });
+
+async function createCompletedHandoverRecord(app: ReturnType<typeof buildApiApp>) {
+  const createResponse = await app.inject({
+    method: "POST",
+    payload: {
+      customerName: "Noura Al Harbi",
+      email: "noura@example.com",
+      message: "Need a bilingual handover path with clear follow-up ownership after move-in.",
+      preferredLocale: "ar",
+      projectInterest: "Palm Horizon"
+    },
+    url: "/v1/website-leads"
+  });
+
+  const createdCase = createResponse.json();
+
+  await app.inject({
+    method: "POST",
+    payload: {
+      budgetBand: "SAR 1.8M to 2.0M",
+      intentSummary: "Qualified buyer with final readiness confirmed and a handover date expected within the month.",
+      moveInTimeline: "Within 30 days",
+      readiness: "high"
+    },
+    url: `/v1/cases/${createdCase.caseId}/qualification`
+  });
+
+  const visitResponse = await app.inject({
+    method: "POST",
+    payload: {
+      location: "Palm Horizon Discovery Center",
+      scheduledAt: "2026-04-15T12:30:00.000Z"
+    },
+    url: `/v1/cases/${createdCase.caseId}/visits`
+  });
+
+  for (const documentRequest of visitResponse.json().documentRequests) {
+    await app.inject({
+      method: "PATCH",
+      payload: {
+        status: "accepted"
+      },
+      url: `/v1/cases/${createdCase.caseId}/documents/${documentRequest.documentRequestId}`
+    });
+  }
+
+  const handoverIntakeResponse = await app.inject({
+    method: "POST",
+    payload: {
+      ownerName: "Handover Desk Riyadh",
+      readinessSummary: "Documents are accepted and the case is ready to enter the controlled handover flow."
+    },
+    url: `/v1/cases/${createdCase.caseId}/handover-intake`
+  });
+
+  const handoverCaseId = handoverIntakeResponse.json().handoverCase.handoverCaseId;
+  const handoverDetailResponse = await app.inject({
+    method: "GET",
+    url: `/v1/handover-cases/${handoverCaseId}`
+  });
+  const handoverDetail = handoverDetailResponse.json();
+  const readinessMilestoneId = handoverDetail.milestones.find(
+    (milestone: { type: string }) => milestone.type === "readiness_gate"
+  )?.milestoneId;
+  const schedulingMilestoneId = handoverDetail.milestones.find(
+    (milestone: { type: string }) => milestone.type === "customer_scheduling_window"
+  )?.milestoneId;
+  const appointmentHoldMilestoneId = handoverDetail.milestones.find(
+    (milestone: { type: string }) => milestone.type === "handover_appointment_hold"
+  )?.milestoneId;
+  const readinessCustomerUpdateId = handoverDetail.customerUpdates.find(
+    (customerUpdate: { type: string }) => customerUpdate.type === "readiness_update"
+  )?.customerUpdateId;
+  const schedulingInviteId = handoverDetail.customerUpdates.find(
+    (customerUpdate: { type: string }) => customerUpdate.type === "scheduling_invite"
+  )?.customerUpdateId;
+  const appointmentConfirmationId = handoverDetail.customerUpdates.find(
+    (customerUpdate: { type: string }) => customerUpdate.type === "appointment_confirmation"
+  )?.customerUpdateId;
+
+  for (const task of handoverDetail.tasks) {
+    await app.inject({
+      method: "PATCH",
+      payload: {
+        status: "complete"
+      },
+      url: `/v1/handover-cases/${handoverCaseId}/tasks/${task.taskId}`
+    });
+  }
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      ownerName: "Customer Care Desk",
+      status: "ready",
+      targetAt: "2026-04-18T09:00:00.000Z"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/milestones/${readinessMilestoneId}`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "approved"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${readinessCustomerUpdateId}`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      ownerName: "Scheduling Desk",
+      status: "ready",
+      targetAt: "2026-04-20T10:00:00.000Z"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/milestones/${schedulingMilestoneId}`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "approved"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${schedulingInviteId}`
+  });
+
+  const appointmentResponse = await app.inject({
+    method: "PATCH",
+    payload: {
+      coordinatorName: "Handover Control",
+      location: "Palm Horizon Tower A",
+      scheduledAt: "2026-04-21T13:00:00.000Z"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/appointment`
+  });
+
+  const appointmentId = appointmentResponse.json().appointment.appointmentId;
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      ownerName: "Project Ops",
+      status: "ready",
+      targetAt: "2026-04-21T09:00:00.000Z"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/milestones/${appointmentHoldMilestoneId}`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "approved"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${appointmentConfirmationId}`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "internally_confirmed"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/appointment/${appointmentId}/confirmation`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      deliverySummary: "Arabic confirmation copy is prepared for manual outbound dispatch after final ops review.",
+      status: "prepared_for_delivery"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${appointmentConfirmationId}/delivery`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "ready_to_dispatch"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/customer-updates/${appointmentConfirmationId}/dispatch-ready`
+  });
+
+  await app.inject({
+    method: "PATCH",
+    payload: {
+      status: "in_progress"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/execution`
+  });
+
+  const completionResponse = await app.inject({
+    method: "PATCH",
+    payload: {
+      completionSummary: "Keys were released, the walkthrough was acknowledged, and the live handover record is complete.",
+      status: "completed"
+    },
+    url: `/v1/handover-cases/${handoverCaseId}/completion`
+  });
+
+  return {
+    caseId: createdCase.caseId,
+    handoverCaseId,
+    handoverStatus: completionResponse.json().status
+  };
+}

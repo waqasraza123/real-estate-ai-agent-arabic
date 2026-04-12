@@ -55,6 +55,9 @@ export const arMessages = {
   },
   common: {
     switchLanguage: "تبديل اللغة",
+    operatorRole: "دور المشغل",
+    applyRole: "تطبيق الدور",
+    roleGuardNote: "ضوابط ما بعد التسليم والأرشفة تتطلب مدير التسليم أو المشرف.",
     skipToContent: "تخطي إلى المحتوى الرئيسي",
     primaryNavigation: "التنقل الرئيسي",
     demoState: "بيانات تجريبية فقط",
@@ -72,6 +75,12 @@ export const arMessages = {
     manager: "المدير",
     placeholderNotice:
       "هذه الشاشة تعتمد عمداً على بيانات تجريبية في المرحلة 1A حتى يتم تثبيت هيكل المستودع قبل إضافة خدمات التشغيل الفعلية."
+  },
+  roles: {
+    sales_manager: "مدير المبيعات",
+    handover_coordinator: "منسق التسليم",
+    handover_manager: "مدير التسليم",
+    admin: "المشرف"
   },
   states: {
     loadingTitle: "جارٍ تجهيز القالب",

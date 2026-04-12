@@ -58,6 +58,9 @@ export interface AppMessages {
   };
   common: {
     switchLanguage: string;
+    operatorRole: string;
+    applyRole: string;
+    roleGuardNote: string;
     skipToContent: string;
     primaryNavigation: string;
     demoState: string;
@@ -74,6 +77,12 @@ export interface AppMessages {
     automation: string;
     manager: string;
     placeholderNotice: string;
+  };
+  roles: {
+    sales_manager: string;
+    handover_coordinator: string;
+    handover_manager: string;
+    admin: string;
   };
   states: {
     loadingTitle: string;

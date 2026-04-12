@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const supportedLocaleSchema = z.enum(["en", "ar"]);
+export const operatorRoleSchema = z.enum(["sales_manager", "handover_coordinator", "handover_manager", "admin"]);
 export const leadSourceSchema = z.enum(["website"]);
 export const caseStageSchema = z.enum(["new", "qualified", "visit_scheduled", "documents_in_progress", "handover_initiated"]);
 export const followUpStatusSchema = z.enum(["on_track", "attention"]);
@@ -401,6 +402,7 @@ export type MarkHandoverCustomerUpdateDispatchReadyInput = z.infer<typeof markHa
 export type ManagerInterventionSeverity = z.infer<typeof managerInterventionSeveritySchema>;
 export type ManagerInterventionStatus = z.infer<typeof managerInterventionStatusSchema>;
 export type ManagerInterventionType = z.infer<typeof managerInterventionTypeSchema>;
+export type OperatorRole = z.infer<typeof operatorRoleSchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseSummary = z.infer<typeof persistedCaseSummarySchema>;
 export type PersistedDocumentRequest = z.infer<typeof persistedDocumentRequestSchema>;

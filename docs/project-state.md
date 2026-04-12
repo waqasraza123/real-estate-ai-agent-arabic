@@ -45,6 +45,7 @@
 - The next persisted Phase 4 admin-closure boundary is now live locally: completed handover records can capture an archive review plus manual held, ready-to-archive, and archived statuses without external archive automation
 - The next persisted Phase 4 manager-visibility boundary is now live locally: manager workspace and lead-list surfaces now expose derived handover closure signals for closure review required, aftercare open, held, ready-to-archive, and archived states
 - Phase 5: hardening and enterprise controls
+- The first persisted Phase 5 control boundary is now live locally: role-aware restrictions now protect post-completion review, aftercare follow-up, and archive mutations behind local handover-manager or admin control
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -69,6 +70,7 @@
 - Added the next persisted handover slice with post-completion manager review, explicit aftercare follow-up tracking, resolution summaries, linked audit events, and live post-handover controls
 - Added the next persisted handover slice with administrative closure review, archive hold or ready decisions, manual archived status, linked audit events, and live archive-boundary controls
 - Added the next persisted manager-visibility slice with derived handover-closure signals in case summaries, manager workspace metrics, closure queues, lead-list badges, and integration-tested list visibility for archived records
+- Added the first persisted Phase 5 control slice with local operator-role switching in the web shell, API-enforced governance permissions on post-completion and archive mutations, localized role visibility, and integration coverage for restricted vs allowed roles
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -97,6 +99,8 @@
 - Administrative archive review can only start after the handover record is completed, the manager review exists, and any required aftercare follow-up is resolved
 - Archive status is a manual admin boundary on the completed record with `held`, `ready`, and `archived` states; it does not trigger any external archive system
 - Case summaries now expose a derived `handoverClosure` signal for manager and list surfaces instead of requiring full handover-detail fetches to render closure state
+- The first local authorization boundary uses a cookie-backed operator role in the web shell and an `x-operator-role` API header; this is a deliberate local-control bridge until real authentication and authorization are implemented
+- Post-completion review, aftercare follow-up, archive review, and archive status changes are now explicitly limited to `handover_manager` and `admin` roles
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
 - Normal `git push` runs `scripts/verify-push.sh` via `.githooks/pre-push`
@@ -104,6 +108,7 @@
 
 ## Deferred / Not Yet Implemented
 - Authentication and authorization
+- Real identity, sessions, and server-trusted role assignment beyond the current local operator-role control mode
 - External integrations
 - Dashboards and analytics
 - Agent orchestration and workflow automation
@@ -124,6 +129,7 @@
 - The local `PGlite` alpha store is a development convenience and must not be mistaken for the long-term production deployment model
 - The current local queue model is intentionally transitional and must not be mistaken for the long-term distributed worker architecture
 - Phase 4 should not be overextended prematurely; the current handover slice is intentionally limited to intake, milestone planning, approval-only customer boundaries, internal appointment confirmation, dispatch-ready preparation, blocker tracking, explicit execution start, controlled completion, aftercare, and a narrow admin-closure boundary, not live provider sending, external archiving, or downstream automation
+- The current operator-role boundary is intentionally local and convenience-oriented; it proves permission flows and UI behavior but must not be mistaken for full production authentication
 
 ## Standard Verification
 - `git status --short`

@@ -4,13 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import type { OperatorRole } from "@real-estate-ai/contracts";
 import type { SupportedLocale } from "@real-estate-ai/domain";
 import type { AppMessages } from "@real-estate-ai/i18n";
 import { getLocaleLabel, toggleLocale } from "@real-estate-ai/i18n";
 import { cx } from "@real-estate-ai/ui";
 
+import { OperatorRoleSwitcher } from "@/components/operator-role-switcher";
+
 export function AppChrome(props: {
   children: ReactNode;
+  currentOperatorRole: OperatorRole;
   locale: SupportedLocale;
   messages: AppMessages;
 }) {
@@ -53,6 +57,10 @@ export function AppChrome(props: {
         </div>
         <div className="chrome-actions">
           <span className="chrome-status">{props.messages.app.phaseLabel}</span>
+          <div className="chrome-role-group">
+            <OperatorRoleSwitcher currentOperatorRole={props.currentOperatorRole} messages={props.messages} />
+            <p className="chrome-role-note">{props.messages.common.roleGuardNote}</p>
+          </div>
           <nav aria-label={props.messages.common.switchLanguage} className="locale-switch">
             <Link className={cx(props.locale === "en" && "locale-active")} href={replaceLocale(pathname, "en")}>
               {getLocaleLabel("en")}

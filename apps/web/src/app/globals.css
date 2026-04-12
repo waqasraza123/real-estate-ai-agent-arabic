@@ -141,6 +141,21 @@ textarea {
   gap: 0.8rem;
 }
 
+.chrome-role-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.chrome-role-note {
+  margin: 0;
+  max-width: 21rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-align: end;
+}
+
 .chrome-status {
   border: 1px solid rgba(114, 213, 178, 0.24);
   background: rgba(114, 213, 178, 0.1);
@@ -177,6 +192,52 @@ textarea {
 .locale-switch .locale-active {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text);
+}
+
+.role-switcher {
+  display: inline-flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.role-switcher-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.role-switcher select {
+  min-width: 11.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  padding: 0.55rem 0.85rem;
+}
+
+.role-switcher-button {
+  border: 1px solid rgba(75, 176, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(75, 176, 255, 0.12);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.58rem 0.95rem;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.role-switcher-button:hover,
+.role-switcher-button:focus-visible {
+  background: rgba(75, 176, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.role-switcher-button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+  transform: none;
 }
 
 .chrome-layout {
@@ -965,6 +1026,15 @@ textarea {
 
   .chrome-actions {
     justify-content: flex-start;
+  }
+
+  .chrome-role-group {
+    align-items: flex-start;
+  }
+
+  .chrome-role-note {
+    max-width: none;
+    text-align: start;
   }
 
   .detail-grid {

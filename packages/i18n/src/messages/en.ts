@@ -55,6 +55,9 @@ export const enMessages = {
   },
   common: {
     switchLanguage: "Switch language",
+    operatorRole: "Operator role",
+    applyRole: "Apply role",
+    roleGuardNote: "Post-completion and archive controls require handover manager or admin.",
     skipToContent: "Skip to main content",
     primaryNavigation: "Primary navigation",
     demoState: "Demo data only",
@@ -72,6 +75,12 @@ export const enMessages = {
     manager: "Manager",
     placeholderNotice:
       "This screen is intentionally fixture-backed in Phase 1A so the repo can lock its structure before real workflow services are added."
+  },
+  roles: {
+    sales_manager: "Sales manager",
+    handover_coordinator: "Handover coordinator",
+    handover_manager: "Handover manager",
+    admin: "Admin"
   },
   states: {
     loadingTitle: "Preparing the shell",

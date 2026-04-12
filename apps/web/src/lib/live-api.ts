@@ -20,6 +20,7 @@ import type {
   SaveHandoverReviewInput,
   ScheduleVisitInput,
   StartHandoverExecutionInput,
+  OperatorRole,
   UpdateHandoverArchiveStatusInput,
   UpdateAutomationStatusInput,
   UpdateDocumentRequestInput,
@@ -32,6 +33,7 @@ const defaultApiBaseUrl = "http://127.0.0.1:4000";
 
 interface ApiRequestOptions {
   cache?: RequestCache;
+  headers?: Record<string, string> | undefined;
   method?: "GET" | "POST" | "PATCH";
   payload?: unknown;
 }
@@ -189,15 +191,21 @@ export async function completeHandover(handoverCaseId: string, input: CompleteHa
   });
 }
 
-export async function saveHandoverReview(handoverCaseId: string, input: SaveHandoverReviewInput) {
+export async function saveHandoverReview(handoverCaseId: string, input: SaveHandoverReviewInput, operatorRole?: OperatorRole) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/review`, {
+    headers: getOperatorRoleHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
 }
 
-export async function saveHandoverArchiveReview(handoverCaseId: string, input: SaveHandoverArchiveReviewInput) {
+export async function saveHandoverArchiveReview(
+  handoverCaseId: string,
+  input: SaveHandoverArchiveReviewInput,
+  operatorRole?: OperatorRole
+) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/archive-review`, {
+    headers: getOperatorRoleHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -205,9 +213,11 @@ export async function saveHandoverArchiveReview(handoverCaseId: string, input: S
 
 export async function createHandoverPostCompletionFollowUp(
   handoverCaseId: string,
-  input: CreateHandoverPostCompletionFollowUpInput
+  input: CreateHandoverPostCompletionFollowUpInput,
+  operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up`, {
+    headers: getOperatorRoleHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -216,16 +226,23 @@ export async function createHandoverPostCompletionFollowUp(
 export async function resolveHandoverPostCompletionFollowUp(
   handoverCaseId: string,
   followUpId: string,
-  input: ResolveHandoverPostCompletionFollowUpInput
+  input: ResolveHandoverPostCompletionFollowUpInput,
+  operatorRole?: OperatorRole
 ) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/post-completion-follow-up/${followUpId}`, {
+    headers: getOperatorRoleHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
 }
 
-export async function updateHandoverArchiveStatus(handoverCaseId: string, input: UpdateHandoverArchiveStatusInput) {
+export async function updateHandoverArchiveStatus(
+  handoverCaseId: string,
+  input: UpdateHandoverArchiveStatusInput,
+  operatorRole?: OperatorRole
+) {
   return requestJson<PersistedHandoverCaseDetail>(`/v1/handover-cases/${handoverCaseId}/archive-status`, {
+    headers: getOperatorRoleHeaders(operatorRole),
     method: "PATCH",
     payload: input
   });
@@ -312,7 +329,8 @@ async function requestJson<T>(path: string, options?: ApiRequestOptions) {
   const requestInit: RequestInit = {
     cache: options?.cache ?? "no-store",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(options?.headers ?? {})
     },
     method: options?.method ?? "GET",
     signal: AbortSignal.timeout(8000)
@@ -331,4 +349,8 @@ async function requestJson<T>(path: string, options?: ApiRequestOptions) {
   }
 
   return responseBody as T;
+}
+
+function getOperatorRoleHeaders(operatorRole?: OperatorRole) {
+  return operatorRole ? { "x-operator-role": operatorRole } : undefined;
 }
