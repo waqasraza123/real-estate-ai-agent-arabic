@@ -1158,7 +1158,7 @@ function revalidatePaths(locale: "en" | "ar", returnPath: string, caseId: string
   revalidatePath(`/${locale}/leads`);
   revalidatePath(`/${locale}/leads/${caseId}`);
   revalidatePath(`/${locale}/leads/${caseId}/documents`);
-  revalidatePath(`/${locale}/manager`);
+  revalidateManagerPaths(locale);
 
   if (handoverCaseId) {
     revalidatePath(`/${locale}/handover/${handoverCaseId}`);
@@ -1170,7 +1170,13 @@ function revalidateHandoverPaths(locale: "en" | "ar", returnPath: string, caseId
   revalidatePath(`/${locale}/handover/${handoverCaseId}`);
   revalidatePath(`/${locale}/leads/${caseId}`);
   revalidatePath(`/${locale}/leads/${caseId}/documents`);
+  revalidateManagerPaths(locale);
+}
+
+function revalidateManagerPaths(locale: "en" | "ar") {
   revalidatePath(`/${locale}/manager`);
+  revalidatePath(`/${locale}/manager/revenue`);
+  revalidatePath(`/${locale}/manager/handover`);
 }
 
 function toIsoDateTimeOrEmpty(value: string) {

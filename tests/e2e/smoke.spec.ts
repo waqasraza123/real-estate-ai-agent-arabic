@@ -1,8 +1,24 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type BrowserContext } from "@playwright/test";
 
 import { operatorSessionCookieName } from "@real-estate-ai/contracts";
 import { createOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
 import { smokeRoutes } from "@real-estate-ai/testing";
+
+async function setOperatorRoleCookie(
+  context: BrowserContext,
+  role: "sales_manager" | "handover_coordinator" | "handover_manager" | "admin"
+) {
+  await context.addCookies([
+    {
+      domain: "127.0.0.1",
+      httpOnly: true,
+      name: operatorSessionCookieName,
+      path: "/",
+      sameSite: "Lax",
+      value: createOperatorSessionToken(role).token
+    }
+  ]);
+}
 
 test("landing shell renders in English", async ({ page }) => {
   await page.goto(smokeRoutes.landing);
@@ -42,24 +58,45 @@ test("handover shell renders milestone readiness", async ({ page }) => {
   await expect(page.getByText("blocked", { exact: true })).toBeVisible();
 });
 
-test("manager shell renders the command-center fallback", async ({ page }) => {
+test("manager entry resolves to the handover command center in default role mode", async ({ page }) => {
+  await page.goto(smokeRoutes.manager);
+
+  await expect(page).toHaveURL(/\/en\/manager\/handover$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Handover command center");
+  await expect(page.getByRole("heading", { level: 2, name: "Fixture handover queue" })).toBeVisible();
+});
+
+test("sales manager lands in the revenue command center", async ({ context, page }) => {
+  await setOperatorRoleCookie(context, "sales_manager");
+
+  await page.goto(smokeRoutes.manager);
+
+  await expect(page).toHaveURL(/\/en\/manager\/revenue$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Revenue command center");
+  await expect(page.getByText("Revenue follow-up queue")).toBeVisible();
+});
+
+test("admin manager gateway exposes both dedicated manager routes", async ({ context, page }) => {
+  await setOperatorRoleCookie(context, "admin");
+
   await page.goto(smokeRoutes.manager);
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Manager command center");
-  await expect(page.getByText("Cases that need manager action")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open revenue command center" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open handover command center" })).toBeVisible();
+});
+
+test("sales manager cannot open the handover command center directly", async ({ context, page }) => {
+  await setOperatorRoleCookie(context, "sales_manager");
+
+  await page.goto(smokeRoutes.managerHandover);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Handover command center");
+  await expect(page.getByText("Handover command center required")).toBeVisible();
 });
 
 test("sales manager cannot open the handover workspace directly", async ({ context, page }) => {
-  await context.addCookies([
-    {
-      domain: "127.0.0.1",
-      httpOnly: true,
-      name: operatorSessionCookieName,
-      path: "/",
-      sameSite: "Lax",
-      value: createOperatorSessionToken("sales_manager").token
-    }
-  ]);
+  await setOperatorRoleCookie(context, "sales_manager");
 
   await page.goto(smokeRoutes.handover);
 

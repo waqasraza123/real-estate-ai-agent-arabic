@@ -51,6 +51,7 @@
 - The next persisted Phase 5 workspace boundary is now live locally: manager and list surfaces now separate active handover work into planning, execution, and closure views using case-summary handover state plus the current local operator role
 - The next persisted Phase 5 session boundary is now live locally: the web shell issues signed local operator sessions, handover detail routes require a trusted session plus workspace access, and manager plus handover entry surfaces are now guarded by shared workspace rules
 - The next persisted Phase 5 trust-hardening boundary is now live locally: the API now accepts only signed operator sessions, the integration harness has fully migrated off raw role headers, and invalid or legacy session attempts are rejected at the boundary
+- The next persisted Phase 5 manager-routing boundary is now live locally: the blended manager command center is now split into dedicated revenue and handover routes, while the shared `/manager` entry redirects single-surface roles and acts as a chooser only when both command surfaces are valid
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -81,6 +82,7 @@
 - Added the next persisted Phase 5 workspace slice with active handover summary state on case-list contracts, role-aware manager queues for planning, execution, and closure surfaces, and lead-list handover workflow visibility beyond closure-only status
 - Added the next persisted Phase 5 session slice with shared signed local operator-session contracts, trusted handover-detail access checks, workspace-gated manager and handover routes, and the remaining intake and task mutations moved behind explicit handover permissions
 - Added the next persisted Phase 5 trust-hardening slice with signed-session-only API enforcement, integration coverage for invalid and legacy session rejection, and full harness migration off the raw role header fallback
+- Added the next persisted Phase 5 manager-routing slice with shared manager workspace helpers, dedicated revenue and handover command-center routes, a role-aware `/manager` gateway, expanded manager-route smoke coverage, and manager-path revalidation across server actions
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -118,6 +120,7 @@
 - Case summaries now expose the linked active handover record so manager and list views can render planning and execution surfaces without fetching full handover detail
 - The manager workspace now separates revenue follow-up, handover planning, handover execution, and handover closure as distinct local-control surfaces keyed off the current operator role
 - Shared operator-workspace definitions now live in `packages/contracts`, with sales, handover, revenue-manager, and handover-manager access separated explicitly at the route and API boundary level
+- The shared `/manager` route now redirects roles that own only one manager surface into their dedicated route, while dual-surface roles use `/manager` as an explicit chooser between `/manager/revenue` and `/manager/handover`
 - Handover intake is now explicitly limited to `handover_manager` and `admin`, while live handover task status updates are now limited to handover coordination roles
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - Playwright smoke verification now runs against a production Next server because the dev-server path was intermittently unstable on the handover route in this environment
