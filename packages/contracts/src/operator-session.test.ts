@@ -24,6 +24,19 @@ describe("operator session contracts", () => {
     expect(verifyOperatorSessionToken(tamperedToken)).toBeNull();
   });
 
+  it("rejects an expired operator session token", () => {
+    const token = createOperatorSessionToken("handover_coordinator", {
+      maxAgeSeconds: 60,
+      now: new Date("2026-04-12T10:00:00.000Z")
+    }).token;
+
+    expect(
+      verifyOperatorSessionToken(token, {
+        now: new Date("2026-04-12T10:01:00.000Z")
+      })
+    ).toBeNull();
+  });
+
   it("separates revenue and handover manager workspaces by role", () => {
     expect(canOperatorRoleAccessWorkspace("manager_revenue", "sales_manager")).toBe(true);
     expect(canOperatorRoleAccessWorkspace("manager_handover", "sales_manager")).toBe(false);

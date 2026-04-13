@@ -50,6 +50,7 @@
 - The next persisted Phase 5 control boundary is now live locally: role-aware restrictions now protect milestone planning, appointment planning or confirmation, and customer-update approval or delivery boundaries with shared permissions and visible UI guardrails
 - The next persisted Phase 5 workspace boundary is now live locally: manager and list surfaces now separate active handover work into planning, execution, and closure views using case-summary handover state plus the current local operator role
 - The next persisted Phase 5 session boundary is now live locally: the web shell issues signed local operator sessions, handover detail routes require a trusted session plus workspace access, and manager plus handover entry surfaces are now guarded by shared workspace rules
+- The next persisted Phase 5 trust-hardening boundary is now live locally: the API now accepts only signed operator sessions, the integration harness has fully migrated off raw role headers, and invalid or legacy session attempts are rejected at the boundary
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -79,6 +80,7 @@
 - Added the next persisted Phase 5 control slice with shared planning permissions, API-enforced restrictions on milestones, appointments, and customer-update delivery boundaries, disabled UI controls with role guard notes, and integration coverage for restricted vs allowed planning actions
 - Added the next persisted Phase 5 workspace slice with active handover summary state on case-list contracts, role-aware manager queues for planning, execution, and closure surfaces, and lead-list handover workflow visibility beyond closure-only status
 - Added the next persisted Phase 5 session slice with shared signed local operator-session contracts, trusted handover-detail access checks, workspace-gated manager and handover routes, and the remaining intake and task mutations moved behind explicit handover permissions
+- Added the next persisted Phase 5 trust-hardening slice with signed-session-only API enforcement, integration coverage for invalid and legacy session rejection, and full harness migration off the raw role header fallback
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -108,7 +110,7 @@
 - Archive status is a manual admin boundary on the completed record with `held`, `ready`, and `archived` states; it does not trigger any external archive system
 - Case summaries now expose a derived `handoverClosure` signal for manager and list surfaces instead of requiring full handover-detail fetches to render closure state
 - The local authorization boundary now uses a signed `operator_session` cookie in the web shell and a signed `x-operator-session` header as the primary trusted path to the API
-- The raw `x-operator-role` header still exists as a local alpha compatibility fallback inside the API integration boundary and should be removed once the harness is fully migrated
+- The API now accepts only the signed `x-operator-session` header as its local trusted operator identity path; raw role headers are rejected
 - Post-completion review, aftercare follow-up, archive review, and archive status changes are now explicitly limited to `handover_manager` and `admin` roles
 - Follow-up-plan and automation controls are now limited to managerial roles in the local control model, while blocker updates are limited to handover-execution roles and execution-day transitions are limited to `handover_manager` and `admin`
 - Milestone planning and appointment controls are now limited to handover coordination roles, while customer-update approval, delivery preparation, and dispatch-ready promotion are limited to `handover_manager` and `admin`
@@ -147,7 +149,6 @@
 - The current local queue model is intentionally transitional and must not be mistaken for the long-term distributed worker architecture
 - Phase 4 should not be overextended prematurely; the current handover slice is intentionally limited to intake, milestone planning, approval-only customer boundaries, internal appointment confirmation, dispatch-ready preparation, blocker tracking, explicit execution start, controlled completion, aftercare, and a narrow admin-closure boundary, not live provider sending, external archiving, or downstream automation
 - The current signed operator-session boundary is intentionally local and transitional; it proves trusted session handling and workspace access patterns but must not be mistaken for full production authentication
-- The legacy raw-role compatibility path in the API should not linger after the local harness fully adopts signed sessions
 
 ## Standard Verification
 - `git status --short`

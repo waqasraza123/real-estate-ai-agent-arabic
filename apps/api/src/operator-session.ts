@@ -4,7 +4,6 @@ import {
   canOperatorRoleAccessWorkspace,
   canOperatorRolePerform,
   getRequiredOperatorRoles,
-  operatorRoleSchema,
   operatorSessionHeaderName,
   type OperatorPermission,
   type OperatorRole,
@@ -84,26 +83,9 @@ function readSignedOperatorSessionHeader(request: FastifyRequest) {
   const headerValue = request.headers[operatorSessionHeaderName];
   const normalizedHeaderValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
-  if (typeof normalizedHeaderValue === "string") {
-    const verifiedSession = verifyOperatorSessionToken(normalizedHeaderValue);
-
-    if (verifiedSession) {
-      return verifiedSession;
-    }
-  }
-
-  const legacyRoleHeader = request.headers["x-operator-role"];
-  const normalizedLegacyRole = Array.isArray(legacyRoleHeader) ? legacyRoleHeader[0] : legacyRoleHeader;
-  const parsedLegacyRole = operatorRoleSchema.safeParse(normalizedLegacyRole);
-
-  if (!parsedLegacyRole.success) {
+  if (typeof normalizedHeaderValue !== "string") {
     return null;
   }
 
-  return {
-    expiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
-    issuedAt: new Date().toISOString(),
-    role: parsedLegacyRole.data,
-    version: 1
-  };
+  return verifyOperatorSessionToken(normalizedHeaderValue);
 }
