@@ -13,6 +13,8 @@ export function CaseManualReplyForm(props: {
   canSend: boolean;
   caseId: string;
   defaultMessage?: string | null;
+  defaultNextAction: string;
+  defaultNextActionDueAt: string;
   defaultSentByName: string;
   disabledLabel: string;
   locale: SupportedLocale;
@@ -50,6 +52,28 @@ export function CaseManualReplyForm(props: {
             rows={5}
           />
         </label>
+        <label className="field-stack field-span-full">
+          <span>{copy.nextAction}</span>
+          <textarea
+            className="textarea-shell"
+            defaultValue={props.defaultNextAction}
+            disabled={!props.canSend}
+            name="nextAction"
+            required
+            rows={3}
+          />
+        </label>
+        <label className="field-stack">
+          <span>{copy.nextActionDueAt}</span>
+          <input
+            className="input-shell"
+            defaultValue={toDateTimeLocalValue(props.defaultNextActionDueAt)}
+            disabled={!props.canSend}
+            name="nextActionDueAt"
+            required
+            type="datetime-local"
+          />
+        </label>
       </div>
 
       {props.showApprovedDraftNote ? <p className="field-note">{copy.approvedDraftNote}</p> : null}
@@ -67,4 +91,14 @@ export function CaseManualReplyForm(props: {
       </div>
     </form>
   );
+}
+
+function toDateTimeLocalValue(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16);
 }

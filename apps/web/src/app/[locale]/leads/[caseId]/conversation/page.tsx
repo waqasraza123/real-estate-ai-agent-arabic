@@ -126,6 +126,8 @@ export default async function ConversationPage(props: PageProps) {
               canSend={canSendHumanReply}
               caseId={persistedCase.caseId}
               defaultMessage={hasApprovedReplyDraft ? currentReplyDraft?.draftMessage : null}
+              defaultNextAction={persistedCase.nextAction}
+              defaultNextActionDueAt={persistedCase.nextActionDueAt}
               defaultSentByName={persistedCase.ownerName}
               disabledLabel={replySendDisabledLabel}
               locale={locale}

@@ -437,17 +437,24 @@ describe("lead capture api", () => {
 
     expect(unauthorizedSendResponse.statusCode).toBe(403);
 
+    const nextAction = "Send the payment instructions and check that the customer received them.";
+    const nextActionDueAt = "2026-04-14T15:00:00.000Z";
+
     const sendResponse = await app.inject({
       headers: withOperatorSession("sales_manager"),
       method: "POST",
       payload: {
         message: approvedDraftMessage,
+        nextAction,
+        nextActionDueAt,
         sentByName: "Amina Rahman"
       },
       url: `/v1/cases/${createdCase.caseId}/replies`
     });
 
     expect(sendResponse.statusCode).toBe(200);
+    expect(sendResponse.json().nextAction).toBe(nextAction);
+    expect(sendResponse.json().nextActionDueAt).toBe(nextActionDueAt);
 
     const detailResponse = await app.inject({
       method: "GET",
@@ -461,11 +468,19 @@ describe("lead capture api", () => {
         .auditEvents.some(
           (event: {
             eventType: string;
-            payload?: { approvedDraftQaReviewId?: string | null; message?: string; sentByName?: string | null };
+            payload?: {
+              approvedDraftQaReviewId?: string | null;
+              message?: string;
+              nextAction?: string;
+              nextActionDueAt?: string;
+              sentByName?: string | null;
+            };
           }) =>
             event.eventType === "case_reply_sent" &&
             event.payload?.approvedDraftQaReviewId === qaReviewId &&
             event.payload?.message === approvedDraftMessage &&
+            event.payload?.nextAction === nextAction &&
+            event.payload?.nextActionDueAt === nextActionDueAt &&
             event.payload?.sentByName === "Amina Rahman"
         )
     ).toBe(true);
@@ -475,6 +490,8 @@ describe("lead capture api", () => {
       method: "POST",
       payload: {
         message: "Following up with the promised banking details and final booking checklist.",
+        nextAction: "Check whether the banking details were received and confirm the booking window.",
+        nextActionDueAt: "2026-04-15T12:00:00.000Z",
         sentByName: "Amina Rahman"
       },
       url: `/v1/cases/${createdCase.caseId}/replies`
@@ -515,6 +532,8 @@ describe("lead capture api", () => {
       method: "POST",
       payload: {
         message: "We are still reviewing the escalation internally and will return with a compliant answer.",
+        nextAction: "Return with a compliant update after QA review closes.",
+        nextActionDueAt: "2026-04-13T17:00:00.000Z",
         sentByName: "Revenue Ops"
       },
       url: `/v1/cases/${createdCase.caseId}/replies`
@@ -573,6 +592,8 @@ describe("lead capture api", () => {
       method: "POST",
       payload: {
         message: `${approveMessage} We can also guarantee the pricing exception today.`,
+        nextAction: "Open a fresh draft review before sending any revised exception language.",
+        nextActionDueAt: "2026-04-14T10:00:00.000Z",
         sentByName: "Revenue Ops"
       },
       url: `/v1/cases/${createdCase.caseId}/replies`
@@ -582,6 +603,51 @@ describe("lead capture api", () => {
     expect(mismatchedSendResponse.json()).toEqual({
       error: "qa_approved_reply_draft_mismatch"
     });
+  });
+
+  it("resets an overdue intervention when a human reply saves the next follow-up plan", async () => {
+    const createdCase = await store.createWebsiteLeadCase({
+      customerName: "Maya Saeed",
+      email: "maya@example.com",
+      message: "Please confirm the next reservation step for me.",
+      nextAction: "Call back with the reservation instructions",
+      nextActionDueAt: "2026-04-12T08:00:00.000Z",
+      preferredLocale: "en",
+      projectInterest: "Canal Heights"
+    });
+
+    const followUpCycle = await store.runDueFollowUpCycle({
+      limit: 10,
+      runAt: "2026-04-12T12:00:00.000Z"
+    });
+
+    expect(followUpCycle.openedInterventions).toBe(1);
+
+    const sendResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "POST",
+      payload: {
+        message: "I just sent the reservation instructions and will confirm receipt next.",
+        nextAction: "Confirm that the customer received the reservation instructions.",
+        nextActionDueAt: "2026-04-13T12:00:00.000Z",
+        sentByName: "Revenue Ops"
+      },
+      url: `/v1/cases/${createdCase.caseId}/replies`
+    });
+
+    expect(sendResponse.statusCode).toBe(200);
+    expect(sendResponse.json().openInterventionsCount).toBe(0);
+    expect(sendResponse.json().nextAction).toBe("Confirm that the customer received the reservation instructions.");
+    expect(sendResponse.json().nextActionDueAt).toBe("2026-04-13T12:00:00.000Z");
+
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/v1/cases/${createdCase.caseId}`
+    });
+
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json().openInterventionsCount).toBe(0);
+    expect(detailResponse.json().managerInterventions.every((intervention: { status: string }) => intervention.status === "resolved")).toBe(true);
   });
 
   it("promotes a document-complete case into controlled handover execution and completion", async () => {

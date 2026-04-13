@@ -146,6 +146,8 @@ export const prepareCaseReplyDraftQaReviewInputSchema = z.object({
 
 export const sendCaseReplyInputSchema = z.object({
   message: z.string().trim().min(10).max(2000),
+  nextAction: z.string().trim().min(4).max(200),
+  nextActionDueAt: z.iso.datetime(),
   sentByName: z.string().trim().min(2).max(120).optional()
 });
 

@@ -328,14 +328,17 @@ export async function resolveCaseQaReviewAction(_: FormActionState, formData: Fo
 export async function sendCaseReplyAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
   const locale = getLocale(formData.get("locale"));
   const caseId = formData.get("caseId");
+  const nextActionDueAt = formData.get("nextActionDueAt");
   const returnPath = formData.get("returnPath");
 
-  if (typeof caseId !== "string" || typeof returnPath !== "string") {
+  if (typeof caseId !== "string" || typeof nextActionDueAt !== "string" || typeof returnPath !== "string") {
     return getLocalizedError(locale);
   }
 
   const result = sendCaseReplyInputSchema.safeParse({
     message: formData.get("message"),
+    nextAction: formData.get("nextAction"),
+    nextActionDueAt: toIsoDateTimeOrEmpty(nextActionDueAt),
     sentByName: normalizeOptionalString(formData.get("sentByName"))
   });
 

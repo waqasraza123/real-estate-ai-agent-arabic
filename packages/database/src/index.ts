@@ -1751,7 +1751,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
     return {
       auditEvents: caseAuditEvents.map((event) => ({
-        createdAt: event.createdAt,
+        createdAt: toIsoDateTimeString(event.createdAt),
         eventType: event.eventType,
         payload: event.payload
       })),
@@ -1759,7 +1759,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       automationStatus: toAutomationStatus(caseRecord.automationStatus),
       budget: caseRecord.budget,
       caseId: caseRecord.caseId,
-      createdAt: caseRecord.createdAt,
+      createdAt: toIsoDateTimeString(caseRecord.createdAt),
       currentHandoverCustomerUpdateQaReview: currentHandoverCustomerUpdateQaReviewMap.get(caseId) ?? null,
       currentQaReview,
       currentVisit: currentVisit[0]
@@ -1785,7 +1785,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       managerInterventions: hydratedInterventions,
       message: caseRecord.message,
       nextAction: caseRecord.nextAction,
-      nextActionDueAt: caseRecord.nextActionDueAt,
+      nextActionDueAt: toIsoDateTimeString(caseRecord.nextActionDueAt),
       openInterventionsCount: hydratedInterventions.filter((intervention) => intervention.status === "open").length,
       ownerName: caseRecord.ownerName,
       phone: caseRecord.phone,
@@ -1803,7 +1803,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         : null,
       source: toLeadSource(caseRecord.source),
       stage: toCaseStage(caseRecord.stage),
-      updatedAt: caseRecord.updatedAt
+      updatedAt: toIsoDateTimeString(caseRecord.updatedAt)
     };
   };
 
@@ -2380,9 +2380,17 @@ export async function createAlphaLeadCaptureStore(options?: {
         await transaction
           .update(cases)
           .set({
+            currentNextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
             updatedAt: createdAt
           })
           .where(eq(cases.id, caseId));
+
+        await resolveOpenInterventions(transaction, {
+          caseId,
+          resolutionNote: "human_reply_sent",
+          resolvedAt: createdAt
+        });
 
         await transaction.insert(auditEvents).values({
           caseId,
@@ -2392,8 +2400,18 @@ export async function createAlphaLeadCaptureStore(options?: {
           payload: {
             approvedDraftQaReviewId: input.approvedDraftQaReviewId,
             message: input.message,
+            nextAction: input.nextAction,
+            nextActionDueAt: input.nextActionDueAt,
             sentByName: input.sentByName ?? caseRecord.ownerName
           }
+        });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
+          caseId,
+          runAfter: input.nextActionDueAt,
+          updatedAt: createdAt
         });
       });
 
@@ -2445,7 +2463,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         automationHoldReason: getCaseAutomationHoldReason(currentQaReviews.get(caseRecord.caseId)),
         automationStatus: toAutomationStatus(caseRecord.automationStatus),
         caseId: caseRecord.caseId,
-        createdAt: caseRecord.createdAt,
+        createdAt: toIsoDateTimeString(caseRecord.createdAt),
         currentHandoverCustomerUpdateQaReview: currentHandoverCustomerUpdateQaReviews.get(caseRecord.caseId) ?? null,
         currentQaReview: currentQaReviews.get(caseRecord.caseId) ?? null,
         customerName: caseRecord.customerName,
@@ -2453,14 +2471,14 @@ export async function createAlphaLeadCaptureStore(options?: {
         handoverCase: linkedHandoverCases.get(caseRecord.caseId) ?? null,
         handoverClosure: handoverClosureSummaries.get(caseRecord.caseId) ?? null,
         nextAction: caseRecord.nextAction,
-        nextActionDueAt: caseRecord.nextActionDueAt,
+        nextActionDueAt: toIsoDateTimeString(caseRecord.nextActionDueAt),
         openInterventionsCount: openInterventionCounts.get(caseRecord.caseId) ?? 0,
         ownerName: caseRecord.ownerName,
         preferredLocale: toSupportedLocale(caseRecord.preferredLocale),
         projectInterest: caseRecord.projectInterest,
         source: toLeadSource(caseRecord.source),
         stage: toCaseStage(caseRecord.stage),
-        updatedAt: caseRecord.updatedAt
+        updatedAt: toIsoDateTimeString(caseRecord.updatedAt)
       }));
     },
     async manageCaseFollowUp(caseId, input) {
@@ -5246,6 +5264,16 @@ function toDocumentRequestType(value: string): DocumentRequestType {
   }
 
   throw new Error(`unsupported_document_request_type:${value}`);
+}
+
+function toIsoDateTimeString(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toISOString();
 }
 
 function toFollowUpStatus(nextActionDueAt: string): FollowUpStatus {
