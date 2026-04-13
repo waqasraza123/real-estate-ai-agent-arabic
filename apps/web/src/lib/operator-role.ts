@@ -10,8 +10,10 @@ import {
 } from "@real-estate-ai/contracts";
 import type { SupportedLocale } from "@real-estate-ai/domain";
 
+import { getDefaultManagerPath } from "@/lib/manager-workspace";
+
 export const defaultOperatorRole: OperatorRole = "handover_manager";
-export const operatorRoleOptions: OperatorRole[] = ["sales_manager", "handover_coordinator", "handover_manager", "admin"];
+export const operatorRoleOptions: OperatorRole[] = ["sales_manager", "handover_coordinator", "handover_manager", "qa_reviewer", "admin"];
 
 export function canCurrentOperatorPerform(permission: OperatorPermission, operatorRole: OperatorRole) {
   return canOperatorRolePerform(permission, operatorRole);
@@ -43,12 +45,14 @@ export function getOperatorRoleLabel(locale: SupportedLocale, role: OperatorRole
       admin: "المشرف",
       handover_coordinator: "منسق التسليم",
       handover_manager: "مدير التسليم",
+      qa_reviewer: "مراجع الجودة",
       sales_manager: "مدير المبيعات"
     },
     en: {
       admin: "admin",
       handover_coordinator: "handover coordinator",
       handover_manager: "handover manager",
+      qa_reviewer: "QA reviewer",
       sales_manager: "sales manager"
     }
   } as const;
@@ -60,12 +64,14 @@ export function getOperatorWorkspaceLabel(locale: SupportedLocale, workspace: Op
   const labels = {
     ar: {
       handover: "مساحة التسليم",
+      qa: "مساحة الجودة",
       manager_handover: "قيادة التسليم",
       manager_revenue: "قيادة الإيرادات",
       sales: "مساحة المبيعات"
     },
     en: {
       handover: "handover workspace",
+      qa: "QA workspace",
       manager_handover: "handover command center",
       manager_revenue: "revenue command center",
       sales: "sales workspace"
@@ -73,6 +79,18 @@ export function getOperatorWorkspaceLabel(locale: SupportedLocale, workspace: Op
   } as const;
 
   return labels[locale][workspace];
+}
+
+export function getPreferredOperatorSurfacePath(locale: SupportedLocale, operatorRole: OperatorRole) {
+  if (canOperatorRoleAccessWorkspace("sales", operatorRole)) {
+    return `/${locale}/leads`;
+  }
+
+  if (canOperatorRoleAccessWorkspace("qa", operatorRole)) {
+    return `/${locale}/qa`;
+  }
+
+  return getDefaultManagerPath(locale, operatorRole);
 }
 
 function joinRoleLabels(locale: SupportedLocale, roleLabels: string[]) {

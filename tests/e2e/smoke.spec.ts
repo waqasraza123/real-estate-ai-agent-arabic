@@ -6,7 +6,7 @@ import { smokeRoutes } from "@real-estate-ai/testing";
 
 async function setOperatorRoleCookie(
   context: BrowserContext,
-  role: "sales_manager" | "handover_coordinator" | "handover_manager" | "admin"
+  role: "sales_manager" | "handover_coordinator" | "handover_manager" | "qa_reviewer" | "admin"
 ) {
   await context.addCookies([
     {
@@ -102,4 +102,13 @@ test("sales manager cannot open the handover workspace directly", async ({ conte
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Handover workspace");
   await expect(page.getByText("Handover workspace required")).toBeVisible();
+});
+
+test("qa reviewer can open the QA review center", async ({ context, page }) => {
+  await setOperatorRoleCookie(context, "qa_reviewer");
+
+  await page.goto(smokeRoutes.qa);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("QA review center");
+  await expect(page.getByText("Open QA queue")).toBeVisible();
 });

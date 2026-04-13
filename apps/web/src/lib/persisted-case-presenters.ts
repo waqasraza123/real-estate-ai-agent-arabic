@@ -10,6 +10,7 @@ import type { ConversationMessage, JourneyEvent } from "@real-estate-ai/domain";
 import {
   getAutomationStatusLabel,
   getCaseStageLabel,
+  getCaseQaReviewStatusLabel,
   getDocumentRequestDetail,
   getDocumentRequestStatusLabel,
   getDocumentRequestTypeLabel,
@@ -307,6 +308,53 @@ export function getPersistedInterventionDisplay(locale: SupportedLocale, caseDet
   }));
 }
 
+export function getPersistedQaReviewDisplay(locale: SupportedLocale, caseDetail: PersistedCaseDetail | PersistedCaseSummary) {
+  if (!caseDetail.currentQaReview) {
+    return null;
+  }
+
+  const statusTone =
+    caseDetail.currentQaReview.status === "approved"
+      ? ("success" as const)
+      : caseDetail.currentQaReview.status === "follow_up_required"
+        ? ("warning" as const)
+        : ("critical" as const);
+
+  return {
+    qaReviewId: caseDetail.currentQaReview.qaReviewId,
+    requestedByName: caseDetail.currentQaReview.requestedByName,
+    reviewSummary: caseDetail.currentQaReview.reviewSummary,
+    reviewedAt: caseDetail.currentQaReview.reviewedAt ? new Date(caseDetail.currentQaReview.reviewedAt).toLocaleString(locale) : null,
+    reviewerName: caseDetail.currentQaReview.reviewerName,
+    sampleSummary: caseDetail.currentQaReview.sampleSummary,
+    status: caseDetail.currentQaReview.status,
+    statusLabel: getCaseQaReviewStatusLabel(locale, caseDetail.currentQaReview.status),
+    statusTone,
+    updatedAt: new Date(caseDetail.currentQaReview.updatedAt).toLocaleString(locale)
+  };
+}
+
+export function getPersistedQaReviewHistory(locale: SupportedLocale, caseDetail: PersistedCaseDetail) {
+  return caseDetail.qaReviews.map((qaReview) => ({
+    createdAt: new Date(qaReview.createdAt).toLocaleString(locale),
+    qaReviewId: qaReview.qaReviewId,
+    requestedByName: qaReview.requestedByName,
+    reviewSummary: qaReview.reviewSummary,
+    reviewedAt: qaReview.reviewedAt ? new Date(qaReview.reviewedAt).toLocaleString(locale) : null,
+    reviewerName: qaReview.reviewerName,
+    sampleSummary: qaReview.sampleSummary,
+    status: qaReview.status,
+    statusLabel: getCaseQaReviewStatusLabel(locale, qaReview.status),
+    statusTone:
+      qaReview.status === "approved"
+        ? ("success" as const)
+        : qaReview.status === "follow_up_required"
+          ? ("warning" as const)
+          : ("critical" as const),
+    updatedAt: new Date(qaReview.updatedAt).toLocaleString(locale)
+  }));
+}
+
 export function getPersistedQualificationSummary(locale: SupportedLocale, caseDetail: PersistedCaseDetail) {
   if (!caseDetail.qualificationSnapshot) {
     return null;
@@ -491,6 +539,14 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
         detail: "تم تحديث الخطة التالية للحالة وإزالة التدخل المفتوح.",
         title: "خطة متابعة جديدة"
       },
+      qa_review_requested: {
+        detail: "تم إرسال الحالة إلى طابور الجودة مع سبب عينة واضح لمراجعة السلامة أو التفسير أو جودة الرد.",
+        title: "فتح مراجعة جودة"
+      },
+      qa_review_resolved: {
+        detail: "تم حفظ قرار مراجعة الجودة وإبقاء النتيجة ظاهرة في سجل الحالة.",
+        title: "إغلاق مراجعة الجودة"
+      },
       visit_scheduled: {
         detail: "تم ربط الحالة بموعد زيارة فعلي مع الموقع المحدد.",
         title: "موعد زيارة محفوظ"
@@ -592,6 +648,14 @@ function describeAuditEvent(caseDetail: PersistedCaseDetail, eventType: string, 
       manager_follow_up_updated: {
         detail: "The follow-up plan was updated and the open intervention was cleared.",
         title: "Follow-up plan updated"
+      },
+      qa_review_requested: {
+        detail: "The case was sent to the QA queue with an explicit sample reason for safety, interpretation, or response-quality review.",
+        title: "QA review requested"
+      },
+      qa_review_resolved: {
+        detail: "The QA decision was saved and kept visible on the live case record.",
+        title: "QA review resolved"
       },
       visit_scheduled: {
         detail: "The case now has a scheduled visit with a saved location and time.",

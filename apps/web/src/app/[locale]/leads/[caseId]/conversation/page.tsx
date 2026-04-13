@@ -10,6 +10,7 @@ import { MessageThread } from "@/components/message-thread";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
+import { getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import { buildCaseReferenceCode, buildPersistedConversation } from "@/lib/persisted-case-presenters";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
@@ -30,7 +31,7 @@ export default async function ConversationPage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.conversation.title} summary={messages.conversation.summary} title={messages.conversation.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "العودة إلى السطح المتاح" : "Return to an allowed surface"}
           locale={locale}
           operatorRole={currentOperatorRole}

@@ -80,6 +80,7 @@ export const arMessages = {
     sales_manager: "مدير المبيعات",
     handover_coordinator: "منسق التسليم",
     handover_manager: "مدير التسليم",
+    qa_reviewer: "مراجع الجودة",
     admin: "المشرف"
   },
   states: {

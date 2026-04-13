@@ -10,6 +10,7 @@ import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { ScreenIntro } from "@/components/screen-intro";
 import { VisitSchedulingForm } from "@/components/visit-scheduling-form";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
+import { getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import { buildCaseReferenceCode } from "@/lib/persisted-case-presenters";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
@@ -30,7 +31,7 @@ export default async function SchedulePage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.schedule.title} summary={messages.schedule.summary} title={messages.schedule.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "العودة إلى مركز القيادة" : "Return to the command center"}
           locale={locale}
           operatorRole={currentOperatorRole}

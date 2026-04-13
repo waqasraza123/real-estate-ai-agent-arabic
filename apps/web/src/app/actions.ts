@@ -19,6 +19,8 @@ import {
   planHandoverAppointmentInputSchema,
   prepareHandoverCustomerUpdateDeliveryInputSchema,
   qualifyCaseInputSchema,
+  requestCaseQaReviewInputSchema,
+  resolveCaseQaReviewInputSchema,
   resolveHandoverPostCompletionFollowUpInputSchema,
   saveHandoverArchiveReviewInputSchema,
   scheduleVisitInputSchema,
@@ -54,6 +56,8 @@ import {
   planHandoverAppointment,
   prepareHandoverCustomerUpdateDelivery,
   qualifyCase,
+  requestCaseQaReview,
+  resolveCaseQaReview,
   resolveHandoverPostCompletionFollowUp,
   saveHandoverArchiveReview,
   scheduleVisit,
@@ -168,6 +172,102 @@ export async function saveManagerFollowUpAction(_: FormActionState, formData: Fo
       status: "success"
     };
   } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function requestCaseQaReviewAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const caseId = formData.get("caseId");
+  const returnPath = formData.get("returnPath");
+
+  if (typeof caseId !== "string" || typeof returnPath !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = requestCaseQaReviewInputSchema.safeParse({
+    requestedByName: normalizeOptionalString(formData.get("requestedByName")),
+    sampleSummary: formData.get("sampleSummary")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedCase = await requestCaseQaReview(caseId, result.data, await getOperatorRole());
+    revalidatePaths(locale, returnPath, caseId, updatedCase.handoverCase?.handoverCaseId);
+
+    return {
+      message:
+        locale === "ar"
+          ? "تم إرسال الحالة إلى طابور مراجعة الجودة مع ملخص واضح للعينة."
+          : "The case was sent to the QA review queue with a clear sampling summary.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "توجد مراجعة جودة مفتوحة بالفعل لهذه الحالة."
+            : "An open QA review already exists for this case.",
+        status: "error"
+      };
+    }
+
+    return getActionError(locale, error);
+  }
+}
+
+export async function resolveCaseQaReviewAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const caseId = formData.get("caseId");
+  const qaReviewId = formData.get("qaReviewId");
+  const returnPath = formData.get("returnPath");
+
+  if (typeof caseId !== "string" || typeof qaReviewId !== "string" || typeof returnPath !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  const result = resolveCaseQaReviewInputSchema.safeParse({
+    reviewSummary: formData.get("reviewSummary"),
+    reviewerName: normalizeOptionalString(formData.get("reviewerName")),
+    status: formData.get("status")
+  });
+
+  if (!result.success) {
+    return {
+      message: getValidationMessage(locale),
+      status: "error"
+    };
+  }
+
+  try {
+    const updatedCase = await resolveCaseQaReview(caseId, qaReviewId, result.data, await getOperatorRole());
+    revalidatePaths(locale, returnPath, caseId, updatedCase.handoverCase?.handoverCaseId);
+
+    return {
+      message:
+        locale === "ar"
+          ? "تم حفظ قرار مراجعة الجودة وتحديث سجل الحالة."
+          : "The QA review decision was saved and the case record was updated.",
+      status: "success"
+    };
+  } catch (error) {
+    if (error instanceof WebApiError && error.status === 409) {
+      return {
+        message:
+          locale === "ar"
+            ? "لا يمكن إغلاق مراجعة الجودة لأن العنصر لم يعد بانتظار المراجعة."
+            : "This QA review can no longer be resolved because it is not pending anymore.",
+        status: "error"
+      };
+    }
+
     return getActionError(locale, error);
   }
 }
@@ -1157,7 +1257,10 @@ function revalidatePaths(locale: "en" | "ar", returnPath: string, caseId: string
   revalidatePath(returnPath);
   revalidatePath(`/${locale}/leads`);
   revalidatePath(`/${locale}/leads/${caseId}`);
+  revalidatePath(`/${locale}/leads/${caseId}/conversation`);
   revalidatePath(`/${locale}/leads/${caseId}/documents`);
+  revalidatePath(`/${locale}/qa`);
+  revalidatePath(`/${locale}/qa/cases/${caseId}`);
   revalidateManagerPaths(locale);
 
   if (handoverCaseId) {
@@ -1169,7 +1272,10 @@ function revalidateHandoverPaths(locale: "en" | "ar", returnPath: string, caseId
   revalidatePath(returnPath);
   revalidatePath(`/${locale}/handover/${handoverCaseId}`);
   revalidatePath(`/${locale}/leads/${caseId}`);
+  revalidatePath(`/${locale}/leads/${caseId}/conversation`);
   revalidatePath(`/${locale}/leads/${caseId}/documents`);
+  revalidatePath(`/${locale}/qa`);
+  revalidatePath(`/${locale}/qa/cases/${caseId}`);
   revalidateManagerPaths(locale);
 }
 

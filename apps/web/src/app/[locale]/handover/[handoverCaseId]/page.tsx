@@ -28,6 +28,7 @@ import { TimelinePanel } from "@/components/timeline-panel";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import {
   getOperatorPermissionGuardNote,
+  getPreferredOperatorSurfacePath,
 } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
@@ -60,7 +61,7 @@ export default async function HandoverPage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.handover.title} summary={messages.handover.summary} title={messages.handover.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "فتح السطح المتاح" : "Open an allowed surface"}
           locale={locale}
           operatorRole={currentOperatorRole}

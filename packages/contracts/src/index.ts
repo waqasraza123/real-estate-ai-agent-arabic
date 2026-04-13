@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const supportedLocaleSchema = z.enum(["en", "ar"]);
-export const operatorRoleSchema = z.enum(["sales_manager", "handover_coordinator", "handover_manager", "admin"]);
-export const operatorWorkspaceSchema = z.enum(["sales", "handover", "manager_revenue", "manager_handover"]);
+export const operatorRoleSchema = z.enum(["sales_manager", "handover_coordinator", "handover_manager", "qa_reviewer", "admin"]);
+export const operatorWorkspaceSchema = z.enum(["sales", "handover", "manager_revenue", "manager_handover", "qa"]);
 export const operatorPermissionSchema = z.enum([
   "manage_case_follow_up",
   "manage_case_automation",
@@ -13,7 +13,9 @@ export const operatorPermissionSchema = z.enum([
   "manage_handover_customer_updates",
   "manage_handover_blockers",
   "manage_handover_execution",
-  "manage_handover_governance"
+  "manage_handover_governance",
+  "manage_qa_sampling",
+  "manage_qa_reviews"
 ]);
 export const operatorSessionPayloadSchema = z.object({
   expiresAt: z.iso.datetime(),
@@ -31,6 +33,7 @@ export const automationStatusSchema = z.enum(["active", "paused"]);
 export const managerInterventionTypeSchema = z.enum(["follow_up_overdue"]);
 export const managerInterventionSeveritySchema = z.enum(["warning", "critical"]);
 export const managerInterventionStatusSchema = z.enum(["open", "resolved"]);
+export const caseQaReviewStatusSchema = z.enum(["pending_review", "approved", "follow_up_required"]);
 export const handoverCaseStatusSchema = z.enum([
   "pending_readiness",
   "internal_tasks_open",
@@ -100,6 +103,17 @@ export const createHandoverIntakeInputSchema = z.object({
 
 export const updateAutomationStatusInputSchema = z.object({
   status: automationStatusSchema
+});
+
+export const requestCaseQaReviewInputSchema = z.object({
+  requestedByName: z.string().trim().min(2).max(120).optional(),
+  sampleSummary: z.string().trim().min(10).max(280)
+});
+
+export const resolveCaseQaReviewInputSchema = z.object({
+  reviewSummary: z.string().trim().min(10).max(280),
+  reviewerName: z.string().trim().min(2).max(120).optional(),
+  status: z.enum(["approved", "follow_up_required"])
 });
 
 export const updateHandoverTaskStatusInputSchema = z.object({
@@ -233,6 +247,18 @@ export const persistedManagerInterventionSchema = z.object({
   type: managerInterventionTypeSchema
 });
 
+export const persistedCaseQaReviewSchema = z.object({
+  createdAt: z.iso.datetime(),
+  qaReviewId: z.uuid(),
+  requestedByName: z.string(),
+  reviewSummary: z.string().nullable(),
+  reviewedAt: z.iso.datetime().nullable(),
+  reviewerName: z.string().nullable(),
+  sampleSummary: z.string(),
+  status: caseQaReviewStatusSchema,
+  updatedAt: z.iso.datetime()
+});
+
 export const persistedHandoverTaskSchema = z.object({
   createdAt: z.iso.datetime(),
   dueAt: z.iso.datetime(),
@@ -346,6 +372,7 @@ export const persistedCaseSummarySchema = z.object({
   automationStatus: automationStatusSchema,
   caseId: z.uuid(),
   createdAt: z.iso.datetime(),
+  currentQaReview: persistedCaseQaReviewSchema.nullable(),
   customerName: z.string(),
   followUpStatus: followUpStatusSchema,
   handoverCase: persistedLinkedHandoverCaseSchema.nullable(),
@@ -371,6 +398,7 @@ export const persistedCaseDetailSchema = persistedCaseSummarySchema.extend({
   managerInterventions: z.array(persistedManagerInterventionSchema),
   message: z.string(),
   phone: z.string().nullable(),
+  qaReviews: z.array(persistedCaseQaReviewSchema),
   qualificationSnapshot: persistedQualificationSnapshotSchema.nullable()
 });
 
@@ -402,6 +430,7 @@ export const createWebsiteLeadResultSchema = persistedCaseSummarySchema.extend({
 export type ApproveHandoverCustomerUpdateInput = z.infer<typeof approveHandoverCustomerUpdateInputSchema>;
 export type AutomationStatus = z.infer<typeof automationStatusSchema>;
 export type CaseStage = z.infer<typeof caseStageSchema>;
+export type CaseQaReviewStatus = z.infer<typeof caseQaReviewStatusSchema>;
 export type CompleteHandoverInput = z.infer<typeof completeHandoverInputSchema>;
 export type ConfirmHandoverAppointmentInput = z.infer<typeof confirmHandoverAppointmentInputSchema>;
 export type HandoverClosureState = z.infer<typeof handoverClosureStateSchema>;
@@ -438,6 +467,7 @@ export type OperatorRole = z.infer<typeof operatorRoleSchema>;
 export type OperatorSessionPayload = z.infer<typeof operatorSessionPayloadSchema>;
 export type OperatorWorkspace = z.infer<typeof operatorWorkspaceSchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
+export type PersistedCaseQaReview = z.infer<typeof persistedCaseQaReviewSchema>;
 export type PersistedCaseSummary = z.infer<typeof persistedCaseSummarySchema>;
 export type PersistedDocumentRequest = z.infer<typeof persistedDocumentRequestSchema>;
 export type PersistedHandoverAppointment = z.infer<typeof persistedHandoverAppointmentSchema>;
@@ -459,7 +489,9 @@ export type PlanHandoverAppointmentInput = z.infer<typeof planHandoverAppointmen
 export type PrepareHandoverCustomerUpdateDeliveryInput = z.infer<typeof prepareHandoverCustomerUpdateDeliveryInputSchema>;
 export type QualificationReadiness = z.infer<typeof qualificationReadinessSchema>;
 export type QualifyCaseInput = z.infer<typeof qualifyCaseInputSchema>;
+export type RequestCaseQaReviewInput = z.infer<typeof requestCaseQaReviewInputSchema>;
 export type ResolveHandoverPostCompletionFollowUpInput = z.infer<typeof resolveHandoverPostCompletionFollowUpInputSchema>;
+export type ResolveCaseQaReviewInput = z.infer<typeof resolveCaseQaReviewInputSchema>;
 export type SaveHandoverArchiveReviewInput = z.infer<typeof saveHandoverArchiveReviewInputSchema>;
 export type SaveHandoverReviewInput = z.infer<typeof saveHandoverReviewInputSchema>;
 export type ScheduleVisitInput = z.infer<typeof scheduleVisitInputSchema>;
@@ -480,9 +512,10 @@ export const localOperatorSessionSecretEnvironmentKey = "LOCAL_OPERATOR_SESSION_
 export const localOperatorSessionDurationSeconds = 60 * 60 * 8;
 
 const operatorWorkspaceAccess = {
-  admin: ["sales", "handover", "manager_revenue", "manager_handover"],
+  admin: ["sales", "handover", "manager_revenue", "manager_handover", "qa"],
   handover_coordinator: ["handover"],
   handover_manager: ["sales", "handover", "manager_handover"],
+  qa_reviewer: ["qa"],
   sales_manager: ["sales", "manager_revenue"]
 } as const satisfies Record<OperatorRole, readonly OperatorWorkspace[]>;
 
@@ -496,7 +529,9 @@ const operatorPermissionRequirements = {
   manage_handover_execution: ["handover_manager", "admin"],
   manage_handover_milestones: ["handover_coordinator", "handover_manager", "admin"],
   manage_handover_tasks: ["handover_coordinator", "handover_manager", "admin"],
-  manage_handover_governance: ["handover_manager", "admin"]
+  manage_handover_governance: ["handover_manager", "admin"],
+  manage_qa_reviews: ["qa_reviewer", "admin"],
+  manage_qa_sampling: ["sales_manager", "handover_manager", "admin"]
 } as const satisfies Record<OperatorPermission, readonly OperatorRole[]>;
 
 export function getAccessibleOperatorWorkspaces(operatorRole: OperatorRole): OperatorWorkspace[] {

@@ -80,6 +80,7 @@ export const enMessages = {
     sales_manager: "Sales manager",
     handover_coordinator: "Handover coordinator",
     handover_manager: "Handover manager",
+    qa_reviewer: "QA reviewer",
     admin: "Admin"
   },
   states: {

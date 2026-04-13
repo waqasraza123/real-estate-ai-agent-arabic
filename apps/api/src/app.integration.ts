@@ -69,6 +69,115 @@ describe("lead capture api", () => {
     expect(detailResponse.json().handoverCase).toBeNull();
   });
 
+  it("opens and resolves a QA review boundary with role-aware controls", async () => {
+    const createResponse = await app.inject({
+      method: "POST",
+      payload: {
+        customerName: "Layla Saeed",
+        email: "layla@example.com",
+        message: "I want an exception on the deposit terms and need someone senior to review the latest reply draft.",
+        preferredLocale: "en",
+        projectInterest: "Canal Heights"
+      },
+      url: "/v1/website-leads"
+    });
+
+    const createdCase = createResponse.json();
+
+    const unauthorizedRequestResponse = await app.inject({
+      method: "POST",
+      payload: {
+        requestedByName: "Revenue Ops",
+        sampleSummary: "Review a sensitive deposit exception request before the next outbound reply."
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review`
+    });
+
+    expect(unauthorizedRequestResponse.statusCode).toBe(401);
+
+    const requestResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "POST",
+      payload: {
+        requestedByName: "Revenue Ops",
+        sampleSummary: "Review a sensitive deposit exception request before the next outbound reply."
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review`
+    });
+
+    expect(requestResponse.statusCode).toBe(200);
+    expect(requestResponse.json().currentQaReview.status).toBe("pending_review");
+    expect(requestResponse.json().qaReviews).toHaveLength(1);
+
+    const qaReviewId = requestResponse.json().currentQaReview.qaReviewId;
+
+    const duplicateRequestResponse = await app.inject({
+      headers: withOperatorSession("handover_manager"),
+      method: "POST",
+      payload: {
+        requestedByName: "Handover Manager",
+        sampleSummary: "Attempt to open a second review while the first review is still pending."
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review`
+    });
+
+    expect(duplicateRequestResponse.statusCode).toBe(409);
+    expect(duplicateRequestResponse.json().error).toBe("qa_review_already_pending");
+
+    const forbiddenResolveResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "PATCH",
+      payload: {
+        reviewSummary: "A sales manager attempted to resolve a QA review without reviewer authority.",
+        reviewerName: "Revenue Ops",
+        status: "approved"
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review/${qaReviewId}`
+    });
+
+    expect(forbiddenResolveResponse.statusCode).toBe(403);
+    expect(forbiddenResolveResponse.json().error).toBe("insufficient_role");
+
+    const resolveResponse = await app.inject({
+      headers: withOperatorSession("qa_reviewer"),
+      method: "PATCH",
+      payload: {
+        reviewSummary: "The draft stays inside approved disclosure boundaries, but the human operator should keep direct ownership of the reply.",
+        reviewerName: "QA Desk",
+        status: "follow_up_required"
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review/${qaReviewId}`
+    });
+
+    expect(resolveResponse.statusCode).toBe(200);
+    expect(resolveResponse.json().currentQaReview.status).toBe("follow_up_required");
+    expect(resolveResponse.json().currentQaReview.reviewerName).toBe("QA Desk");
+
+    const repeatResolveResponse = await app.inject({
+      headers: withOperatorSession("qa_reviewer"),
+      method: "PATCH",
+      payload: {
+        reviewSummary: "Attempt to resolve an already closed QA review.",
+        reviewerName: "QA Desk",
+        status: "approved"
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review/${qaReviewId}`
+    });
+
+    expect(repeatResolveResponse.statusCode).toBe(409);
+    expect(repeatResolveResponse.json().error).toBe("qa_review_not_pending");
+
+    const casesResponse = await app.inject({
+      method: "GET",
+      url: "/v1/cases"
+    });
+
+    expect(casesResponse.statusCode).toBe(200);
+    expect(casesResponse.json().cases.find((caseItem: { caseId: string }) => caseItem.caseId === createdCase.caseId)?.currentQaReview?.status).toBe(
+      "follow_up_required"
+    );
+  });
+
   it("promotes a document-complete case into controlled handover execution and completion", async () => {
     const createResponse = await app.inject({
       method: "POST",

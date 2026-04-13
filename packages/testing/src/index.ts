@@ -7,5 +7,6 @@ export const smokeRoutes = {
   handover: "/en/handover/handover-sunrise-001",
   manager: "/en/manager",
   managerHandover: "/en/manager/handover",
-  managerRevenue: "/en/manager/revenue"
+  managerRevenue: "/en/manager/revenue",
+  qa: "/en/qa"
 } as const;

@@ -83,6 +83,7 @@
 - Added the next persisted Phase 5 session slice with shared signed local operator-session contracts, trusted handover-detail access checks, workspace-gated manager and handover routes, and the remaining intake and task mutations moved behind explicit handover permissions
 - Added the next persisted Phase 5 trust-hardening slice with signed-session-only API enforcement, integration coverage for invalid and legacy session rejection, and full harness migration off the raw role header fallback
 - Added the next persisted Phase 5 manager-routing slice with shared manager workspace helpers, dedicated revenue and handover command-center routes, a role-aware `/manager` gateway, expanded manager-route smoke coverage, and manager-path revalidation across server actions
+- Added the next persisted Phase 5 QA-governance slice with a first-class `qa_reviewer` role, dedicated `/qa` workspace routes, persisted case-linked QA sampling and review records, localized QA forms and queue views, and role-aware integration plus smoke coverage
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -122,6 +123,9 @@
 - Shared operator-workspace definitions now live in `packages/contracts`, with sales, handover, revenue-manager, and handover-manager access separated explicitly at the route and API boundary level
 - The shared `/manager` route now redirects roles that own only one manager surface into their dedicated route, while dual-surface roles use `/manager` as an explicit chooser between `/manager/revenue` and `/manager/handover`
 - Handover intake is now explicitly limited to `handover_manager` and `admin`, while live handover task status updates are now limited to handover coordination roles
+- The local role model now includes a dedicated `qa_reviewer` role and `qa` workspace for explicit human inspection beyond manager routes
+- QA sampling is now a case-linked persisted boundary with append-friendly review history, while queue surfaces and case detail use the latest review as the active QA state
+- QA review requests are limited to managerial roles plus `admin`, while QA review resolution is limited to `qa_reviewer` and `admin`
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - Playwright smoke verification now runs against a production Next server because the dev-server path was intermittently unstable on the handover route in this environment
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`
@@ -137,6 +141,7 @@
 - Real provider integrations
 - Real AI execution and automation enforcement
 - Deeper qualification policy logic and approval boundaries beyond the current structured alpha form
+- Automatic QA sampling rules, policy packs, and message-level draft approval gates beyond the current case-linked review boundary
 - Redis or BullMQ-backed durable job orchestration beyond the current local alpha worker
 - Leasing-specific rejection reasons and policy rules beyond the current shared document-request model
 - Real outbound customer communication, provider callbacks, external archive systems, broader post-completion workflows, and fully automated handover execution beyond the current planning, dispatch-ready, blocker, in-progress, controlled-completion, aftercare, and admin-closure boundaries

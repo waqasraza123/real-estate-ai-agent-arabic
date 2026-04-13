@@ -1,6 +1,7 @@
 import type {
   AutomationStatus,
   CaseStage,
+  CaseQaReviewStatus,
   DocumentRequestStatus,
   DocumentRequestType,
   FollowUpStatus,
@@ -55,6 +56,23 @@ export function getAutomationStatusLabel(locale: SupportedLocale, status: Automa
     en: {
       active: "Active",
       paused: "Paused"
+    }
+  } as const;
+
+  return labels[locale][status];
+}
+
+export function getCaseQaReviewStatusLabel(locale: SupportedLocale, status: CaseQaReviewStatus) {
+  const labels = {
+    ar: {
+      approved: "مقبولة",
+      follow_up_required: "تحتاج متابعة",
+      pending_review: "بانتظار المراجعة"
+    },
+    en: {
+      approved: "Approved",
+      follow_up_required: "Follow-up required",
+      pending_review: "Pending review"
     }
   } as const;
 
@@ -154,6 +172,50 @@ export function getFollowUpManagerCopy(locale: SupportedLocale) {
     ownerName: "Current owner",
     summary: "Update the next step, due time, and ownership to clear the open intervention and re-arm follow-up.",
     title: "Manager intervention"
+  };
+}
+
+export function getQaReviewRequestCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "إرسال إلى الجودة",
+      requestedByName: "الجهة الطالبة",
+      sampleSummary: "سبب العينة أو المخاطر المراد مراجعتها",
+      summary: "افتح مراجعة جودة واضحة عندما تحتاج الحالة إلى تدقيق بشري على السلامة أو التفسير أو جودة الرد.",
+      title: "إرسال الحالة إلى الجودة"
+    };
+  }
+
+  return {
+    action: "Send to QA",
+    requestedByName: "Requested by",
+    sampleSummary: "Sampling reason or risk to review",
+    summary: "Open an explicit QA review when the case needs human inspection for safety, interpretation, or response quality.",
+    title: "Send case to QA"
+  };
+}
+
+export function getQaReviewResolutionCopy(locale: SupportedLocale) {
+  if (locale === "ar") {
+    return {
+      action: "حفظ قرار الجودة",
+      approved: "اعتماد الحالة",
+      followUpRequired: "تتطلب متابعة",
+      reviewSummary: "ملخص قرار الجودة",
+      reviewerName: "اسم المراجع",
+      summary: "أغلق مراجعة الجودة بقرار واضح يوضح ما إذا كانت الحالة آمنة أو تحتاج تصحيحاً أو متابعة إضافية.",
+      title: "قرار مراجعة الجودة"
+    };
+  }
+
+  return {
+    action: "Save QA decision",
+    approved: "Approve case",
+    followUpRequired: "Needs follow-up",
+    reviewSummary: "QA decision summary",
+    reviewerName: "Reviewer name",
+    summary: "Close the QA review with an explicit decision about whether the case is safe to continue or needs corrective follow-up.",
+    title: "QA review decision"
   };
 }
 

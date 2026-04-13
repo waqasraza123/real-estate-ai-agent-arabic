@@ -18,6 +18,7 @@ import {
 } from "@/lib/persisted-case-presenters";
 import { getInterventionCountLabel } from "@/lib/live-copy";
 import { tryListPersistedCases } from "@/lib/live-api";
+import { getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function LeadsPage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.app.phaseLabel} summary={messages.leads.summary} title={messages.leads.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "العودة إلى مركز القيادة" : "Return to the command center"}
           locale={locale}
           operatorRole={currentOperatorRole}

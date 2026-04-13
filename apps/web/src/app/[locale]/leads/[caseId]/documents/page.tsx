@@ -20,7 +20,7 @@ import {
 } from "@/lib/persisted-case-presenters";
 import { getHandoverIntakeCopy } from "@/lib/live-copy";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
-import { getOperatorPermissionGuardNote } from "@/lib/operator-role";
+import { getOperatorPermissionGuardNote, getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function DocumentsPage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.documents.title} summary={messages.documents.summary} title={messages.documents.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "العودة إلى السطح المتاح" : "Return to an allowed surface"}
           locale={locale}
           operatorRole={currentOperatorRole}

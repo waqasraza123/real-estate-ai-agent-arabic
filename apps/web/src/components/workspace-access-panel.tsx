@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { SupportedLocale } from "@real-estate-ai/contracts";
+import type { OperatorRole, OperatorWorkspace, SupportedLocale } from "@real-estate-ai/contracts";
 import { Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { getOperatorRoleLabel, getOperatorWorkspaceLabel } from "@/lib/operator-role";
@@ -9,10 +9,10 @@ export function WorkspaceAccessPanel(props: {
   actionHref: string;
   actionLabel: string;
   locale: SupportedLocale;
-  operatorRole: "sales_manager" | "handover_coordinator" | "handover_manager" | "admin";
+  operatorRole: OperatorRole;
   summary: string;
   title: string;
-  workspace: "sales" | "handover" | "manager_revenue" | "manager_handover";
+  workspace: OperatorWorkspace;
 }) {
   return (
     <Panel title={props.title}>

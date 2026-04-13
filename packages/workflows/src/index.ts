@@ -10,11 +10,13 @@ import type {
   MarkHandoverCustomerUpdateDispatchReadyInput,
   ManageCaseFollowUpInput,
   PlanHandoverAppointmentInput,
+  RequestCaseQaReviewInput,
   PrepareHandoverCustomerUpdateDeliveryInput,
   PersistedCaseDetail,
   PersistedCaseSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
+  ResolveCaseQaReviewInput,
   ResolveHandoverPostCompletionFollowUpInput,
   SaveHandoverArchiveReviewInput,
   SaveHandoverReviewInput,
@@ -76,6 +78,49 @@ export async function managePersistedCaseFollowUp(
   input: ManageCaseFollowUpInput
 ): Promise<PersistedCaseDetail | null> {
   return store.manageCaseFollowUp(caseId, input);
+}
+
+export async function requestPersistedCaseQaReview(
+  store: LeadCaptureStore,
+  caseId: string,
+  input: RequestCaseQaReviewInput
+): Promise<PersistedCaseDetail | null> {
+  const caseDetail = await store.getCaseDetail(caseId);
+
+  if (!caseDetail) {
+    return null;
+  }
+
+  if (caseDetail.currentQaReview?.status === "pending_review") {
+    throw new WorkflowRuleError("qa_review_already_pending");
+  }
+
+  return store.requestCaseQaReview(caseId, input);
+}
+
+export async function resolvePersistedCaseQaReview(
+  store: LeadCaptureStore,
+  caseId: string,
+  qaReviewId: string,
+  input: ResolveCaseQaReviewInput
+): Promise<PersistedCaseDetail | null> {
+  const caseDetail = await store.getCaseDetail(caseId);
+
+  if (!caseDetail) {
+    return null;
+  }
+
+  const qaReview = caseDetail.qaReviews.find((review) => review.qaReviewId === qaReviewId);
+
+  if (!qaReview) {
+    return null;
+  }
+
+  if (qaReview.status !== "pending_review") {
+    throw new WorkflowRuleError("qa_review_not_pending");
+  }
+
+  return store.resolveCaseQaReview(caseId, qaReviewId, input);
 }
 
 export async function qualifyPersistedCase(

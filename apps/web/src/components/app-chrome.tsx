@@ -12,6 +12,7 @@ import { getLocaleLabel, toggleLocale } from "@real-estate-ai/i18n";
 import { cx } from "@real-estate-ai/ui";
 
 import { OperatorRoleSwitcher } from "@/components/operator-role-switcher";
+import { getQaWorkspaceCopy } from "@/lib/qa-workspace";
 
 export function AppChrome(props: {
   children: ReactNode;
@@ -22,6 +23,7 @@ export function AppChrome(props: {
   const pathname = usePathname();
   const alternateLocale = toggleLocale(props.locale);
   const alternatePath = replaceLocale(pathname, alternateLocale);
+  const qaWorkspaceCopy = getQaWorkspaceCopy(props.locale);
   const navigation = [
     {
       href: `/${props.locale}`,
@@ -48,6 +50,12 @@ export function AppChrome(props: {
       visible:
         canOperatorRoleAccessWorkspace("manager_revenue", props.currentOperatorRole) ||
         canOperatorRoleAccessWorkspace("manager_handover", props.currentOperatorRole)
+    },
+    {
+      href: `/${props.locale}/qa`,
+      label: props.locale === "ar" ? "الجودة" : "QA",
+      summary: qaWorkspaceCopy.title,
+      visible: canOperatorRoleAccessWorkspace("qa", props.currentOperatorRole)
     }
   ].filter((item) => item.visible);
 

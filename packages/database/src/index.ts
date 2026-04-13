@@ -5,6 +5,7 @@ import type {
   ApproveHandoverCustomerUpdateInput,
   AutomationStatus,
   CaseStage,
+  CaseQaReviewStatus,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
   HandoverClosureState,
@@ -34,6 +35,7 @@ import type {
   ManagerInterventionSeverity,
   ManagerInterventionStatus,
   ManagerInterventionType,
+  PersistedCaseQaReview,
   PersistedCaseDetail,
   PersistedCaseSummary,
   PersistedDocumentRequest,
@@ -54,6 +56,8 @@ import type {
   PrepareHandoverCustomerUpdateDeliveryInput,
   QualifyCaseInput,
   QualificationReadiness,
+  RequestCaseQaReviewInput,
+  ResolveCaseQaReviewInput,
   ResolveHandoverPostCompletionFollowUpInput,
   SaveHandoverArchiveReviewInput,
   SaveHandoverReviewInput,
@@ -298,6 +302,21 @@ const managerInterventions = pgTable("manager_interventions", {
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
+const caseQaReviews = pgTable("case_qa_reviews", {
+  caseId: uuid("case_id")
+    .notNull()
+    .references(() => cases.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  id: uuid("id").primaryKey(),
+  requestedByName: text("requested_by_name").notNull(),
+  reviewSummary: text("review_summary"),
+  reviewedAt: timestamp("reviewed_at", { mode: "string", withTimezone: true }),
+  reviewerName: text("reviewer_name"),
+  sampleSummary: text("sample_summary").notNull(),
+  status: text("status").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
 const automationJobs = pgTable("automation_jobs", {
   caseId: uuid("case_id")
     .notNull()
@@ -341,6 +360,8 @@ export interface LeadCaptureStore {
       nextActionDueAt: string;
     }
   ): Promise<CreateWebsiteLeadResult>;
+  requestCaseQaReview(caseId: string, input: RequestCaseQaReviewInput): Promise<PersistedCaseDetail | null>;
+  resolveCaseQaReview(caseId: string, qaReviewId: string, input: ResolveCaseQaReviewInput): Promise<PersistedCaseDetail | null>;
   getCaseDetail(caseId: string): Promise<PersistedCaseDetail | null>;
   getHandoverCaseDetail(handoverCaseId: string): Promise<PersistedHandoverCaseDetail | null>;
   listCases(): Promise<PersistedCaseSummary[]>;
@@ -526,6 +547,7 @@ export async function createAlphaLeadCaptureStore(options?: {
     schema: {
       auditEvents,
       automationJobs,
+      caseQaReviews,
       cases,
       documentRequests,
       handoverAppointments,
@@ -733,6 +755,19 @@ export async function createAlphaLeadCaptureStore(options?: {
       updated_at timestamptz not null default now()
     );
 
+    create table if not exists case_qa_reviews (
+      id uuid primary key,
+      case_id uuid not null references cases(id) on delete cascade,
+      requested_by_name text not null,
+      sample_summary text not null,
+      status text not null,
+      reviewer_name text,
+      review_summary text,
+      reviewed_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
     create table if not exists automation_jobs (
       id uuid primary key,
       case_id uuid not null references cases(id) on delete cascade,
@@ -766,6 +801,7 @@ export async function createAlphaLeadCaptureStore(options?: {
     create index if not exists audit_events_case_id_idx on audit_events (case_id, created_at asc);
     create index if not exists manager_interventions_case_id_idx on manager_interventions (case_id, created_at desc);
     create index if not exists manager_interventions_open_case_idx on manager_interventions (case_id, status);
+    create index if not exists case_qa_reviews_case_id_idx on case_qa_reviews (case_id, created_at desc);
     create index if not exists automation_jobs_due_idx on automation_jobs (status, run_after asc);
   `);
 
@@ -1086,6 +1122,41 @@ export async function createAlphaLeadCaptureStore(options?: {
     );
   };
 
+  const listCurrentQaReviews = async (caseIds: string[]) => {
+    const caseIdsWithValues = caseIds.filter(Boolean);
+
+    if (caseIdsWithValues.length === 0) {
+      return new Map<string, PersistedCaseQaReview>();
+    }
+
+    const records = await db
+      .select({
+        caseId: caseQaReviews.caseId,
+        createdAt: caseQaReviews.createdAt,
+        qaReviewId: caseQaReviews.id,
+        requestedByName: caseQaReviews.requestedByName,
+        reviewSummary: caseQaReviews.reviewSummary,
+        reviewedAt: caseQaReviews.reviewedAt,
+        reviewerName: caseQaReviews.reviewerName,
+        sampleSummary: caseQaReviews.sampleSummary,
+        status: caseQaReviews.status,
+        updatedAt: caseQaReviews.updatedAt
+      })
+      .from(caseQaReviews)
+      .where(inArray(caseQaReviews.caseId, caseIdsWithValues))
+      .orderBy(desc(caseQaReviews.createdAt), desc(caseQaReviews.updatedAt));
+
+    const latestReviews = new Map<string, PersistedCaseQaReview>();
+
+    for (const record of records) {
+      if (!latestReviews.has(record.caseId)) {
+        latestReviews.set(record.caseId, hydrateCaseQaReview(record));
+      }
+    }
+
+    return latestReviews;
+  };
+
   const getPersistedCaseDetail = async (caseId: string): Promise<PersistedCaseDetail | null> => {
     const persistedCase = await db
       .select({
@@ -1117,8 +1188,16 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [caseAuditEvents, qualificationRecord, currentVisit, persistedDocumentRequests, persistedInterventions, linkedHandoverCase, handoverClosureMap] =
-      await Promise.all([
+    const [
+      caseAuditEvents,
+      qualificationRecord,
+      currentVisit,
+      persistedDocumentRequests,
+      persistedInterventions,
+      persistedQaReviews,
+      linkedHandoverCase,
+      handoverClosureMap
+    ] = await Promise.all([
         db
           .select({
             createdAt: auditEvents.createdAt,
@@ -1177,6 +1256,21 @@ export async function createAlphaLeadCaptureStore(options?: {
           .orderBy(desc(managerInterventions.createdAt)),
         db
           .select({
+            createdAt: caseQaReviews.createdAt,
+            qaReviewId: caseQaReviews.id,
+            requestedByName: caseQaReviews.requestedByName,
+            reviewSummary: caseQaReviews.reviewSummary,
+            reviewedAt: caseQaReviews.reviewedAt,
+            reviewerName: caseQaReviews.reviewerName,
+            sampleSummary: caseQaReviews.sampleSummary,
+            status: caseQaReviews.status,
+            updatedAt: caseQaReviews.updatedAt
+          })
+          .from(caseQaReviews)
+          .where(eq(caseQaReviews.caseId, caseId))
+          .orderBy(desc(caseQaReviews.createdAt), desc(caseQaReviews.updatedAt)),
+        db
+          .select({
             createdAt: handoverCases.createdAt,
             handoverCaseId: handoverCases.id,
             ownerName: handoverCases.ownerName,
@@ -1190,6 +1284,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       ]);
 
     const hydratedInterventions = persistedInterventions.map((intervention) => hydrateManagerIntervention(intervention));
+    const hydratedQaReviews = persistedQaReviews.map((qaReview) => hydrateCaseQaReview(qaReview));
 
     return {
       auditEvents: caseAuditEvents.map((event) => ({
@@ -1201,6 +1296,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       budget: caseRecord.budget,
       caseId: caseRecord.caseId,
       createdAt: caseRecord.createdAt,
+      currentQaReview: hydratedQaReviews[0] ?? null,
       currentVisit: currentVisit[0]
         ? {
             createdAt: currentVisit[0].createdAt,
@@ -1230,6 +1326,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       phone: caseRecord.phone,
       preferredLocale: toSupportedLocale(caseRecord.preferredLocale),
       projectInterest: caseRecord.projectInterest,
+      qaReviews: hydratedQaReviews,
       qualificationSnapshot: qualificationRecord[0]
         ? {
             budgetBand: qualificationRecord[0].budgetBand,
@@ -1486,6 +1583,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         automationStatus: toAutomationStatus(createdCase.automationStatus),
         caseId: createdCase.caseId,
         createdAt: createdCase.createdAt,
+        currentQaReview: null,
         customerName: createdCase.customerName,
         followUpStatus: toFollowUpStatus(createdCase.nextActionDueAt),
         handoverCase: null,
@@ -1501,6 +1599,106 @@ export async function createAlphaLeadCaptureStore(options?: {
         stage: toCaseStage(createdCase.stage),
         updatedAt: createdCase.updatedAt
       };
+    },
+    async requestCaseQaReview(caseId, input) {
+      const caseRecord = await getPersistedCaseDetail(caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
+      const currentQaReview = caseRecord.qaReviews[0];
+
+      if (currentQaReview?.status === "pending_review") {
+        return null;
+      }
+
+      const createdAt = new Date().toISOString();
+      const qaReviewId = randomUUID();
+
+      await db.transaction(async (transaction) => {
+        await transaction.insert(caseQaReviews).values({
+          caseId,
+          createdAt,
+          id: qaReviewId,
+          requestedByName: input.requestedByName ?? caseRecord.ownerName,
+          reviewSummary: null,
+          reviewedAt: null,
+          reviewerName: null,
+          sampleSummary: input.sampleSummary,
+          status: "pending_review",
+          updatedAt: createdAt
+        });
+
+        await transaction.insert(auditEvents).values({
+          caseId,
+          createdAt,
+          eventType: "qa_review_requested",
+          id: randomUUID(),
+          payload: {
+            qaReviewId,
+            requestedByName: input.requestedByName ?? caseRecord.ownerName,
+            sampleSummary: input.sampleSummary
+          }
+        });
+      });
+
+      return getPersistedCaseDetail(caseId);
+    },
+    async resolveCaseQaReview(caseId, qaReviewId, input) {
+      const currentQaReview = await db
+        .select({
+          createdAt: caseQaReviews.createdAt,
+          qaReviewId: caseQaReviews.id,
+          requestedByName: caseQaReviews.requestedByName,
+          reviewSummary: caseQaReviews.reviewSummary,
+          reviewedAt: caseQaReviews.reviewedAt,
+          reviewerName: caseQaReviews.reviewerName,
+          sampleSummary: caseQaReviews.sampleSummary,
+          status: caseQaReviews.status,
+          updatedAt: caseQaReviews.updatedAt
+        })
+        .from(caseQaReviews)
+        .where(and(eq(caseQaReviews.caseId, caseId), eq(caseQaReviews.id, qaReviewId)))
+        .limit(1);
+
+      if (!currentQaReview[0]) {
+        return null;
+      }
+
+      if (toCaseQaReviewStatus(currentQaReview[0].status) !== "pending_review") {
+        return null;
+      }
+
+      const updatedAt = new Date().toISOString();
+
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(caseQaReviews)
+          .set({
+            reviewSummary: input.reviewSummary,
+            reviewedAt: updatedAt,
+            reviewerName: input.reviewerName ?? "QA Reviewer",
+            status: input.status,
+            updatedAt
+          })
+          .where(and(eq(caseQaReviews.caseId, caseId), eq(caseQaReviews.id, qaReviewId)));
+
+        await transaction.insert(auditEvents).values({
+          caseId,
+          createdAt: updatedAt,
+          eventType: "qa_review_resolved",
+          id: randomUUID(),
+          payload: {
+            qaReviewId,
+            reviewSummary: input.reviewSummary,
+            reviewerName: input.reviewerName ?? "QA Reviewer",
+            status: input.status
+          }
+        });
+      });
+
+      return getPersistedCaseDetail(caseId);
     },
     async getCaseDetail(caseId) {
       return getPersistedCaseDetail(caseId);
@@ -1529,8 +1727,9 @@ export async function createAlphaLeadCaptureStore(options?: {
         .orderBy(desc(cases.createdAt));
 
       const caseIds = persistedCases.map((caseRecord) => caseRecord.caseId);
-      const [openInterventionCounts, linkedHandoverCases, handoverClosureSummaries] = await Promise.all([
+      const [openInterventionCounts, currentQaReviews, linkedHandoverCases, handoverClosureSummaries] = await Promise.all([
         listOpenInterventionCounts(caseIds),
+        listCurrentQaReviews(caseIds),
         listLinkedHandoverCases(caseIds),
         listHandoverClosureSummaries(caseIds)
       ]);
@@ -1539,6 +1738,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         automationStatus: toAutomationStatus(caseRecord.automationStatus),
         caseId: caseRecord.caseId,
         createdAt: caseRecord.createdAt,
+        currentQaReview: currentQaReviews.get(caseRecord.caseId) ?? null,
         customerName: caseRecord.customerName,
         followUpStatus: toFollowUpStatus(caseRecord.nextActionDueAt),
         handoverCase: linkedHandoverCases.get(caseRecord.caseId) ?? null,
@@ -3834,6 +4034,30 @@ function hydrateManagerIntervention(value: {
   };
 }
 
+function hydrateCaseQaReview(value: {
+  createdAt: string;
+  qaReviewId: string;
+  requestedByName: string;
+  reviewSummary: string | null;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  sampleSummary: string;
+  status: string;
+  updatedAt: string;
+}): PersistedCaseQaReview {
+  return {
+    createdAt: value.createdAt,
+    qaReviewId: value.qaReviewId,
+    requestedByName: value.requestedByName,
+    reviewSummary: value.reviewSummary,
+    reviewedAt: value.reviewedAt,
+    reviewerName: value.reviewerName,
+    sampleSummary: value.sampleSummary,
+    status: toCaseQaReviewStatus(value.status),
+    updatedAt: value.updatedAt
+  };
+}
+
 function toAutomationStatus(value: string): AutomationStatus {
   if (value === "active" || value === "paused") {
     return value;
@@ -3848,6 +4072,14 @@ function toCaseStage(value: string): CaseStage {
   }
 
   throw new Error(`unsupported_case_stage:${value}`);
+}
+
+function toCaseQaReviewStatus(value: string): CaseQaReviewStatus {
+  if (value === "pending_review" || value === "approved" || value === "follow_up_required") {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_qa_review_status:${value}`);
 }
 
 function toDocumentRequestStatus(value: string): DocumentRequestStatus {

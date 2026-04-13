@@ -17,6 +17,8 @@ import type {
   PersistedCaseSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
+  RequestCaseQaReviewInput,
+  ResolveCaseQaReviewInput,
   ResolveHandoverPostCompletionFollowUpInput,
   SaveHandoverArchiveReviewInput,
   SaveHandoverReviewInput,
@@ -95,6 +97,27 @@ export async function manageCaseFollowUp(caseId: string, input: ManageCaseFollow
   return requestJson<PersistedCaseDetail>(`/v1/cases/${caseId}/follow-up-plan`, {
     headers: await getOperatorSessionHeaders(operatorRole),
     method: "POST",
+    payload: input
+  });
+}
+
+export async function requestCaseQaReview(caseId: string, input: RequestCaseQaReviewInput, operatorRole?: OperatorRole) {
+  return requestJson<PersistedCaseDetail>(`/v1/cases/${caseId}/qa-review`, {
+    headers: await getOperatorSessionHeaders(operatorRole),
+    method: "POST",
+    payload: input
+  });
+}
+
+export async function resolveCaseQaReview(
+  caseId: string,
+  qaReviewId: string,
+  input: ResolveCaseQaReviewInput,
+  operatorRole?: OperatorRole
+) {
+  return requestJson<PersistedCaseDetail>(`/v1/cases/${caseId}/qa-review/${qaReviewId}`, {
+    headers: await getOperatorSessionHeaders(operatorRole),
+    method: "PATCH",
     payload: input
   });
 }

@@ -10,12 +10,13 @@ import { AutomationStatusForm } from "@/components/automation-status-form";
 import { CaseRouteTabs } from "@/components/case-route-tabs";
 import { ManagerFollowUpForm } from "@/components/manager-follow-up-form";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
+import { QaReviewRequestForm } from "@/components/qa-review-request-form";
 import { QualificationForm } from "@/components/qualification-form";
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
 import { TimelinePanel } from "@/components/timeline-panel";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
-import { getOperatorPermissionGuardNote } from "@/lib/operator-role";
+import { getOperatorPermissionGuardNote, getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildCaseReferenceCode,
@@ -27,10 +28,11 @@ import {
   getPersistedFollowUpLabel,
   getPersistedHandoverStatusLabel,
   getPersistedInterventionDisplay,
+  getPersistedQaReviewDisplay,
   getPersistedQualificationSummary,
   getPersistedSourceLabel
 } from "@/lib/persisted-case-presenters";
-import { getAutomationStatusCopy, getFollowUpManagerCopy, getInterventionCountLabel } from "@/lib/live-copy";
+import { getAutomationStatusCopy, getFollowUpManagerCopy, getInterventionCountLabel, getQaReviewRequestCopy } from "@/lib/live-copy";
 import { tryGetPersistedCaseDetail } from "@/lib/live-api";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +51,7 @@ export default async function LeadProfilePage(props: PageProps) {
       <div className="page-stack">
         <ScreenIntro badge={messages.profile.title} summary={messages.profile.summary} title={messages.profile.title} />
         <WorkspaceAccessPanel
-          actionHref={`/${locale}/manager`}
+          actionHref={getPreferredOperatorSurfacePath(locale, currentOperatorRole)}
           actionLabel={locale === "ar" ? "فتح السطح المتاح" : "Open an available surface"}
           locale={locale}
           operatorRole={currentOperatorRole}
@@ -74,9 +76,14 @@ export default async function LeadProfilePage(props: PageProps) {
     const followUpManagerCopy = getFollowUpManagerCopy(locale);
     const canManageFollowUp = canOperatorRolePerform("manage_case_follow_up", currentOperatorRole);
     const canManageAutomation = canOperatorRolePerform("manage_case_automation", currentOperatorRole);
+    const canManageQaSampling = canOperatorRolePerform("manage_qa_sampling", currentOperatorRole);
     const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", currentOperatorRole);
+    const canAccessQaWorkspace = canOperatorRoleAccessWorkspace("qa", currentOperatorRole);
     const followUpGuardNote = getOperatorPermissionGuardNote(locale, "manage_case_follow_up");
     const automationGuardNote = getOperatorPermissionGuardNote(locale, "manage_case_automation");
+    const qaSamplingGuardNote = getOperatorPermissionGuardNote(locale, "manage_qa_sampling");
+    const qaReviewDisplay = getPersistedQaReviewDisplay(locale, persistedCase);
+    const qaReviewRequestCopy = getQaReviewRequestCopy(locale);
 
     return (
       <div className="page-stack">
@@ -175,6 +182,49 @@ export default async function LeadProfilePage(props: PageProps) {
               returnPath={`/${locale}/leads/${persistedCase.caseId}`}
               status={persistedCase.automationStatus}
             />
+          </Panel>
+        </div>
+
+        <div className="two-column-grid">
+          <Panel title={qaReviewRequestCopy.title}>
+            <p className="panel-summary">{qaReviewRequestCopy.summary}</p>
+            <p className="field-note">{qaSamplingGuardNote}</p>
+            <QaReviewRequestForm
+              canManage={canManageQaSampling && qaReviewDisplay?.status !== "pending_review"}
+              caseId={persistedCase.caseId}
+              defaultRequestedByName={persistedCase.ownerName}
+              disabledLabel={locale === "ar" ? "يتطلب دوراً مخولاً للجودة" : "QA sampling role required"}
+              locale={locale}
+              returnPath={`/${locale}/leads/${persistedCase.caseId}`}
+            />
+          </Panel>
+
+          <Panel title={locale === "ar" ? "حالة مراجعة الجودة" : "QA review status"}>
+            {qaReviewDisplay ? (
+              <div className="page-stack">
+                <div className="row-between">
+                  <h3>{qaReviewDisplay.sampleSummary}</h3>
+                  <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
+                </div>
+                <p>{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}</p>
+                <p className="case-link-meta">
+                  {qaReviewDisplay.reviewerName ?? qaReviewDisplay.requestedByName}
+                  {" · "}
+                  {qaReviewDisplay.reviewedAt ?? qaReviewDisplay.updatedAt}
+                </p>
+                {canAccessQaWorkspace ? (
+                  <Link className="inline-link" href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
+                    {locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <p className="panel-summary">
+                {locale === "ar"
+                  ? "لم تُرسل هذه الحالة إلى طابور الجودة بعد."
+                  : "This case has not been sent to the QA queue yet."}
+              </p>
+            )}
           </Panel>
         </div>
 

@@ -82,6 +82,7 @@ export interface AppMessages {
     sales_manager: string;
     handover_coordinator: string;
     handover_manager: string;
+    qa_reviewer: string;
     admin: string;
   };
   states: {
