@@ -6,6 +6,7 @@ import { buildQaWorkspaceQueues, getQaWorkspaceCopy } from "./qa-workspace";
 
 function buildCase(caseId: string, status: CaseQaReviewStatus, updatedAt: string) {
   return {
+    automationHoldReason: status === "pending_review" ? "qa_pending_review" : status === "follow_up_required" ? "qa_follow_up_required" : null,
     automationStatus: "active",
     caseId,
     createdAt: "2026-04-10T08:00:00.000Z",

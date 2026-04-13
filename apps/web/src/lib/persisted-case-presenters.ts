@@ -9,6 +9,8 @@ import type { ConversationMessage, JourneyEvent, LocalizedText } from "@real-est
 
 import {
   getAutomationStatusLabel,
+  getAutomationHoldReasonLabel,
+  getAutomationHoldReasonNote,
   getCaseQaPolicySignalLabel,
   getCaseStageLabel,
   getCaseQaReviewStatusLabel,
@@ -162,6 +164,21 @@ export function formatDueAt(value: PersistedCaseDetail | PersistedCaseSummary, l
 
 export function getPersistedAutomationLabel(locale: SupportedLocale, automationStatus: PersistedCaseDetail["automationStatus"]) {
   return getAutomationStatusLabel(locale, automationStatus);
+}
+
+export function getPersistedAutomationHoldReasonLabel(
+  locale: SupportedLocale,
+  automationHoldReason: PersistedCaseDetail["automationHoldReason"] | PersistedCaseSummary["automationHoldReason"]
+) {
+  return automationHoldReason ? getAutomationHoldReasonLabel(locale, automationHoldReason) : null;
+}
+
+export function getPersistedAutomationHoldReasonNote(
+  locale: SupportedLocale,
+  automationStatus: PersistedCaseDetail["automationStatus"],
+  automationHoldReason: PersistedCaseDetail["automationHoldReason"]
+) {
+  return automationHoldReason ? getAutomationHoldReasonNote(locale, automationHoldReason, automationStatus) : null;
 }
 
 export function getPersistedCaseStageLabel(locale: SupportedLocale, caseStage: PersistedCaseDetail["stage"] | PersistedCaseSummary["stage"]) {

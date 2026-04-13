@@ -86,4 +86,56 @@ describe("follow-up worker", () => {
     expect(caseDetail?.automationStatus).toBe("paused");
     expect(caseDetail?.openInterventionsCount).toBe(0);
   });
+
+  it("suppresses overdue automation while QA is open and re-arms follow-up once QA clears", async () => {
+    const createdCase = await store.createWebsiteLeadCase({
+      customerName: "Noura Aziz",
+      email: "noura@example.com",
+      message:
+        "I am frustrated and need a special approval on the deposit terms. If this keeps happening, my lawyer will step in.",
+      nextAction: "Call the customer back with the next revenue update",
+      nextActionDueAt: "2026-04-12T08:00:00.000Z",
+      preferredLocale: "en",
+      projectInterest: "Harbor Gate"
+    });
+
+    expect(createdCase.automationHoldReason).toBe("qa_pending_review");
+    expect(createdCase.currentQaReview?.status).toBe("pending_review");
+
+    const heldCycle = await runPersistedFollowUpCycle(store, {
+      limit: 10,
+      runAt: "2026-04-12T12:00:00.000Z"
+    });
+
+    expect(heldCycle.processedJobs).toBe(0);
+    expect(heldCycle.openedInterventions).toBe(0);
+
+    const pendingCase = await store.getCaseDetail(createdCase.caseId);
+
+    expect(pendingCase?.automationHoldReason).toBe("qa_pending_review");
+    expect(pendingCase?.openInterventionsCount).toBe(0);
+
+    const resolvedCase = await store.resolveCaseQaReview(createdCase.caseId, createdCase.currentQaReview!.qaReviewId, {
+      reviewSummary: "The escalation can proceed with a compliant human-managed response.",
+      reviewerName: "QA Desk",
+      status: "approved"
+    });
+
+    expect(resolvedCase?.automationHoldReason).toBeNull();
+    expect(resolvedCase?.currentQaReview?.status).toBe("approved");
+
+    const resumedCycle = await runPersistedFollowUpCycle(store, {
+      limit: 10,
+      runAt: "2026-04-12T12:05:00.000Z"
+    });
+
+    expect(resumedCycle.processedJobs).toBe(1);
+    expect(resumedCycle.openedInterventions).toBe(1);
+
+    const escalatedCase = await store.getCaseDetail(createdCase.caseId);
+
+    expect(escalatedCase?.automationHoldReason).toBeNull();
+    expect(escalatedCase?.openInterventionsCount).toBe(1);
+    expect(escalatedCase?.managerInterventions[0]?.type).toBe("follow_up_overdue");
+  });
 });

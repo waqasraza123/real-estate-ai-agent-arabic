@@ -24,6 +24,8 @@ import {
   formatCaseLastChange,
   formatDueAt,
   getPersistedAutomationLabel,
+  getPersistedAutomationHoldReasonLabel,
+  getPersistedAutomationHoldReasonNote,
   getPersistedCaseStageLabel,
   getPersistedFollowUpLabel,
   getPersistedHandoverStatusLabel,
@@ -84,6 +86,12 @@ export default async function LeadProfilePage(props: PageProps) {
     const qaSamplingGuardNote = getOperatorPermissionGuardNote(locale, "manage_qa_sampling");
     const qaReviewDisplay = getPersistedQaReviewDisplay(locale, persistedCase);
     const qaReviewRequestCopy = getQaReviewRequestCopy(locale);
+    const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(locale, persistedCase.automationHoldReason);
+    const automationHoldReasonNote = getPersistedAutomationHoldReasonNote(
+      locale,
+      persistedCase.automationStatus,
+      persistedCase.automationHoldReason
+    );
 
     return (
       <div className="page-stack">
@@ -123,6 +131,7 @@ export default async function LeadProfilePage(props: PageProps) {
                 {getPersistedFollowUpLabel(locale, persistedCase)}
               </StatusBadge>
               <StatusBadge>{getPersistedAutomationLabel(locale, persistedCase.automationStatus)}</StatusBadge>
+              {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
               {persistedCase.openInterventionsCount > 0 ? (
                 <StatusBadge tone="warning">{getInterventionCountLabel(locale, persistedCase.openInterventionsCount)}</StatusBadge>
               ) : null}
@@ -174,6 +183,7 @@ export default async function LeadProfilePage(props: PageProps) {
           <Panel title={automationCopy.title}>
             <p className="panel-summary">{automationCopy.summary}</p>
             <p className="field-note">{automationGuardNote}</p>
+            {automationHoldReasonNote ? <p className="field-note">{automationHoldReasonNote}</p> : null}
             <AutomationStatusForm
               canManage={canManageAutomation}
               caseId={persistedCase.caseId}

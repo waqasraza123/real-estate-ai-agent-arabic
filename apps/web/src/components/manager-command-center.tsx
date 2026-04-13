@@ -36,6 +36,7 @@ import {
   buildCaseReferenceCode,
   formatCaseLastChange,
   getPersistedAutomationLabel,
+  getPersistedAutomationHoldReasonLabel,
   getPersistedCaseStageLabel,
   getPersistedFollowUpLabel,
   getPersistedHandoverCustomerUpdateQaReviewDisplay,
@@ -717,7 +718,9 @@ export function RevenueManagerCommandCenter(props: {
   const messages = getMessages(props.locale);
   const workspaceCopy = getManagerWorkspaceCopy(props.locale, "manager_revenue");
   const managerCapabilities = getManagerWorkspaceCapabilities(props.currentOperatorRole);
-  const { openInterventionsCount, pausedAutomationCases, revenueAttentionCases } = buildManagerWorkspaceQueues(props.persistedCases);
+  const { governanceHeldAutomationCases, openInterventionsCount, pausedAutomationCases, revenueAttentionCases } = buildManagerWorkspaceQueues(
+    props.persistedCases
+  );
   const governanceSummary = buildManagerGovernanceSummary(props.persistedCases);
   const canAccessHandoverManagerWorkspace = canOperatorRoleAccessWorkspace("manager_handover", props.currentOperatorRole);
   const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", props.currentOperatorRole);
@@ -927,6 +930,15 @@ export function RevenueManagerCommandCenter(props: {
               : "Cases where automation was paused behind an explicit managerial decision."}
           </p>
         </article>
+        <article className="metric-tile metric-tile-sand">
+          <p className="metric-label">{props.locale === "ar" ? "أتمتة معلقة بالجودة" : "QA-held automation"}</p>
+          <p className="metric-value">{governanceHeldAutomationCases.length}</p>
+          <p className="metric-detail">
+            {props.locale === "ar"
+              ? "حالات لا تستطيع فيها المتابعة التلقائية الاستمرار حتى تُغلق مراجعة الجودة الحالية."
+              : "Cases where follow-up automation is blocked until the current QA boundary is cleared."}
+          </p>
+        </article>
         <article className="metric-tile metric-tile-mint">
           <p className="metric-label">{props.locale === "ar" ? "حوكمة المحادثات" : "Conversation governance"}</p>
           <p className="metric-value">{governanceSummary.revenueAttentionCases.length}</p>
@@ -956,6 +968,7 @@ export function RevenueManagerCommandCenter(props: {
             renderItem={(caseItem) => {
               const handoverDisplay = getPersistedHandoverWorkspaceDisplay(props.locale, caseItem);
               const qaReviewDisplay = getPersistedQaReviewDisplay(props.locale, caseItem);
+              const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(props.locale, caseItem.automationHoldReason);
 
               return (
                 <article key={caseItem.caseId} className="alert-row alert-row-high">
@@ -979,6 +992,7 @@ export function RevenueManagerCommandCenter(props: {
                   <p className="case-link-meta">{formatCaseLastChange(caseItem, props.locale)}</p>
                   <div className="status-row-wrap">
                     <StatusBadge>{getPersistedAutomationLabel(props.locale, caseItem.automationStatus)}</StatusBadge>
+                    {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
                     <StatusBadge>{getPersistedCaseStageLabel(props.locale, caseItem.stage)}</StatusBadge>
                   </div>
                   <div className="status-row-wrap">
@@ -1005,6 +1019,7 @@ export function RevenueManagerCommandCenter(props: {
             renderItem={(caseItem) => {
               const handoverDisplay = getPersistedHandoverWorkspaceDisplay(props.locale, caseItem);
               const qaReviewDisplay = getPersistedQaReviewDisplay(props.locale, caseItem);
+              const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(props.locale, caseItem.automationHoldReason);
 
               return (
                 <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/leads/${caseItem.caseId}`}>
@@ -1018,6 +1033,7 @@ export function RevenueManagerCommandCenter(props: {
                       {getPersistedFollowUpLabel(props.locale, caseItem)}
                     </StatusBadge>
                     <StatusBadge>{getPersistedAutomationLabel(props.locale, caseItem.automationStatus)}</StatusBadge>
+                    {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
                     {caseItem.openInterventionsCount > 0 ? (
                       <StatusBadge tone="warning">{getInterventionCountLabel(props.locale, caseItem.openInterventionsCount)}</StatusBadge>
                     ) : null}

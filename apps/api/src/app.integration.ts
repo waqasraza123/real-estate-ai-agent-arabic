@@ -88,6 +88,7 @@ describe("lead capture api", () => {
 
     const createdCase = response.json();
 
+    expect(createdCase.automationHoldReason).toBe("qa_pending_review");
     expect(createdCase.currentQaReview.status).toBe("pending_review");
     expect(createdCase.currentQaReview.subjectType).toBe("case_message");
     expect(createdCase.currentQaReview.triggerSource).toBe("policy_rule");
@@ -158,6 +159,7 @@ describe("lead capture api", () => {
     });
 
     expect(requestResponse.statusCode).toBe(200);
+    expect(requestResponse.json().automationHoldReason).toBe("qa_pending_review");
     expect(requestResponse.json().currentQaReview.status).toBe("pending_review");
     expect(requestResponse.json().qaReviews).toHaveLength(1);
 
@@ -202,6 +204,7 @@ describe("lead capture api", () => {
     });
 
     expect(resolveResponse.statusCode).toBe(200);
+    expect(resolveResponse.json().automationHoldReason).toBe("qa_follow_up_required");
     expect(resolveResponse.json().currentQaReview.status).toBe("follow_up_required");
     expect(resolveResponse.json().currentQaReview.reviewerName).toBe("QA Desk");
 
@@ -228,6 +231,64 @@ describe("lead capture api", () => {
     expect(casesResponse.json().cases.find((caseItem: { caseId: string }) => caseItem.caseId === createdCase.caseId)?.currentQaReview?.status).toBe(
       "follow_up_required"
     );
+    expect(casesResponse.json().cases.find((caseItem: { caseId: string }) => caseItem.caseId === createdCase.caseId)?.automationHoldReason).toBe(
+      "qa_follow_up_required"
+    );
+  });
+
+  it("clears the derived automation hold once a case QA review is approved", async () => {
+    const createResponse = await app.inject({
+      method: "POST",
+      payload: {
+        customerName: "Mila Hassan",
+        email: "mila@example.com",
+        message: "Please review this escalation path before the next customer reply goes out.",
+        preferredLocale: "en",
+        projectInterest: "Canal Heights"
+      },
+      url: "/v1/website-leads"
+    });
+
+    const createdCase = createResponse.json();
+
+    const requestResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "POST",
+      payload: {
+        requestedByName: "Revenue Ops",
+        sampleSummary: "Review the customer escalation before the next outbound reply."
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review`
+    });
+
+    expect(requestResponse.statusCode).toBe(200);
+    expect(requestResponse.json().automationHoldReason).toBe("qa_pending_review");
+
+    const qaReviewId = requestResponse.json().currentQaReview.qaReviewId;
+
+    const resolveResponse = await app.inject({
+      headers: withOperatorSession("qa_reviewer"),
+      method: "PATCH",
+      payload: {
+        reviewSummary: "The draft path is compliant. Resume normal follow-up.",
+        reviewerName: "QA Desk",
+        status: "approved"
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review/${qaReviewId}`
+    });
+
+    expect(resolveResponse.statusCode).toBe(200);
+    expect(resolveResponse.json().automationHoldReason).toBeNull();
+    expect(resolveResponse.json().currentQaReview.status).toBe("approved");
+
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/v1/cases/${createdCase.caseId}`
+    });
+
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json().automationHoldReason).toBeNull();
+    expect(detailResponse.json().currentQaReview.status).toBe("approved");
   });
 
   it("opens and resolves a prepared reply-draft QA gate with persisted draft context", async () => {

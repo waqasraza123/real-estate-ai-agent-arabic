@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type {
   ApproveHandoverCustomerUpdateInput,
   AutomationStatus,
+  CaseAutomationHoldReason,
   CaseStage,
   CaseQaPolicySignal,
   CaseQaReviewStatus,
@@ -1739,6 +1740,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
     const hydratedInterventions = persistedInterventions.map((intervention) => hydrateManagerIntervention(intervention));
     const hydratedQaReviews = persistedQaReviews.map((qaReview) => hydrateCaseQaReview(qaReview));
+    const currentQaReview = hydratedQaReviews[0] ?? null;
 
     return {
       auditEvents: caseAuditEvents.map((event) => ({
@@ -1746,12 +1748,13 @@ export async function createAlphaLeadCaptureStore(options?: {
         eventType: event.eventType,
         payload: event.payload
       })),
+      automationHoldReason: getCaseAutomationHoldReason(currentQaReview),
       automationStatus: toAutomationStatus(caseRecord.automationStatus),
       budget: caseRecord.budget,
       caseId: caseRecord.caseId,
       createdAt: caseRecord.createdAt,
       currentHandoverCustomerUpdateQaReview: currentHandoverCustomerUpdateQaReviewMap.get(caseId) ?? null,
-      currentQaReview: hydratedQaReviews[0] ?? null,
+      currentQaReview,
       currentVisit: currentVisit[0]
         ? {
             createdAt: currentVisit[0].createdAt,
@@ -1843,6 +1846,7 @@ export async function createAlphaLeadCaptureStore(options?: {
   const syncFollowUpJob = async (
     transaction: AlphaTransaction,
     input: {
+      automationHoldReason: CaseAutomationHoldReason | null;
       automationStatus: AutomationStatus;
       caseId: string;
       runAfter: string;
@@ -1859,7 +1863,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         and(eq(automationJobs.caseId, input.caseId), eq(automationJobs.jobType, followUpWatchJobType), eq(automationJobs.status, "queued"))
       );
 
-    if (input.automationStatus === "paused") {
+    if (input.automationStatus === "paused" || input.automationHoldReason !== null) {
       return;
     }
 
@@ -1906,6 +1910,32 @@ export async function createAlphaLeadCaptureStore(options?: {
       triggerSource: input.triggerSource,
       updatedAt: input.createdAt
     });
+  };
+
+  const getCaseAutomationHoldReason = (
+    qaReview: Pick<PersistedCaseQaReview, "status"> | null | undefined
+  ): CaseAutomationHoldReason | null => {
+    if (qaReview?.status === "pending_review") {
+      return "qa_pending_review";
+    }
+
+    if (qaReview?.status === "follow_up_required") {
+      return "qa_follow_up_required";
+    }
+
+    return null;
+  };
+
+  const getCaseAutomationHoldReasonFromStatus = (status: CaseQaReviewStatus | null | undefined): CaseAutomationHoldReason | null => {
+    if (status === "pending_review") {
+      return "qa_pending_review";
+    }
+
+    if (status === "follow_up_required") {
+      return "qa_follow_up_required";
+    }
+
+    return null;
   };
 
   return {
@@ -1967,6 +1997,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2066,6 +2097,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: "active",
+          automationHoldReason: automaticQaReviewId ? "qa_pending_review" : null,
           caseId: createdCaseId,
           runAfter: input.nextActionDueAt,
           updatedAt: createdAt
@@ -2106,6 +2138,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         : null;
 
       return {
+        automationHoldReason: getCaseAutomationHoldReason(currentQaReview),
         automationStatus: toAutomationStatus(createdCase.automationStatus),
         caseId: createdCase.caseId,
         createdAt: createdCase.createdAt,
@@ -2173,6 +2206,14 @@ export async function createAlphaLeadCaptureStore(options?: {
             triggerSource: "manual_request"
           }
         });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          automationHoldReason: "qa_pending_review",
+          caseId,
+          runAfter: caseRecord.nextActionDueAt,
+          updatedAt: createdAt
+        });
       });
 
       return getPersistedCaseDetail(caseId);
@@ -2229,11 +2270,25 @@ export async function createAlphaLeadCaptureStore(options?: {
             triggerSource
           }
         });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          automationHoldReason: "qa_pending_review",
+          caseId,
+          runAfter: caseRecord.nextActionDueAt,
+          updatedAt: createdAt
+        });
       });
 
       return getPersistedCaseDetail(caseId);
     },
     async resolveCaseQaReview(caseId, qaReviewId, input) {
+      const caseRecord = await getPersistedCaseDetail(caseId);
+
+      if (!caseRecord) {
+        return null;
+      }
+
       const currentQaReview = await db
         .select({
           createdAt: caseQaReviews.createdAt,
@@ -2293,6 +2348,14 @@ export async function createAlphaLeadCaptureStore(options?: {
             subjectType: qaReviewRecord.subjectType
           }
         });
+
+        await syncFollowUpJob(transaction, {
+          automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReasonFromStatus(input.status),
+          caseId,
+          runAfter: caseRecord.nextActionDueAt,
+          updatedAt
+        });
       });
 
       return getPersistedCaseDetail(caseId);
@@ -2340,6 +2403,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       ]);
 
       return persistedCases.map((caseRecord) => ({
+        automationHoldReason: getCaseAutomationHoldReason(currentQaReviews.get(caseRecord.caseId)),
         automationStatus: toAutomationStatus(caseRecord.automationStatus),
         caseId: caseRecord.caseId,
         createdAt: caseRecord.createdAt,
@@ -2401,6 +2465,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2447,6 +2512,15 @@ export async function createAlphaLeadCaptureStore(options?: {
             .where(eq(cases.id, job.caseId))
             .limit(1);
 
+          const [currentQaReview] = await transaction
+            .select({
+              status: caseQaReviews.status
+            })
+            .from(caseQaReviews)
+            .where(eq(caseQaReviews.caseId, job.caseId))
+            .orderBy(desc(caseQaReviews.createdAt), desc(caseQaReviews.updatedAt))
+            .limit(1);
+
           await transaction
             .update(automationJobs)
             .set({
@@ -2462,7 +2536,10 @@ export async function createAlphaLeadCaptureStore(options?: {
             };
           }
 
-          if (toAutomationStatus(caseRecord.automationStatus) === "paused") {
+          if (
+            toAutomationStatus(caseRecord.automationStatus) === "paused" ||
+            getCaseAutomationHoldReasonFromStatus(currentQaReview ? toCaseQaReviewStatus(currentQaReview.status) : null) !== null
+          ) {
             return {
               caseId: caseRecord.caseId,
               openedIntervention: false
@@ -2587,6 +2664,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2625,6 +2703,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: input.status,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: caseRecord.nextActionDueAt,
           updatedAt
@@ -2733,6 +2812,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2794,6 +2874,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2870,6 +2951,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -2980,6 +3062,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3044,6 +3127,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3123,6 +3207,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3182,6 +3267,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3241,6 +3327,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3319,6 +3406,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3397,6 +3485,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3486,6 +3575,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3564,6 +3654,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3631,6 +3722,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3737,6 +3829,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3814,6 +3907,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3886,6 +3980,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -3967,6 +4062,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -4070,6 +4166,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt
@@ -4141,6 +4238,7 @@ export async function createAlphaLeadCaptureStore(options?: {
 
         await syncFollowUpJob(transaction, {
           automationStatus: caseRecord.automationStatus,
+          automationHoldReason: getCaseAutomationHoldReason(caseRecord.currentQaReview),
           caseId: handoverRecord.caseId,
           runAfter: input.nextActionDueAt,
           updatedAt

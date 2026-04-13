@@ -30,6 +30,7 @@ export const qualificationReadinessSchema = z.enum(["watch", "medium", "high"]);
 export const documentRequestTypeSchema = z.enum(["government_id", "proof_of_funds", "employment_letter"]);
 export const documentRequestStatusSchema = z.enum(["requested", "under_review", "accepted", "rejected"]);
 export const automationStatusSchema = z.enum(["active", "paused"]);
+export const caseAutomationHoldReasonSchema = z.enum(["qa_pending_review", "qa_follow_up_required"]);
 export const managerInterventionTypeSchema = z.enum(["follow_up_overdue"]);
 export const managerInterventionSeveritySchema = z.enum(["warning", "critical"]);
 export const managerInterventionStatusSchema = z.enum(["open", "resolved"]);
@@ -539,6 +540,7 @@ export const persistedGovernanceSummarySchema = z.object({
 });
 
 export const persistedCaseSummarySchema = z.object({
+  automationHoldReason: caseAutomationHoldReasonSchema.nullable(),
   automationStatus: automationStatusSchema,
   caseId: z.uuid(),
   createdAt: z.iso.datetime(),
@@ -600,6 +602,7 @@ export const createWebsiteLeadResultSchema = persistedCaseSummarySchema.extend({
 
 export type ApproveHandoverCustomerUpdateInput = z.infer<typeof approveHandoverCustomerUpdateInputSchema>;
 export type AutomationStatus = z.infer<typeof automationStatusSchema>;
+export type CaseAutomationHoldReason = z.infer<typeof caseAutomationHoldReasonSchema>;
 export type CaseStage = z.infer<typeof caseStageSchema>;
 export type CaseQaReviewStatus = z.infer<typeof caseQaReviewStatusSchema>;
 export type CaseQaPolicySignal = z.infer<typeof caseQaPolicySignalSchema>;

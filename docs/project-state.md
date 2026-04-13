@@ -13,7 +13,7 @@
 - Root tooling now includes `pnpm` workspaces, `turbo`, TypeScript base config, ESLint, Vitest, Playwright, and a versioned pre-push safety system
 - The web application is now a hybrid Next.js App Router shell: premium seeded Phase 1 surfaces remain available, while the lead intake, lead detail, scheduling, documents, and manager routes can use persisted alpha data from `apps/api`
 - The API application is a Fastify service with schema-validated website lead intake, qualification, visit scheduling, follow-up-plan mutation, automation control, document state mutation, manager-readable case list and case detail endpoints, and persisted handover intake, milestone-planning, customer-update-boundary, and readiness-task endpoints
-- The worker application is a narrow background follow-up processor that polls the local alpha queue, opens overdue manager interventions, and respects per-case automation pause or resume state
+- The worker application is a narrow background follow-up processor that polls the local alpha queue, opens overdue manager interventions, and respects both manual automation pause state and derived QA-driven automation holds
 - The current persisted alpha store uses Drizzle over local `PGlite` for safe Phase 2 and early Phase 3 development without introducing remote infrastructure
 - `integrations`, `analytics`, and `config` remain planned and unimplemented
 - Durable memory is kept in `docs/project-state.md`
@@ -58,6 +58,7 @@
 - The next persisted Phase 5 governance-reporting boundary is now live locally: the API now exposes a trusted-session governance summary with 7-day activity and recent-event rollups across intake QA reviews and handover-draft QA gates, and manager routes render those historical trends alongside current pressure
 - The next persisted Phase 5 revenue-draft-governance boundary is now live locally: sales managers can prepare customer reply drafts into the QA queue, automatic draft policy checks preserve matched evidence on the live case, and reviewer decisions stay visible across conversation, QA, and manager surfaces
 - The next persisted Phase 5 exportable-governance-reporting boundary is now live locally: manager roles can open a dedicated governance report route with filterable detailed QA event history across revenue and handover, and export the current scope as CSV through the trusted local session path
+- The next persisted Phase 5 automation-governance boundary is now live locally: open case QA reviews now suppress follow-up automation, clearing or follow-up-required outcomes derive an explicit case automation hold state, and revenue plus manager surfaces show that governance hold directly
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -96,6 +97,7 @@
 - Added the next persisted Phase 5 governance-reporting slice with a dedicated governance-summary API, 7-day QA activity rollups, recent governance event history across both QA scopes, workspace-gated report access, manager-route history panels, and integration coverage for the new reporting contract
 - Added the next persisted Phase 5 revenue-draft-governance slice with prepared customer-reply draft submission into the existing case QA boundary, outbound reply-draft policy detection, persisted draft context on QA records and audit history, conversation plus QA surface rendering for the draft, and integration coverage for the new route and review lifecycle
 - Added the next persisted Phase 5 exportable-governance-reporting slice with filterable governance-event contracts, normalized event reporting from audit history, a manager-only `/manager/governance` route, CSV export, manager-route entry links, and integration plus smoke coverage for the new reporting surface
+- Added the next persisted Phase 5 automation-governance slice with derived case automation-hold state from QA reviews, worker-side suppression of overdue automation while QA is open, follow-up job re-arming when QA clears, manager and lead-surface hold visibility, and lifecycle coverage across API, worker, and manager-unit tests
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -144,6 +146,7 @@
 - Manager governance analytics now derive directly from the existing case-summary QA fields so revenue and handover command centers can show governance pressure without a separate reporting backend
 - Historical governance reporting now comes from a dedicated summary endpoint aggregated from persisted QA records plus audit events, rather than expanding the case-list contract with trend data
 - Detailed governance reporting and CSV export now come from a dedicated manager-only event-list endpoint plus web export route, instead of overloading the existing 7-day summary contract
+- Case summaries now expose a derived `automationHoldReason` from the latest case QA review, and open or follow-up-required case QA states suppress queued follow-up automation until QA is cleared
 - Push verification now covers lint and API integration tests because the repo has meaningful backend behavior, not just shell code
 - Playwright smoke verification now runs against a production Next server because the dev-server path was intermittently unstable on the handover route in this environment
 - The repository uses a versioned `core.hooksPath` pointing to `.githooks`

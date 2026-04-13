@@ -1,5 +1,6 @@
 import type {
   AutomationStatus,
+  CaseAutomationHoldReason,
   CaseStage,
   CaseQaPolicySignal,
   CaseQaReviewStatus,
@@ -64,6 +65,49 @@ export function getAutomationStatusLabel(locale: SupportedLocale, status: Automa
   } as const;
 
   return labels[locale][status];
+}
+
+export function getAutomationHoldReasonLabel(locale: SupportedLocale, reason: CaseAutomationHoldReason) {
+  const labels = {
+    ar: {
+      qa_follow_up_required: "موقوفة بسبب متابعة الجودة",
+      qa_pending_review: "موقوفة بانتظار الجودة"
+    },
+    en: {
+      qa_follow_up_required: "Held by QA follow-up",
+      qa_pending_review: "Held pending QA"
+    }
+  } as const;
+
+  return labels[locale][reason];
+}
+
+export function getAutomationHoldReasonNote(
+  locale: SupportedLocale,
+  reason: CaseAutomationHoldReason,
+  automationStatus: AutomationStatus
+) {
+  if (locale === "ar") {
+    if (reason === "qa_follow_up_required") {
+      return automationStatus === "paused"
+        ? "الأتمتة موقوفة يدوياً، كما أن الجودة طلبت متابعة تصحيحية. لن تعود المتابعة التلقائية حتى تُرفع ملاحظة الجودة ويُعاد تشغيل الأتمتة."
+        : "أوقفت الجودة المتابعة التلقائية لأن الحالة تحتاج تصحيحاً أو متابعة بشرية. ستظل الأتمتة محجوزة حتى تُغلق ملاحظة الجودة."
+    }
+
+    return automationStatus === "paused"
+      ? "الأتمتة موقوفة يدوياً، كما أن الحالة داخل مراجعة جودة مفتوحة. حتى بعد رفع المراجعة ستظل الأتمتة متوقفة إلى أن يعاد تشغيلها."
+      : "أوقفت مراجعة الجودة المتابعة التلقائية مؤقتاً. ستعود الأتمتة تلقائياً فقط بعد اعتماد الجودة النهائي."
+  }
+
+  if (reason === "qa_follow_up_required") {
+    return automationStatus === "paused"
+      ? "Automation is manually paused and QA also requires corrective follow-up. Follow-up will stay blocked until QA clears and automation is resumed."
+      : "QA blocked follow-up automation because the case needs corrective work or human follow-up. Automation will remain held until that QA item is cleared."
+  }
+
+  return automationStatus === "paused"
+    ? "Automation is manually paused and the case is also inside an open QA review. Even after QA clears, automation will stay paused until it is resumed."
+    : "An open QA review is temporarily blocking follow-up automation. It will resume automatically only after QA clears the case.";
 }
 
 export function getCaseQaReviewStatusLabel(locale: SupportedLocale, status: CaseQaReviewStatus) {

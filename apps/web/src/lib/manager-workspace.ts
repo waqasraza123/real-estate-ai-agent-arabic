@@ -79,12 +79,14 @@ export function buildManagerWorkspaceQueues(persistedCases: PersistedManagerCase
   const revenueAttentionCases = persistedCases.filter(
     (caseItem) => caseItem.followUpStatus === "attention" || caseItem.openInterventionsCount > 0
   );
+  const governanceHeldAutomationCases = persistedCases.filter((caseItem) => caseItem.automationHoldReason !== null);
   const pausedAutomationCases = persistedCases.filter((caseItem) => caseItem.automationStatus === "paused");
   const openInterventionsCount = persistedCases.reduce((total, caseItem) => total + caseItem.openInterventionsCount, 0);
 
   return {
     closureCases,
     executionCases,
+    governanceHeldAutomationCases,
     openInterventionsCount,
     pausedAutomationCases,
     planningCases,

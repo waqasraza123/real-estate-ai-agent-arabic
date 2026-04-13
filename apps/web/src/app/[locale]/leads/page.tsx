@@ -12,6 +12,7 @@ import {
   formatCaseLastChange,
   formatDueAt,
   getPersistedAutomationLabel,
+  getPersistedAutomationHoldReasonLabel,
   getPersistedCaseStageLabel,
   getPersistedFollowUpLabel,
   getPersistedHandoverWorkspaceDisplay,
@@ -92,6 +93,7 @@ export default async function LeadsPage(props: PageProps) {
                   (() => {
                     const handoverDisplay = getPersistedHandoverWorkspaceDisplay(locale, caseItem);
                     const qaReviewDisplay = getPersistedQaReviewDisplay(locale, caseItem);
+                    const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(locale, caseItem.automationHoldReason);
 
                     return (
                       <tr key={caseItem.caseId}>
@@ -127,6 +129,7 @@ export default async function LeadsPage(props: PageProps) {
                             <span>{caseItem.nextAction}</span>
                             <div className="status-row-wrap">
                               <StatusBadge>{getPersistedAutomationLabel(locale, caseItem.automationStatus)}</StatusBadge>
+                              {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
                               {caseItem.openInterventionsCount > 0 ? (
                                 <StatusBadge tone="warning">{getInterventionCountLabel(locale, caseItem.openInterventionsCount)}</StatusBadge>
                               ) : null}
