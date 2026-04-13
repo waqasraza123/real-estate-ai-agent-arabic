@@ -7,6 +7,7 @@ import type {
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
+  ListGovernanceEventsQuery,
   MarkHandoverCustomerUpdateDispatchReadyInput,
   ManageCaseFollowUpInput,
   PlanHandoverAppointmentInput,
@@ -15,6 +16,7 @@ import type {
   PrepareHandoverCustomerUpdateDeliveryInput,
   PersistedCaseDetail,
   PersistedCaseSummary,
+  PersistedGovernanceEventList,
   PersistedGovernanceSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
@@ -80,6 +82,13 @@ export async function listPersistedCases(store: LeadCaptureStore): Promise<Persi
 
 export async function getPersistedGovernanceSummary(store: LeadCaptureStore): Promise<PersistedGovernanceSummary> {
   return store.getGovernanceSummary();
+}
+
+export async function listPersistedGovernanceEvents(
+  store: LeadCaptureStore,
+  input: ListGovernanceEventsQuery
+): Promise<PersistedGovernanceEventList> {
+  return store.listGovernanceEvents(input);
 }
 
 export async function managePersistedCaseFollowUp(

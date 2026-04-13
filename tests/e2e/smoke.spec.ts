@@ -88,6 +88,17 @@ test("admin manager gateway exposes both dedicated manager routes", async ({ con
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Manager command center");
   await expect(page.getByRole("link", { name: "Open revenue command center" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open handover command center" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open governance report" })).toBeVisible();
+});
+
+test("sales manager can open the governance report and export controls", async ({ context, page }) => {
+  await setOperatorRoleCookie(context, "sales_manager");
+
+  await page.goto(smokeRoutes.managerGovernance);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Governance report");
+  await expect(page.getByText("Quick filters")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download CSV report" })).toBeVisible();
 });
 
 test("sales manager cannot open the handover command center directly", async ({ context, page }) => {

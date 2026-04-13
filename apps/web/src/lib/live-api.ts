@@ -9,6 +9,7 @@ import type {
   CreateHandoverIntakeInput,
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
+  ListGovernanceEventsQuery,
   MarkHandoverCustomerUpdateDispatchReadyInput,
   ManageCaseFollowUpInput,
   PlanHandoverAppointmentInput,
@@ -16,6 +17,7 @@ import type {
   PrepareHandoverCustomerUpdateDeliveryInput,
   PersistedCaseDetail,
   PersistedCaseSummary,
+  PersistedGovernanceEventList,
   PersistedGovernanceSummary,
   PersistedHandoverCaseDetail,
   QualifyCaseInput,
@@ -98,6 +100,13 @@ export async function listPersistedCasesFromApi() {
 
 export async function getPersistedGovernanceSummaryFromApi(operatorRole?: OperatorRole) {
   return requestJson<PersistedGovernanceSummary>("/v1/governance/summary", {
+    cache: "no-store",
+    headers: await getOperatorSessionHeaders(operatorRole)
+  });
+}
+
+export async function getPersistedGovernanceEventsFromApi(query?: Partial<ListGovernanceEventsQuery>, operatorRole?: OperatorRole) {
+  return requestJson<PersistedGovernanceEventList>(buildGovernanceEventsPath(query), {
     cache: "no-store",
     headers: await getOperatorSessionHeaders(operatorRole)
   });
@@ -193,6 +202,14 @@ export async function tryListPersistedCases() {
 export async function tryGetPersistedGovernanceSummary(operatorRole?: OperatorRole) {
   try {
     return await getPersistedGovernanceSummaryFromApi(operatorRole);
+  } catch {
+    return null;
+  }
+}
+
+export async function tryGetPersistedGovernanceEvents(query?: Partial<ListGovernanceEventsQuery>, operatorRole?: OperatorRole) {
+  try {
+    return await getPersistedGovernanceEventsFromApi(query, operatorRole);
   } catch {
     return null;
   }
@@ -424,6 +441,46 @@ export function getWebApiBaseUrl() {
   const configuredBaseUrl = process.env.WEB_API_BASE_URL ?? defaultApiBaseUrl;
 
   return configuredBaseUrl.replace(/\/$/, "");
+}
+
+export function buildGovernanceEventsPath(query?: Partial<ListGovernanceEventsQuery>) {
+  if (!query) {
+    return "/v1/governance/events";
+  }
+
+  const searchParams = new URLSearchParams();
+
+  if (query.action) {
+    searchParams.set("action", query.action);
+  }
+
+  if (query.kind) {
+    searchParams.set("kind", query.kind);
+  }
+
+  if (typeof query.limit === "number") {
+    searchParams.set("limit", String(query.limit));
+  }
+
+  if (query.status) {
+    searchParams.set("status", query.status);
+  }
+
+  if (query.subjectType) {
+    searchParams.set("subjectType", query.subjectType);
+  }
+
+  if (query.triggerSource) {
+    searchParams.set("triggerSource", query.triggerSource);
+  }
+
+  if (typeof query.windowDays === "number") {
+    searchParams.set("windowDays", String(query.windowDays));
+  }
+
+  const serialized = searchParams.toString();
+
+  return serialized.length > 0 ? `/v1/governance/events?${serialized}` : "/v1/governance/events";
 }
 
 async function requestJson<T>(path: string, options?: ApiRequestOptions) {

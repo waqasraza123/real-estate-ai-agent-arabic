@@ -264,6 +264,9 @@ export function HandoverManagerCommandCenter(props: {
               {props.locale === "ar" ? "الانتقال إلى قيادة الإيرادات" : "Switch to revenue command center"}
             </Link>
           ) : null}
+          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+            {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
+          </Link>
         </div>
       </Panel>
 
@@ -559,6 +562,9 @@ export function ManagerWorkspaceGateway(props: {
             <StatusBadge tone="success">{getManagerWorkspaceCopy(props.locale, "manager_revenue").title}</StatusBadge>
             <StatusBadge tone="success">{getManagerWorkspaceCopy(props.locale, "manager_handover").title}</StatusBadge>
           </div>
+          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+            {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
+          </Link>
         </div>
       </Panel>
 
@@ -593,13 +599,16 @@ export function ManagerWorkspaceGateway(props: {
                 <StatusBadge>{getGovernanceSignalLabel(props.locale, governanceSummary.topPolicySignals[0])}</StatusBadge>
               ) : null}
             </div>
-            {canAccessQaWorkspace ? (
-              <Link className="inline-link" href={`/${props.locale}/qa`}>
-                {props.locale === "ar" ? "فتح مركز الجودة" : "Open QA review center"}
-              </Link>
-            ) : null}
-          </div>
-        </Panel>
+          {canAccessQaWorkspace ? (
+            <Link className="inline-link" href={`/${props.locale}/qa`}>
+              {props.locale === "ar" ? "فتح مركز الجودة" : "Open QA review center"}
+            </Link>
+          ) : null}
+          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+            {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
+          </Link>
+        </div>
+      </Panel>
       ) : null}
 
       <div className="two-column-grid">
@@ -884,6 +893,9 @@ export function RevenueManagerCommandCenter(props: {
               {props.locale === "ar" ? "الانتقال إلى قيادة التسليم" : "Switch to handover command center"}
             </Link>
           ) : null}
+          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+            {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
+          </Link>
         </div>
       </Panel>
 

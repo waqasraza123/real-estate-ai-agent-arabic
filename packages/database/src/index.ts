@@ -22,7 +22,9 @@ import type {
   DocumentRequestStatus,
   DocumentRequestType,
   FollowUpStatus,
+  GovernanceEventStatus,
   GovernancePolicySignal,
+  GovernanceSubjectType,
   HandoverAppointmentStatus,
   HandoverBlockerSeverity,
   HandoverBlockerStatus,
@@ -41,11 +43,14 @@ import type {
   ManagerInterventionSeverity,
   ManagerInterventionStatus,
   ManagerInterventionType,
+  ListGovernanceEventsQuery,
   PersistedCaseQaReview,
   PersistedCaseDetail,
   PersistedCaseSummary,
   PersistedCurrentHandoverCustomerUpdateQaReview,
   PersistedDocumentRequest,
+  PersistedGovernanceEventList,
+  PersistedGovernanceEventRecord,
   PersistedGovernanceSummary,
   PersistedHandoverAppointment,
   PersistedHandoverArchiveReview,
@@ -397,6 +402,7 @@ export interface LeadCaptureStore {
   requestCaseQaReview(caseId: string, input: RequestCaseQaReviewInput): Promise<PersistedCaseDetail | null>;
   resolveCaseQaReview(caseId: string, qaReviewId: string, input: ResolveCaseQaReviewInput): Promise<PersistedCaseDetail | null>;
   getCaseDetail(caseId: string): Promise<PersistedCaseDetail | null>;
+  listGovernanceEvents(input: ListGovernanceEventsQuery): Promise<PersistedGovernanceEventList>;
   getGovernanceSummary(): Promise<PersistedGovernanceSummary>;
   getHandoverCaseDetail(handoverCaseId: string): Promise<PersistedHandoverCaseDetail | null>;
   listCases(): Promise<PersistedCaseSummary[]>;
@@ -1301,6 +1307,77 @@ export async function createAlphaLeadCaptureStore(options?: {
     return latestReviews;
   };
 
+  const listGovernanceAuditEvents = async (windowStart: string) =>
+    db
+      .select({
+        caseId: auditEvents.caseId,
+        createdAt: auditEvents.createdAt,
+        customerName: leads.customerName,
+        eventType: auditEvents.eventType,
+        payload: auditEvents.payload
+      })
+      .from(auditEvents)
+      .innerJoin(cases, eq(auditEvents.caseId, cases.id))
+      .innerJoin(leads, eq(cases.leadId, leads.id))
+      .where(
+        and(
+          gte(auditEvents.createdAt, windowStart),
+          inArray(auditEvents.eventType, [
+            "qa_review_requested",
+            "qa_review_policy_opened",
+            "qa_review_resolved",
+            "handover_customer_update_qa_review_requested",
+            "handover_customer_update_qa_review_resolved"
+          ])
+        )
+      )
+      .orderBy(desc(auditEvents.createdAt));
+
+  const listGovernanceEvents = async (input: ListGovernanceEventsQuery): Promise<PersistedGovernanceEventList> => {
+    const now = new Date();
+    const windowStartDate = new Date(now);
+    windowStartDate.setUTCHours(0, 0, 0, 0);
+    windowStartDate.setUTCDate(windowStartDate.getUTCDate() - (input.windowDays - 1));
+
+    const windowStart = windowStartDate.toISOString();
+    const windowEnd = now.toISOString();
+    const governanceEventRecords = await listGovernanceAuditEvents(windowStart);
+    const normalizedEvents = governanceEventRecords
+      .map((record) => hydrateGovernanceEventRecord(record))
+      .filter((record): record is PersistedGovernanceEventRecord => record !== null)
+      .filter((record) => {
+        if (input.action && record.action !== input.action) {
+          return false;
+        }
+
+        if (input.kind && record.kind !== input.kind) {
+          return false;
+        }
+
+        if (input.status && record.status !== input.status) {
+          return false;
+        }
+
+        if (input.subjectType && record.subjectType !== input.subjectType) {
+          return false;
+        }
+
+        if (input.triggerSource && record.triggerSource !== input.triggerSource) {
+          return false;
+        }
+
+        return true;
+      });
+
+    return {
+      generatedAt: windowEnd,
+      items: normalizedEvents.slice(0, input.limit),
+      totalCount: normalizedEvents.length,
+      windowEnd,
+      windowStart
+    };
+  };
+
   const getGovernanceSummary = async (): Promise<PersistedGovernanceSummary> => {
     const now = new Date();
     const windowStartDate = new Date(now);
@@ -1315,30 +1392,7 @@ export async function createAlphaLeadCaptureStore(options?: {
     const [currentQaReviews, currentHandoverCustomerUpdateQaReviews, governanceEventRecords] = await Promise.all([
       listCurrentQaReviews(caseIds),
       listCurrentHandoverCustomerUpdateQaReviews(caseIds),
-      db
-        .select({
-          caseId: auditEvents.caseId,
-          createdAt: auditEvents.createdAt,
-          customerName: leads.customerName,
-          eventType: auditEvents.eventType,
-          payload: auditEvents.payload
-        })
-        .from(auditEvents)
-        .innerJoin(cases, eq(auditEvents.caseId, cases.id))
-        .innerJoin(leads, eq(cases.leadId, leads.id))
-        .where(
-          and(
-            gte(auditEvents.createdAt, windowStart),
-            inArray(auditEvents.eventType, [
-              "qa_review_requested",
-              "qa_review_policy_opened",
-              "qa_review_resolved",
-              "handover_customer_update_qa_review_requested",
-              "handover_customer_update_qa_review_resolved"
-            ])
-          )
-        )
-        .orderBy(desc(auditEvents.createdAt))
+      listGovernanceAuditEvents(windowStart)
     ]);
 
     const currentOpenItems = {
@@ -1439,14 +1493,14 @@ export async function createAlphaLeadCaptureStore(options?: {
     }
 
     for (const record of governanceEventRecords) {
-      const normalizedEvent = hydrateGovernanceRecentEvent(record);
+      const normalizedEvent = hydrateGovernanceEventRecord(record);
 
       if (!normalizedEvent) {
         continue;
       }
 
       if (recentEvents.length < 8) {
-        recentEvents.push(normalizedEvent);
+        recentEvents.push(toGovernanceRecentEvent(normalizedEvent));
       }
 
       const dailyActivity = dailyActivityMap.get(normalizedEvent.createdAt.slice(0, 10));
@@ -2245,6 +2299,9 @@ export async function createAlphaLeadCaptureStore(options?: {
     },
     async getCaseDetail(caseId) {
       return getPersistedCaseDetail(caseId);
+    },
+    async listGovernanceEvents(input) {
+      return listGovernanceEvents(input);
     },
     async getGovernanceSummary() {
       return getGovernanceSummary();
@@ -4830,13 +4887,13 @@ function hydrateCaseQaReview(value: {
   };
 }
 
-function hydrateGovernanceRecentEvent(value: {
+function hydrateGovernanceEventRecord(value: {
   caseId: string;
   createdAt: string;
   customerName: string;
   eventType: string;
   payload: Record<string, unknown>;
-}): PersistedGovernanceSummary["recentEvents"][number] | null {
+}): PersistedGovernanceEventRecord | null {
   const payload = value.payload ?? {};
 
   if (value.eventType === "qa_review_requested" || value.eventType === "qa_review_policy_opened") {
@@ -4846,11 +4903,15 @@ function hydrateGovernanceRecentEvent(value: {
       caseId: value.caseId,
       createdAt: value.createdAt,
       customerName: value.customerName,
+      draftMessage: readPayloadString(payload, "draftMessage"),
       handoverCaseId: null,
       kind: "case_message",
       policySignals: readPayloadStringArray(payload, "policySignals").map((signal) => toGovernancePolicySignal(signal)),
+      reviewSummary: null,
+      sampleSummary: readPayloadString(payload, "sampleSummary"),
       status: "pending_review",
-      subjectType: readPayloadString(payload, "subjectType") ?? "case_message",
+      subjectType: toGovernanceSubjectType(readPayloadString(payload, "subjectType") ?? "case_message"),
+      triggerEvidence: readPayloadStringArray(payload, "triggerEvidence"),
       triggerSource: value.eventType === "qa_review_policy_opened" ? "policy_rule" : toCaseQaReviewTriggerSource(readPayloadString(payload, "triggerSource") ?? "manual_request")
     };
   }
@@ -4862,11 +4923,15 @@ function hydrateGovernanceRecentEvent(value: {
       caseId: value.caseId,
       createdAt: value.createdAt,
       customerName: value.customerName,
+      draftMessage: readPayloadString(payload, "draftMessage"),
       handoverCaseId: null,
       kind: "case_message",
       policySignals: [],
-      status: toCaseQaReviewStatus(readPayloadString(payload, "status") ?? "follow_up_required"),
-      subjectType: readPayloadString(payload, "subjectType") ?? "case_message",
+      reviewSummary: readPayloadString(payload, "reviewSummary"),
+      sampleSummary: null,
+      status: toGovernanceEventStatus(readPayloadString(payload, "status") ?? "follow_up_required"),
+      subjectType: toGovernanceSubjectType(readPayloadString(payload, "subjectType") ?? "case_message"),
+      triggerEvidence: [],
       triggerSource: null
     };
   }
@@ -4878,11 +4943,15 @@ function hydrateGovernanceRecentEvent(value: {
       caseId: value.caseId,
       createdAt: value.createdAt,
       customerName: value.customerName,
+      draftMessage: readPayloadString(payload, "deliverySummary"),
       handoverCaseId: readPayloadString(payload, "handoverCaseId"),
       kind: "handover_customer_update",
       policySignals: readPayloadStringArray(payload, "policySignals").map((signal) => toGovernancePolicySignal(signal)),
+      reviewSummary: null,
+      sampleSummary: readPayloadString(payload, "reviewSampleSummary"),
       status: "pending_review",
-      subjectType: readPayloadString(payload, "type"),
+      subjectType: toGovernanceSubjectType(readPayloadString(payload, "type")),
+      triggerEvidence: readPayloadStringArray(payload, "triggerEvidence"),
       triggerSource: "policy_rule"
     };
   }
@@ -4894,16 +4963,38 @@ function hydrateGovernanceRecentEvent(value: {
       caseId: value.caseId,
       createdAt: value.createdAt,
       customerName: value.customerName,
+      draftMessage: null,
       handoverCaseId: readPayloadString(payload, "handoverCaseId"),
       kind: "handover_customer_update",
       policySignals: [],
-      status: toHandoverCustomerUpdateQaReviewStatus(readPayloadString(payload, "status") ?? "follow_up_required"),
-      subjectType: readPayloadString(payload, "type"),
+      reviewSummary: readPayloadString(payload, "reviewSummary"),
+      sampleSummary: null,
+      status: toGovernanceEventStatus(readPayloadString(payload, "status") ?? "follow_up_required"),
+      subjectType: toGovernanceSubjectType(readPayloadString(payload, "type")),
+      triggerEvidence: [],
       triggerSource: null
     };
   }
 
   return null;
+}
+
+function toGovernanceRecentEvent(
+  value: PersistedGovernanceEventRecord
+): PersistedGovernanceSummary["recentEvents"][number] {
+  return {
+    action: value.action,
+    actorName: value.actorName,
+    caseId: value.caseId,
+    createdAt: value.createdAt,
+    customerName: value.customerName,
+    handoverCaseId: value.handoverCaseId,
+    kind: value.kind,
+    policySignals: value.policySignals,
+    status: value.status,
+    subjectType: value.subjectType,
+    triggerSource: value.triggerSource
+  };
 }
 
 function readPayloadString(payload: Record<string, unknown>, key: string) {
@@ -4981,6 +5072,26 @@ function toGovernancePolicySignal(value: string): GovernancePolicySignal {
     return toCaseQaPolicySignal(value);
   } catch {
     return toHandoverCustomerUpdateQaPolicySignal(value);
+  }
+}
+
+function toGovernanceEventStatus(value: string): GovernanceEventStatus {
+  if (value === "pending_review" || value === "approved" || value === "follow_up_required") {
+    return value;
+  }
+
+  throw new Error(`unsupported_governance_event_status:${value}`);
+}
+
+function toGovernanceSubjectType(value: string | null): GovernanceSubjectType | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return toCaseQaReviewSubjectType(value);
+  } catch {
+    return toHandoverCustomerUpdateType(value);
   }
 }
 

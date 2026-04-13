@@ -8,6 +8,7 @@ import {
   createHandoverPostCompletionFollowUpInputSchema,
   createHandoverIntakeInputSchema,
   createWebsiteLeadInputSchema,
+  listGovernanceEventsQuerySchema,
   prepareCaseReplyDraftQaReviewInputSchema,
   requestCaseQaReviewInputSchema,
   resolveCaseQaReviewInputSchema,
@@ -48,6 +49,7 @@ import {
   getPersistedCaseDetail,
   getPersistedGovernanceSummary,
   getPersistedHandoverCaseDetail,
+  listPersistedGovernanceEvents,
   listPersistedCases,
   markPersistedHandoverCustomerUpdateDispatchReady,
   managePersistedCaseFollowUp,
@@ -103,6 +105,23 @@ export function buildApiApp(dependencies: {
     }
 
     return getPersistedGovernanceSummary(dependencies.store);
+  });
+
+  app.get("/v1/governance/events", async (request, reply) => {
+    if (!requireAnyOperatorWorkspace(request, reply, ["manager_revenue", "manager_handover"])) {
+      return reply;
+    }
+
+    const result = listGovernanceEventsQuerySchema.safeParse(request.query);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    return listPersistedGovernanceEvents(dependencies.store, result.data);
   });
 
   app.get<{

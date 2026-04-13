@@ -6,6 +6,7 @@ export const smokeRoutes = {
   leadDocuments: "/en/leads/lead-oasis-002/documents",
   handover: "/en/handover/handover-sunrise-001",
   manager: "/en/manager",
+  managerGovernance: "/en/manager/governance",
   managerHandover: "/en/manager/handover",
   managerRevenue: "/en/manager/revenue",
   qa: "/en/qa"

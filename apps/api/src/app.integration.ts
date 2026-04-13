@@ -1936,6 +1936,109 @@ describe("lead capture api", () => {
       resolved: 2
     });
   }, 50000);
+
+  it("returns filtered governance events for manager-facing reporting", async () => {
+    const createCaseResponse = await app.inject({
+      method: "POST",
+      payload: {
+        customerName: "Rana Saeed",
+        email: "rana@example.com",
+        message: "Need a manager to review this lead before we send any commitments.",
+        preferredLocale: "en",
+        projectInterest: "Harbor Gate"
+      },
+      url: "/v1/website-leads"
+    });
+
+    const createdCase = createCaseResponse.json();
+
+    const draftReviewResponse = await app.inject({
+      headers: withOperatorSession("sales_manager"),
+      method: "POST",
+      payload: {
+        draftMessage: "We guarantee the exception approval and can waive the fee today.",
+        requestedByName: "Revenue Desk"
+      },
+      url: `/v1/cases/${createdCase.caseId}/reply-draft/qa-review`
+    });
+
+    expect(draftReviewResponse.statusCode).toBe(200);
+    expect(draftReviewResponse.json().currentQaReview.subjectType).toBe("prepared_reply_draft");
+
+    const resolvedDraftResponse = await app.inject({
+      headers: withOperatorSession("qa_reviewer"),
+      method: "PATCH",
+      payload: {
+        reviewSummary: "The draft may proceed after removing the guaranteed exception language.",
+        reviewerName: "QA Shift Lead",
+        status: "approved"
+      },
+      url: `/v1/cases/${createdCase.caseId}/qa-review/${draftReviewResponse.json().currentQaReview.qaReviewId}`
+    });
+
+    expect(resolvedDraftResponse.statusCode).toBe(200);
+
+    const unauthorizedEventsResponse = await app.inject({
+      method: "GET",
+      url: "/v1/governance/events"
+    });
+
+    expect(unauthorizedEventsResponse.statusCode).toBe(401);
+
+    const qaEventsResponse = await app.inject({
+      headers: withOperatorSession("qa_reviewer"),
+      method: "GET",
+      url: "/v1/governance/events"
+    });
+
+    expect(qaEventsResponse.statusCode).toBe(403);
+
+    const governanceEventsResponse = await app.inject({
+      headers: withOperatorSession("admin"),
+      method: "GET",
+      url: "/v1/governance/events?windowDays=30&kind=case_message&subjectType=prepared_reply_draft"
+    });
+
+    expect(governanceEventsResponse.statusCode).toBe(200);
+
+    const governanceEvents = governanceEventsResponse.json();
+
+    expect(governanceEvents.totalCount).toBe(2);
+    expect(governanceEvents.items).toHaveLength(2);
+    expect(
+      governanceEvents.items.every(
+        (event: { kind: string; subjectType: string }) =>
+          event.kind === "case_message" && event.subjectType === "prepared_reply_draft"
+      )
+    ).toBe(true);
+    expect(
+      governanceEvents.items.some(
+        (event: {
+          action: string;
+          draftMessage: string | null;
+          reviewSummary: string | null;
+          sampleSummary: string | null;
+          triggerEvidence: string[];
+          triggerSource: string | null;
+        }) =>
+          event.action === "opened" &&
+          event.triggerSource === "policy_rule" &&
+          event.draftMessage?.includes("guarantee") === true &&
+          event.sampleSummary !== null &&
+          event.triggerEvidence.length > 0 &&
+          event.reviewSummary === null
+      )
+    ).toBe(true);
+    expect(
+      governanceEvents.items.some(
+        (event: { action: string; actorName: string | null; reviewSummary: string | null; status: string }) =>
+          event.action === "resolved" &&
+          event.actorName === "QA Shift Lead" &&
+          event.status === "approved" &&
+          event.reviewSummary?.includes("removing") === true
+      )
+    ).toBe(true);
+  }, 50000);
 });
 
 async function createPlanningBoundaryHandoverRecord(app: ReturnType<typeof buildApiApp>) {

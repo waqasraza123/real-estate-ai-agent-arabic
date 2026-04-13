@@ -81,7 +81,9 @@ export const handoverCustomerUpdateQaPolicySignalSchema = z.enum([
 ]);
 export const governanceReviewKindSchema = z.enum(["case_message", "handover_customer_update"]);
 export const governanceReviewEventActionSchema = z.enum(["opened", "resolved"]);
+export const governanceEventStatusSchema = z.enum(["pending_review", "approved", "follow_up_required"]);
 export const governancePolicySignalSchema = z.union([caseQaPolicySignalSchema, handoverCustomerUpdateQaPolicySignalSchema]);
+export const governanceSubjectTypeSchema = z.union([caseQaReviewSubjectTypeSchema, handoverCustomerUpdateTypeSchema]);
 export const handoverAppointmentStatusSchema = z.enum(["planned", "internally_confirmed"]);
 export const handoverReviewOutcomeSchema = z.enum(["accepted", "follow_up_required"]);
 export const handoverPostCompletionFollowUpStatusSchema = z.enum(["open", "resolved"]);
@@ -488,6 +490,42 @@ export const persistedGovernanceRecentEventSchema = z.object({
   triggerSource: caseQaReviewTriggerSourceSchema.nullable()
 });
 
+export const listGovernanceEventsQuerySchema = z.object({
+  action: governanceReviewEventActionSchema.optional(),
+  kind: governanceReviewKindSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  status: governanceEventStatusSchema.optional(),
+  subjectType: governanceSubjectTypeSchema.optional(),
+  triggerSource: caseQaReviewTriggerSourceSchema.optional(),
+  windowDays: z.coerce.number().int().min(1).max(90).default(30)
+});
+
+export const persistedGovernanceEventRecordSchema = z.object({
+  action: governanceReviewEventActionSchema,
+  actorName: z.string().nullable(),
+  caseId: z.uuid(),
+  createdAt: z.iso.datetime(),
+  customerName: z.string(),
+  draftMessage: z.string().nullable(),
+  handoverCaseId: z.uuid().nullable(),
+  kind: governanceReviewKindSchema,
+  policySignals: z.array(governancePolicySignalSchema),
+  reviewSummary: z.string().nullable(),
+  sampleSummary: z.string().nullable(),
+  status: governanceEventStatusSchema,
+  subjectType: governanceSubjectTypeSchema.nullable(),
+  triggerEvidence: z.array(z.string()),
+  triggerSource: caseQaReviewTriggerSourceSchema.nullable()
+});
+
+export const persistedGovernanceEventListSchema = z.object({
+  generatedAt: z.iso.datetime(),
+  items: z.array(persistedGovernanceEventRecordSchema),
+  totalCount: z.number().int().min(0),
+  windowEnd: z.iso.datetime(),
+  windowStart: z.iso.datetime()
+});
+
 export const persistedGovernanceSummarySchema = z.object({
   currentOpenItems: persistedGovernanceCurrentOpenSummarySchema,
   dailyActivity: z.array(persistedGovernanceDailyActivitySchema),
@@ -581,8 +619,10 @@ export type DocumentRequestStatus = z.infer<typeof documentRequestStatusSchema>;
 export type DocumentRequestType = z.infer<typeof documentRequestTypeSchema>;
 export type FollowUpStatus = z.infer<typeof followUpStatusSchema>;
 export type GovernancePolicySignal = z.infer<typeof governancePolicySignalSchema>;
+export type GovernanceEventStatus = z.infer<typeof governanceEventStatusSchema>;
 export type GovernanceReviewEventAction = z.infer<typeof governanceReviewEventActionSchema>;
 export type GovernanceReviewKind = z.infer<typeof governanceReviewKindSchema>;
+export type GovernanceSubjectType = z.infer<typeof governanceSubjectTypeSchema>;
 export type HandoverAppointmentStatus = z.infer<typeof handoverAppointmentStatusSchema>;
 export type HandoverBlockerSeverity = z.infer<typeof handoverBlockerSeveritySchema>;
 export type HandoverBlockerStatus = z.infer<typeof handoverBlockerStatusSchema>;
@@ -608,12 +648,15 @@ export type OperatorRole = z.infer<typeof operatorRoleSchema>;
 export type OperatorSessionPayload = z.infer<typeof operatorSessionPayloadSchema>;
 export type OperatorWorkspace = z.infer<typeof operatorWorkspaceSchema>;
 export type PrepareCaseReplyDraftQaReviewInput = z.infer<typeof prepareCaseReplyDraftQaReviewInputSchema>;
+export type ListGovernanceEventsQuery = z.infer<typeof listGovernanceEventsQuerySchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseQaReview = z.infer<typeof persistedCaseQaReviewSchema>;
 export type PersistedCaseSummary = z.infer<typeof persistedCaseSummarySchema>;
 export type PersistedCurrentHandoverCustomerUpdateQaReview = z.infer<typeof persistedCurrentHandoverCustomerUpdateQaReviewSchema>;
 export type PersistedDocumentRequest = z.infer<typeof persistedDocumentRequestSchema>;
 export type PersistedGovernanceDailyActivity = z.infer<typeof persistedGovernanceDailyActivitySchema>;
+export type PersistedGovernanceEventList = z.infer<typeof persistedGovernanceEventListSchema>;
+export type PersistedGovernanceEventRecord = z.infer<typeof persistedGovernanceEventRecordSchema>;
 export type PersistedGovernancePolicySignalCount = z.infer<typeof persistedGovernancePolicySignalCountSchema>;
 export type PersistedGovernanceRecentEvent = z.infer<typeof persistedGovernanceRecentEventSchema>;
 export type PersistedGovernanceSummary = z.infer<typeof persistedGovernanceSummarySchema>;
