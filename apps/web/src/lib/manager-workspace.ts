@@ -7,7 +7,7 @@ import {
   type SupportedLocale
 } from "@real-estate-ai/contracts";
 
-import { getPersistedHandoverWorkspaceSurface } from "./persisted-case-presenters";
+import { getPersistedHandoverWorkspaceSurface, hasPersistedLatestHumanReplyHandoff } from "./persisted-case-presenters";
 
 export type ManagerWorkspaceRoute = "manager_revenue" | "manager_handover";
 
@@ -81,6 +81,9 @@ export function buildManagerWorkspaceQueues(persistedCases: PersistedManagerCase
   );
   const governanceHeldAutomationCases = persistedCases.filter((caseItem) => caseItem.automationHoldReason !== null);
   const pausedAutomationCases = persistedCases.filter((caseItem) => caseItem.automationStatus === "paused");
+  const postReplyHandoffCases = persistedCases.filter((caseItem) =>
+    hasPersistedLatestHumanReplyHandoff(caseItem.ownerName, caseItem.latestHumanReply)
+  );
   const openInterventionsCount = persistedCases.reduce((total, caseItem) => total + caseItem.openInterventionsCount, 0);
 
   return {
@@ -89,6 +92,7 @@ export function buildManagerWorkspaceQueues(persistedCases: PersistedManagerCase
     governanceHeldAutomationCases,
     openInterventionsCount,
     pausedAutomationCases,
+    postReplyHandoffCases,
     planningCases,
     revenueAttentionCases
   };

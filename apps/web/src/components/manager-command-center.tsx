@@ -43,6 +43,7 @@ import {
   getPersistedHandoverCustomerUpdateQaReviewDisplay,
   getPersistedHandoverWorkspaceDisplay,
   getPersistedLatestHumanReplyLabel,
+  getPersistedLatestHumanReplyOwnershipLabel,
   getPersistedQaReviewDisplay
 } from "@/lib/persisted-case-presenters";
 
@@ -720,9 +721,8 @@ export function RevenueManagerCommandCenter(props: {
   const messages = getMessages(props.locale);
   const workspaceCopy = getManagerWorkspaceCopy(props.locale, "manager_revenue");
   const managerCapabilities = getManagerWorkspaceCapabilities(props.currentOperatorRole);
-  const { governanceHeldAutomationCases, openInterventionsCount, pausedAutomationCases, revenueAttentionCases } = buildManagerWorkspaceQueues(
-    props.persistedCases
-  );
+  const { governanceHeldAutomationCases, openInterventionsCount, pausedAutomationCases, postReplyHandoffCases, revenueAttentionCases } =
+    buildManagerWorkspaceQueues(props.persistedCases);
   const governanceSummary = buildManagerGovernanceSummary(props.persistedCases);
   const canAccessHandoverManagerWorkspace = canOperatorRoleAccessWorkspace("manager_handover", props.currentOperatorRole);
   const canAccessHandoverWorkspace = canOperatorRoleAccessWorkspace("handover", props.currentOperatorRole);
@@ -959,6 +959,15 @@ export function RevenueManagerCommandCenter(props: {
               : "QA items that have been pending for more than a day and may need managerial escalation."}
           </p>
         </article>
+        <article className="metric-tile metric-tile-ocean">
+          <p className="metric-label">{props.locale === "ar" ? "تسليمات ما بعد الرد" : "Post-reply handoffs"}</p>
+          <p className="metric-value">{postReplyHandoffCases.length}</p>
+          <p className="metric-detail">
+            {props.locale === "ar"
+              ? "حالات أرسل فيها شخص آخر آخر رد بشري ثم انتقلت المتابعة الحالية إلى مالك مختلف."
+              : "Cases where the latest human reply was sent by one operator and the active follow-up now sits with a different owner."}
+          </p>
+        </article>
       </div>
 
       <div className="two-column-grid">
@@ -973,6 +982,11 @@ export function RevenueManagerCommandCenter(props: {
               const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(props.locale, caseItem.automationHoldReason);
               const latestHumanReplyLabel = getPersistedLatestHumanReplyLabel(props.locale, caseItem.latestHumanReply);
               const latestHumanReplySentAt = formatLatestHumanReplySentAt(caseItem.latestHumanReply, props.locale);
+              const latestHumanReplyOwnershipLabel = getPersistedLatestHumanReplyOwnershipLabel(
+                props.locale,
+                caseItem.ownerName,
+                caseItem.latestHumanReply
+              );
 
               return (
                 <article key={caseItem.caseId} className="alert-row alert-row-high">
@@ -994,13 +1008,16 @@ export function RevenueManagerCommandCenter(props: {
                   </div>
                   <p>{caseItem.nextAction}</p>
                   {caseItem.latestHumanReply ? (
-                    <p className="case-link-meta">
-                      {latestHumanReplyLabel}
-                      {" · "}
-                      {caseItem.latestHumanReply.sentByName}
-                      {" · "}
-                      {latestHumanReplySentAt}
-                    </p>
+                    <div className="stack-tight">
+                      <p className="case-link-meta">
+                        {latestHumanReplyLabel}
+                        {" · "}
+                        {caseItem.latestHumanReply.sentByName}
+                        {" · "}
+                        {latestHumanReplySentAt}
+                      </p>
+                      {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
+                    </div>
                   ) : null}
                   <p className="case-link-meta">{formatCaseLastChange(caseItem, props.locale)}</p>
                   <div className="status-row-wrap">
@@ -1035,6 +1052,11 @@ export function RevenueManagerCommandCenter(props: {
               const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(props.locale, caseItem.automationHoldReason);
               const latestHumanReplyLabel = getPersistedLatestHumanReplyLabel(props.locale, caseItem.latestHumanReply);
               const latestHumanReplySentAt = formatLatestHumanReplySentAt(caseItem.latestHumanReply, props.locale);
+              const latestHumanReplyOwnershipLabel = getPersistedLatestHumanReplyOwnershipLabel(
+                props.locale,
+                caseItem.ownerName,
+                caseItem.latestHumanReply
+              );
 
               return (
                 <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/leads/${caseItem.caseId}`}>
@@ -1043,13 +1065,16 @@ export function RevenueManagerCommandCenter(props: {
                     <h3>{caseItem.customerName}</h3>
                     <p>{caseItem.nextAction}</p>
                     {caseItem.latestHumanReply ? (
-                      <p className="case-link-meta">
-                        {latestHumanReplyLabel}
-                        {" · "}
-                        {caseItem.latestHumanReply.sentByName}
-                        {" · "}
-                        {latestHumanReplySentAt}
-                      </p>
+                      <div className="stack-tight">
+                        <p className="case-link-meta">
+                          {latestHumanReplyLabel}
+                          {" · "}
+                          {caseItem.latestHumanReply.sentByName}
+                          {" · "}
+                          {latestHumanReplySentAt}
+                        </p>
+                        {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
+                      </div>
                     ) : null}
                   </div>
                   <div className="case-link-aside">

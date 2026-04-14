@@ -229,6 +229,49 @@ export function getPersistedLatestHumanReplyLabel(
   return locale === "ar" ? "رد بشري محفوظ" : "Human reply saved";
 }
 
+export function hasPersistedLatestHumanReplyHandoff(
+  ownerName: PersistedCaseDetail["ownerName"] | PersistedCaseSummary["ownerName"],
+  latestHumanReply: PersistedCaseDetail["latestHumanReply"] | PersistedCaseSummary["latestHumanReply"]
+) {
+  return latestHumanReply ? latestHumanReply.sentByName !== ownerName : false;
+}
+
+export function getPersistedLatestHumanReplyOwnershipLabel(
+  locale: SupportedLocale,
+  ownerName: PersistedCaseDetail["ownerName"] | PersistedCaseSummary["ownerName"],
+  latestHumanReply: PersistedCaseDetail["latestHumanReply"] | PersistedCaseSummary["latestHumanReply"]
+) {
+  if (!latestHumanReply) {
+    return null;
+  }
+
+  return hasPersistedLatestHumanReplyHandoff(ownerName, latestHumanReply)
+    ? locale === "ar"
+      ? `تم تسليم المتابعة إلى ${ownerName}`
+      : `Follow-up handed to ${ownerName}`
+    : locale === "ar"
+      ? "مرسل الرد ما زال يملك المتابعة"
+      : "Reply sender still owns follow-up";
+}
+
+export function getPersistedLatestHumanReplyOwnershipNote(
+  locale: SupportedLocale,
+  ownerName: PersistedCaseDetail["ownerName"] | PersistedCaseSummary["ownerName"],
+  latestHumanReply: PersistedCaseDetail["latestHumanReply"] | PersistedCaseSummary["latestHumanReply"]
+) {
+  if (!latestHumanReply) {
+    return null;
+  }
+
+  return hasPersistedLatestHumanReplyHandoff(ownerName, latestHumanReply)
+    ? locale === "ar"
+      ? `أرسل ${latestHumanReply.sentByName} آخر رد، لكن المتابعة الحالية أصبحت لدى ${ownerName}.`
+      : `${latestHumanReply.sentByName} sent the latest reply, but ${ownerName} now owns the active follow-up.`
+    : locale === "ar"
+      ? `آخر رد والمتابعة الحالية ما زالا عند ${ownerName}.`
+      : `The latest reply and the active follow-up both remain with ${ownerName}.`;
+}
+
 export function getPersistedAutomationLabel(locale: SupportedLocale, automationStatus: PersistedCaseDetail["automationStatus"]) {
   return getAutomationStatusLabel(locale, automationStatus);
 }

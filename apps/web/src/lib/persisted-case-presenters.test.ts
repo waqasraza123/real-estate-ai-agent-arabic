@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { PersistedCaseDetail } from "@real-estate-ai/contracts";
 
-import { buildPersistedConversation, formatLatestHumanReplySentAt, getPersistedLatestHumanReplyLabel } from "./persisted-case-presenters";
+import {
+  buildPersistedConversation,
+  formatLatestHumanReplySentAt,
+  getPersistedLatestHumanReplyLabel,
+  getPersistedLatestHumanReplyOwnershipLabel,
+  getPersistedLatestHumanReplyOwnershipNote,
+  hasPersistedLatestHumanReplyHandoff
+} from "./persisted-case-presenters";
 
 const qaReviewId = "11111111-1111-4111-8111-111111111111";
 
@@ -122,5 +129,27 @@ describe("buildPersistedConversation", () => {
 
     expect(getPersistedLatestHumanReplyLabel("en", caseDetail.latestHumanReply)).toBe("Human reply after QA approval");
     expect(formatLatestHumanReplySentAt(caseDetail.latestHumanReply, "en")).toBe(new Date("2026-04-13T09:12:00.000Z").toLocaleString("en"));
+  });
+
+  it("derives a handoff label when the reply sender and current owner differ", () => {
+    const caseDetail = buildCaseDetail([]);
+
+    caseDetail.ownerName = "Manager Desk North";
+    caseDetail.latestHumanReply = {
+      approvedFromQa: false,
+      message: "I have shared the visit options.",
+      nextAction: "Confirm the preferred slot",
+      nextActionDueAt: "2026-04-14T09:00:00.000Z",
+      sentAt: "2026-04-13T09:12:00.000Z",
+      sentByName: "Amina Rahman"
+    };
+
+    expect(hasPersistedLatestHumanReplyHandoff(caseDetail.ownerName, caseDetail.latestHumanReply)).toBe(true);
+    expect(getPersistedLatestHumanReplyOwnershipLabel("en", caseDetail.ownerName, caseDetail.latestHumanReply)).toBe(
+      "Follow-up handed to Manager Desk North"
+    );
+    expect(getPersistedLatestHumanReplyOwnershipNote("en", caseDetail.ownerName, caseDetail.latestHumanReply)).toBe(
+      "Amina Rahman sent the latest reply, but Manager Desk North now owns the active follow-up."
+    );
   });
 });

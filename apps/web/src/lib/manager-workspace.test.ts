@@ -109,4 +109,32 @@ describe("manager workspace routing", () => {
     expect(queues.governanceHeldAutomationCases.map((caseItem) => caseItem.caseId)).toEqual(["qa-held", "dual-held"]);
     expect(queues.pausedAutomationCases.map((caseItem) => caseItem.caseId)).toEqual(["paused", "dual-held"]);
   });
+
+  it("tracks post-reply handoff cases separately from sender-owned follow-up", () => {
+    const queues = buildManagerWorkspaceQueues([
+      buildCase("aligned", {
+        latestHumanReply: {
+          approvedFromQa: false,
+          message: "Shared the pricing follow-up.",
+          nextAction: "Confirm the callback time",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          sentAt: "2026-04-11T09:00:00.000Z",
+          sentByName: "Revenue Ops"
+        }
+      }),
+      buildCase("handoff", {
+        latestHumanReply: {
+          approvedFromQa: true,
+          message: "Shared the approved availability update.",
+          nextAction: "Wait for customer confirmation",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          sentAt: "2026-04-11T10:00:00.000Z",
+          sentByName: "Amina Rahman"
+        },
+        ownerName: "Manager Desk North"
+      })
+    ]);
+
+    expect(queues.postReplyHandoffCases.map((caseItem) => caseItem.caseId)).toEqual(["handoff"]);
+  });
 });

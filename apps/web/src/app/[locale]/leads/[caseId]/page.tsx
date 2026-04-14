@@ -32,6 +32,8 @@ import {
   getPersistedHandoverStatusLabel,
   getPersistedInterventionDisplay,
   getPersistedLatestHumanReplyLabel,
+  getPersistedLatestHumanReplyOwnershipLabel,
+  getPersistedLatestHumanReplyOwnershipNote,
   getPersistedQaReviewDisplay,
   getPersistedQualificationSummary,
   getPersistedSourceLabel
@@ -96,6 +98,16 @@ export default async function LeadProfilePage(props: PageProps) {
     );
     const latestHumanReplyLabel = getPersistedLatestHumanReplyLabel(locale, persistedCase.latestHumanReply);
     const latestHumanReplySentAt = formatLatestHumanReplySentAt(persistedCase.latestHumanReply, locale);
+    const latestHumanReplyOwnershipLabel = getPersistedLatestHumanReplyOwnershipLabel(
+      locale,
+      persistedCase.ownerName,
+      persistedCase.latestHumanReply
+    );
+    const latestHumanReplyOwnershipNote = getPersistedLatestHumanReplyOwnershipNote(
+      locale,
+      persistedCase.ownerName,
+      persistedCase.latestHumanReply
+    );
 
     return (
       <div className="page-stack">
@@ -207,6 +219,7 @@ export default async function LeadProfilePage(props: PageProps) {
                   <h3>{persistedCase.latestHumanReply.sentByName}</h3>
                   {latestHumanReplyLabel ? <StatusBadge tone="success">{latestHumanReplyLabel}</StatusBadge> : null}
                 </div>
+                {latestHumanReplyOwnershipLabel ? <StatusBadge>{latestHumanReplyOwnershipLabel}</StatusBadge> : null}
                 <p>{persistedCase.latestHumanReply.message}</p>
                 <dl className="detail-list">
                   <div>
@@ -222,6 +235,7 @@ export default async function LeadProfilePage(props: PageProps) {
                     <dd>{new Date(persistedCase.latestHumanReply.nextActionDueAt).toLocaleString(locale)}</dd>
                   </div>
                 </dl>
+                {latestHumanReplyOwnershipNote ? <p className="field-note">{latestHumanReplyOwnershipNote}</p> : null}
               </div>
             ) : (
               <p className="panel-summary">

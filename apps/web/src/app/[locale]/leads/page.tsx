@@ -18,6 +18,7 @@ import {
   getPersistedFollowUpLabel,
   getPersistedHandoverWorkspaceDisplay,
   getPersistedLatestHumanReplyLabel,
+  getPersistedLatestHumanReplyOwnershipLabel,
   getPersistedQaReviewDisplay
 } from "@/lib/persisted-case-presenters";
 import { getInterventionCountLabel } from "@/lib/live-copy";
@@ -98,6 +99,11 @@ export default async function LeadsPage(props: PageProps) {
                     const automationHoldReasonLabel = getPersistedAutomationHoldReasonLabel(locale, caseItem.automationHoldReason);
                     const latestHumanReplyLabel = getPersistedLatestHumanReplyLabel(locale, caseItem.latestHumanReply);
                     const latestHumanReplySentAt = formatLatestHumanReplySentAt(caseItem.latestHumanReply, locale);
+                    const latestHumanReplyOwnershipLabel = getPersistedLatestHumanReplyOwnershipLabel(
+                      locale,
+                      caseItem.ownerName,
+                      caseItem.latestHumanReply
+                    );
 
                     return (
                       <tr key={caseItem.caseId}>
@@ -132,13 +138,18 @@ export default async function LeadsPage(props: PageProps) {
                           <div className="stack-tight">
                             <span>{caseItem.nextAction}</span>
                             {caseItem.latestHumanReply ? (
-                              <span className="case-link-meta">
-                                {latestHumanReplyLabel}
-                                {" · "}
-                                {caseItem.latestHumanReply.sentByName}
-                                {" · "}
-                                {latestHumanReplySentAt}
-                              </span>
+                              <div className="stack-tight">
+                                <span className="case-link-meta">
+                                  {latestHumanReplyLabel}
+                                  {" · "}
+                                  {caseItem.latestHumanReply.sentByName}
+                                  {" · "}
+                                  {latestHumanReplySentAt}
+                                </span>
+                                {latestHumanReplyOwnershipLabel ? (
+                                  <span className="case-link-meta">{latestHumanReplyOwnershipLabel}</span>
+                                ) : null}
+                              </div>
                             ) : null}
                             <div className="status-row-wrap">
                               <StatusBadge>{getPersistedAutomationLabel(locale, caseItem.automationStatus)}</StatusBadge>
