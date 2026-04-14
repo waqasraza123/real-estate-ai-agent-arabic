@@ -315,7 +315,77 @@ describe("manager governance summary", () => {
             {
               casesWithHistoryCount: 2,
               casesWithLaterChangesCount: 1,
-              historyCases: [],
+              historyCases: [
+                {
+                  caseId: "handoff-owner-1",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "handoff-owner-1",
+                  entries: [
+                    {
+                      batchCaseCount: 3,
+                      batchId: "33333333-3333-4333-8333-333333333333",
+                      caseId: "handoff-owner-1",
+                      createdAt: "2026-04-13T11:15:00.000Z",
+                      currentOwnerName: "Manager Desk North",
+                      currentRiskStatus: "still_escalated",
+                      customerName: "handoff-owner-1",
+                      nextAction: "Reset the desk follow-up",
+                      nextActionDueAt: "2026-04-13T12:30:00.000Z",
+                      ownerName: "Manager Desk North",
+                      scopedOwnerName: "Revenue Ops Queue",
+                      type: "scoped_batch_reset"
+                    },
+                    {
+                      batchCaseCount: 2,
+                      batchId: "66666666-6666-4666-8666-666666666666",
+                      caseId: "handoff-owner-1",
+                      createdAt: "2026-04-13T13:00:00.000Z",
+                      currentOwnerName: "Manager Desk North",
+                      currentRiskStatus: "still_escalated",
+                      customerName: "handoff-owner-1",
+                      nextAction: "Manager bulk retry",
+                      nextActionDueAt: "2026-04-13T14:00:00.000Z",
+                      ownerName: "Manager Desk North",
+                      scopedOwnerName: "Manager Desk North",
+                      type: "later_bulk_reset"
+                    },
+                    {
+                      caseId: "handoff-owner-1",
+                      createdAt: "2026-04-13T14:00:00.000Z",
+                      currentOwnerName: "Manager Desk North",
+                      currentRiskStatus: "still_escalated",
+                      customerName: "handoff-owner-1",
+                      nextAction: "Manual follow-up save",
+                      nextActionDueAt: "2026-04-13T15:00:00.000Z",
+                      ownerName: "Manager Desk North",
+                      type: "follow_up_update"
+                    }
+                  ]
+                },
+                {
+                  caseId: "bulk-cleared",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "cleared",
+                  customerName: "bulk-cleared",
+                  entries: [
+                    {
+                      batchCaseCount: 3,
+                      batchId: "33333333-3333-4333-8333-333333333333",
+                      caseId: "bulk-cleared",
+                      createdAt: "2026-04-13T11:15:00.000Z",
+                      currentOwnerName: "Manager Desk North",
+                      currentRiskStatus: "cleared",
+                      customerName: "bulk-cleared",
+                      nextAction: "Reset the desk follow-up",
+                      nextActionDueAt: "2026-04-13T12:30:00.000Z",
+                      ownerName: "Manager Desk North",
+                      scopedOwnerName: "Revenue Ops Queue",
+                      type: "scoped_batch_reset"
+                    }
+                  ]
+                }
+              ],
               laterBulkResetCount: 1,
               postBatchFollowUpUpdateCount: 2
             }
@@ -326,7 +396,10 @@ describe("manager governance summary", () => {
 
     expect(summary.batchesWithDriftCount).toBe(1);
     expect(summary.driftedCaseCount).toBe(1);
+    expect(summary.followUpUpdateOnlyDriftCaseCount).toBe(0);
     expect(summary.laterBulkResetCount).toBe(1);
+    expect(summary.laterBulkResetOnlyDriftCaseCount).toBe(0);
+    expect(summary.mixedReasonDriftCaseCount).toBe(1);
     expect(summary.postBatchFollowUpUpdateCount).toBe(2);
     expect(summary.bulkBatches).toEqual([
       {
@@ -337,7 +410,10 @@ describe("manager governance summary", () => {
         drift: {
           casesWithHistoryCount: 2,
           casesWithLaterChangesCount: 1,
+          followUpUpdateOnlyCaseCount: 0,
           laterBulkResetCount: 1,
+          laterBulkResetOnlyCaseCount: 0,
+          mixedReasonCaseCount: 1,
           postBatchFollowUpUpdateCount: 2
         },
         savedAt: "2026-04-13T11:15:00.000Z",

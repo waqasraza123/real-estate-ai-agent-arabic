@@ -146,6 +146,40 @@ export function ManagerGovernanceReport(props: {
             </p>
           </article>
         ) : null}
+        {showOperationalRisk ? (
+          <article className="metric-tile metric-tile-mint">
+            <p className="metric-label">{props.locale === "ar" ? "مزيج أسباب الانجراف" : "Drift reason mix"}</p>
+            <p className="metric-value">{props.operationalRiskSummary.mixedReasonDriftCaseCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "حالات انجرفت بسبب تحديث متابعة فردي وإعادة ضبط جماعية لاحقة معاً داخل الدفعات الحديثة المرئية."
+                : "Drifted cases in the recent visible batches that were changed by both later individual follow-up saves and later bulk resets."}
+            </p>
+            <div className="status-row-wrap">
+              {props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount > 0 ? (
+                <StatusBadge>
+                  {props.locale === "ar"
+                    ? `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} متابعة فقط`
+                    : `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} follow-up only`}
+                </StatusBadge>
+              ) : null}
+              {props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount > 0 ? (
+                <StatusBadge>
+                  {props.locale === "ar"
+                    ? `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} دفعة فقط`
+                    : `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} bulk reset only`}
+                </StatusBadge>
+              ) : null}
+              {props.operationalRiskSummary.mixedReasonDriftCaseCount > 0 ? (
+                <StatusBadge tone="warning">
+                  {props.locale === "ar"
+                    ? `${props.operationalRiskSummary.mixedReasonDriftCaseCount} مختلطة`
+                    : `${props.operationalRiskSummary.mixedReasonDriftCaseCount} mixed`}
+                </StatusBadge>
+              ) : null}
+            </div>
+          </article>
+        ) : null}
       </div>
 
       <div className="two-column-grid">
@@ -475,6 +509,27 @@ export function ManagerGovernanceReport(props: {
                                 {props.locale === "ar"
                                   ? `${batch.drift.laterBulkResetCount} دفعات لاحقة`
                                   : `${batch.drift.laterBulkResetCount} later bulk resets`}
+                              </StatusBadge>
+                            ) : null}
+                            {batch.drift.followUpUpdateOnlyCaseCount > 0 ? (
+                              <StatusBadge>
+                                {props.locale === "ar"
+                                  ? `${batch.drift.followUpUpdateOnlyCaseCount} متابعة فقط`
+                                  : `${batch.drift.followUpUpdateOnlyCaseCount} follow-up only`}
+                              </StatusBadge>
+                            ) : null}
+                            {batch.drift.laterBulkResetOnlyCaseCount > 0 ? (
+                              <StatusBadge>
+                                {props.locale === "ar"
+                                  ? `${batch.drift.laterBulkResetOnlyCaseCount} دفعة فقط`
+                                  : `${batch.drift.laterBulkResetOnlyCaseCount} bulk reset only`}
+                              </StatusBadge>
+                            ) : null}
+                            {batch.drift.mixedReasonCaseCount > 0 ? (
+                              <StatusBadge tone="warning">
+                                {props.locale === "ar"
+                                  ? `${batch.drift.mixedReasonCaseCount} أسباب مختلطة`
+                                  : `${batch.drift.mixedReasonCaseCount} mixed reasons`}
                               </StatusBadge>
                             ) : null}
                           </div>

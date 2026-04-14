@@ -77,6 +77,7 @@
 - The next persisted Phase 5 operational-risk-batch-drift-reporting boundary is now live locally: governance operational-risk reporting now surfaces later-change drift indicators for recent bulk follow-up batches from reconstructed case audit history before managers drill into the exact affected-case scope
 - The next persisted Phase 5 operational-risk-drifted-batch-routing boundary is now live locally: governance operational-risk reporting can now deep-link drifted bulk batches into only the cases that changed after the original bulk reset, while revenue views keep an explicit path back to the full affected-case scope
 - The next persisted Phase 5 operational-risk-drift-reason-labeling boundary is now live locally: changed-later revenue batch scopes now label each drifted case with whether it moved because of later individual follow-up saves, later bulk resets, or both before managers open the full in-product batch history
+- The next persisted Phase 5 operational-risk-batch-reason-mix-reporting boundary is now live locally: governance operational-risk reporting now shows whether each recent drifted bulk batch is dominated by follow-up-only changes, later bulk resets, or mixed case-level reasons before managers drill into the changed-later subset
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -134,6 +135,7 @@
 - Added the next persisted Phase 5 operational-risk-batch-drift-reporting slice with governance-route hydration for recent batch-scoped case details, shared drift counts derived from existing batch-history logic, operational-risk report visibility for later follow-up updates and later bulk resets before drill-down, and successful focused-test plus typecheck verification
 - Added the next persisted Phase 5 operational-risk-drifted-batch-routing slice with explicit revenue-route `changed_later` scope parsing, drift-only batch filtering derived from the existing history model, aligned changed-case CSV export, governance-report links into the tighter drifted subset plus back-navigation to the full batch, and successful focused-test plus typecheck verification
 - Added the next persisted Phase 5 operational-risk-drift-reason-labeling slice with shared per-case drift-reason derivation from existing batch-history entries, changed-later scope badges plus latest-drift timestamps on the revenue queue, and successful focused-test plus typecheck verification
+- Added the next persisted Phase 5 operational-risk-batch-reason-mix-reporting slice with shared drift-reason-mix derivation from reconstructed batch history, governance operational-risk visibility for follow-up-only vs later-bulk-only vs mixed drifted cases on recent batches, and successful focused-test plus typecheck verification
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -196,6 +198,7 @@
 - Governance-side batch-drift reporting remains a web-layer concern built by hydrating case details only for the recent visible bulk batches, so the existing governance summary API and case-summary contract stay unchanged
 - Drift-only batch drill-down also remains a revenue-routing concern in the web layer, so the changed-later subset is derived from reconstructed batch history on demand rather than via a dedicated persisted drift index or a new API filter contract
 - Per-case drift reasons also remain derived from the same reconstructed batch-history entries in the web layer, so changed-later labeling does not add another persisted reason model alongside the existing audit stream
+- Governance-side drift reason mix also remains derived from that same reconstructed batch-history model in the web layer, so operational-risk reporting does not introduce a second persisted batch-reason summary alongside the existing audit stream
 - Bulk-result drill-down remains a web-layer revenue-routing concern, so governance reporting links into a batch-id-scoped revenue view instead of extending the API with a dedicated bulk-batch detail endpoint
 - Prepared handover customer updates now carry their own persisted QA gate state, and dispatch-ready promotion is blocked whenever the latest draft review is pending or marked for follow-up
 - Manager governance analytics now derive directly from the existing case-summary QA fields so revenue and handover command centers can show governance pressure without a separate reporting backend

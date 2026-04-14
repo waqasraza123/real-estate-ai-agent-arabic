@@ -87,6 +87,13 @@ export interface RevenueManagerBatchDriftReasonSummary {
   reasons: Array<"follow_up_update" | "later_bulk_reset">;
 }
 
+export interface RevenueManagerBatchDriftReasonMixSummary {
+  driftedCaseCount: number;
+  followUpUpdateOnlyCaseCount: number;
+  laterBulkResetOnlyCaseCount: number;
+  mixedReasonCaseCount: number;
+}
+
 interface RevenueManagerScopeOptions {
   changedCaseIds?: ReadonlySet<string>;
 }
@@ -383,6 +390,44 @@ export function buildRevenueManagerBatchDriftReasonSummaries(batchHistory: Reven
       }
     ];
   });
+}
+
+export function buildRevenueManagerBatchDriftReasonMixSummary(
+  batchHistory: RevenueManagerBatchHistorySummary | null
+): RevenueManagerBatchDriftReasonMixSummary {
+  const driftReasonSummaries = buildRevenueManagerBatchDriftReasonSummaries(batchHistory);
+
+  return driftReasonSummaries.reduce<RevenueManagerBatchDriftReasonMixSummary>(
+    (summary, reasonSummary) => {
+      if (reasonSummary.reasons.length > 1) {
+        return {
+          ...summary,
+          driftedCaseCount: summary.driftedCaseCount + 1,
+          mixedReasonCaseCount: summary.mixedReasonCaseCount + 1
+        };
+      }
+
+      if (reasonSummary.reasons[0] === "later_bulk_reset") {
+        return {
+          ...summary,
+          driftedCaseCount: summary.driftedCaseCount + 1,
+          laterBulkResetOnlyCaseCount: summary.laterBulkResetOnlyCaseCount + 1
+        };
+      }
+
+      return {
+        ...summary,
+        driftedCaseCount: summary.driftedCaseCount + 1,
+        followUpUpdateOnlyCaseCount: summary.followUpUpdateOnlyCaseCount + 1
+      };
+    },
+    {
+      driftedCaseCount: 0,
+      followUpUpdateOnlyCaseCount: 0,
+      laterBulkResetOnlyCaseCount: 0,
+      mixedReasonCaseCount: 0
+    }
+  );
 }
 
 function normalizeSearchParamRecord(searchParams: SearchParamsInput) {

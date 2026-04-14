@@ -6,7 +6,10 @@ import type {
 } from "@real-estate-ai/contracts";
 
 import { hasPersistedLatestHumanReplyEscalation } from "./persisted-case-presenters";
-import type { RevenueManagerBatchHistorySummary } from "./revenue-manager";
+import {
+  buildRevenueManagerBatchDriftReasonMixSummary,
+  type RevenueManagerBatchHistorySummary
+} from "./revenue-manager";
 
 type PersistedGovernanceCase = PersistedCaseDetail | PersistedCaseSummary;
 
@@ -40,7 +43,10 @@ export interface GovernanceOperationalRiskBulkBatch {
 export interface GovernanceOperationalRiskBatchDrift {
   casesWithHistoryCount: number;
   casesWithLaterChangesCount: number;
+  followUpUpdateOnlyCaseCount: number;
   laterBulkResetCount: number;
+  laterBulkResetOnlyCaseCount: number;
+  mixedReasonCaseCount: number;
   postBatchFollowUpUpdateCount: number;
 }
 
@@ -49,7 +55,10 @@ export interface GovernanceOperationalRiskSummary {
   bulkBatches: GovernanceOperationalRiskBulkBatch[];
   driftedCaseCount: number;
   escalatedReplyHandoffCases: PersistedGovernanceCase[];
+  followUpUpdateOnlyDriftCaseCount: number;
   laterBulkResetCount: number;
+  laterBulkResetOnlyDriftCaseCount: number;
+  mixedReasonDriftCaseCount: number;
   owners: GovernanceOperationalRiskOwner[];
   postBatchFollowUpUpdateCount: number;
   totalEscalatedReplyHandoffCount: number;
@@ -204,19 +213,33 @@ export function buildGovernanceOperationalRiskSummary(
         return batch;
       }
 
+      const driftReasonMix = buildRevenueManagerBatchDriftReasonMixSummary(history);
+
       return {
         ...batch,
         drift: {
           casesWithHistoryCount: history.casesWithHistoryCount,
           casesWithLaterChangesCount: history.casesWithLaterChangesCount,
+          followUpUpdateOnlyCaseCount: driftReasonMix.followUpUpdateOnlyCaseCount,
           laterBulkResetCount: history.laterBulkResetCount,
+          laterBulkResetOnlyCaseCount: driftReasonMix.laterBulkResetOnlyCaseCount,
+          mixedReasonCaseCount: driftReasonMix.mixedReasonCaseCount,
           postBatchFollowUpUpdateCount: history.postBatchFollowUpUpdateCount
         }
       };
     });
   const batchesWithDriftCount = recentBulkBatches.filter((batch) => (batch.drift?.casesWithLaterChangesCount ?? 0) > 0).length;
   const driftedCaseCount = recentBulkBatches.reduce((total, batch) => total + (batch.drift?.casesWithLaterChangesCount ?? 0), 0);
+  const followUpUpdateOnlyDriftCaseCount = recentBulkBatches.reduce(
+    (total, batch) => total + (batch.drift?.followUpUpdateOnlyCaseCount ?? 0),
+    0
+  );
   const laterBulkResetCount = recentBulkBatches.reduce((total, batch) => total + (batch.drift?.laterBulkResetCount ?? 0), 0);
+  const laterBulkResetOnlyDriftCaseCount = recentBulkBatches.reduce(
+    (total, batch) => total + (batch.drift?.laterBulkResetOnlyCaseCount ?? 0),
+    0
+  );
+  const mixedReasonDriftCaseCount = recentBulkBatches.reduce((total, batch) => total + (batch.drift?.mixedReasonCaseCount ?? 0), 0);
   const postBatchFollowUpUpdateCount = recentBulkBatches.reduce(
     (total, batch) => total + (batch.drift?.postBatchFollowUpUpdateCount ?? 0),
     0
@@ -227,7 +250,10 @@ export function buildGovernanceOperationalRiskSummary(
     bulkBatches: recentBulkBatches,
     driftedCaseCount,
     escalatedReplyHandoffCases,
+    followUpUpdateOnlyDriftCaseCount,
     laterBulkResetCount,
+    laterBulkResetOnlyDriftCaseCount,
+    mixedReasonDriftCaseCount,
     owners: [...owners.values()]
       .sort((left, right) => {
         if (left.escalatedHandoffCount !== right.escalatedHandoffCount) {
