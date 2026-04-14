@@ -14,6 +14,7 @@ import { EmptyState, Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
 import { buildGovernanceOperationalRiskSummary } from "@/lib/governance-workspace";
+import type { GovernanceReportView } from "@/lib/governance-report";
 import { getOperatorRoleLabel } from "@/lib/operator-role";
 import { buildCaseReferenceCode } from "@/lib/persisted-case-presenters";
 import { buildGovernanceReportHref } from "@/lib/governance-report";
@@ -25,6 +26,7 @@ export function ManagerGovernanceReport(props: {
   governanceEvents: PersistedGovernanceEventList | null;
   governanceSummary: PersistedGovernanceSummary | null;
   locale: SupportedLocale;
+  view: GovernanceReportView;
 }) {
   const activeRoleLabel = getOperatorRoleLabel(props.locale, props.currentOperatorRole);
   const exportHref = buildGovernanceExportHref(props.locale, props.filters);
@@ -33,6 +35,8 @@ export function ManagerGovernanceReport(props: {
   const resolvedCount = props.governanceSummary?.resolvedItems.totalCount ?? 0;
   const filteredCount = props.governanceEvents?.totalCount ?? 0;
   const operationalRiskSummary = buildGovernanceOperationalRiskSummary(props.persistedCases);
+  const showQaHistory = props.view !== "operational_risk";
+  const showOperationalRisk = props.view !== "qa_history";
 
   return (
     <div className="page-stack">
@@ -57,6 +61,7 @@ export function ManagerGovernanceReport(props: {
             <StatusBadge>{activeRoleLabel}</StatusBadge>
             <StatusBadge>{props.locale === "ar" ? `${props.filters.windowDays} أيام` : `${props.filters.windowDays} days`}</StatusBadge>
             <StatusBadge>{props.locale === "ar" ? `${props.filters.limit} حدثاً` : `${props.filters.limit} events`}</StatusBadge>
+            <StatusBadge>{getReportViewLabel(props.locale, props.view)}</StatusBadge>
             {props.filters.kind ? <StatusBadge>{getKindLabel(props.locale, props.filters.kind)}</StatusBadge> : null}
             {props.filters.status ? <StatusBadge tone={getStatusTone(props.filters.status)}>{getStatusLabel(props.locale, props.filters.status)}</StatusBadge> : null}
             {props.filters.subjectType ? <StatusBadge>{getSubjectLabel(props.locale, props.filters.subjectType)}</StatusBadge> : null}
@@ -65,72 +70,105 @@ export function ManagerGovernanceReport(props: {
       </Panel>
 
       <div className="metric-grid">
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "حدود مفتوحة الآن" : "Open governance holds"}</p>
-          <p className="metric-value">{currentOpenCount}</p>
-          <p className="metric-detail">
-            {props.locale === "ar"
-              ? "عدد العناصر التي ما زالت عالقة في حدود الجودة الحية."
-              : "Items that are still sitting inside a live governance boundary."}
-          </p>
-        </article>
-        <article className="metric-tile metric-tile-sand">
-          <p className="metric-label">{props.locale === "ar" ? "فتحات النافذة الحالية" : "Opened in window"}</p>
-          <p className="metric-value">{openedCount}</p>
-          <p className="metric-detail">
-            {props.locale === "ar"
-              ? "كل فتحات الجودة المسجلة داخل نافذة التقرير الحالية."
-              : "All governance openings captured inside the active reporting window."}
-          </p>
-        </article>
-        <article className="metric-tile metric-tile-mint">
-          <p className="metric-label">{props.locale === "ar" ? "حسم النافذة الحالية" : "Resolved in window"}</p>
-          <p className="metric-value">{resolvedCount}</p>
-          <p className="metric-detail">
-            {props.locale === "ar"
-              ? "القرارات التي أغلقت حدود الجودة خلال نفس النافذة."
-              : "Decisions that resolved governance boundaries during the same window."}
-          </p>
-        </article>
-        <article className="metric-tile">
-          <p className="metric-label">{props.locale === "ar" ? "الأحداث المطابقة للفلاتر" : "Events matching filters"}</p>
-          <p className="metric-value">{filteredCount}</p>
-          <p className="metric-detail">
-            {props.locale === "ar"
-              ? "إجمالي السجل المطابق بعد تطبيق الفلاتر الحالية قبل التصدير."
-              : "Filtered event count after the current scope is applied, before export."}
-          </p>
-        </article>
-        <article className="metric-tile metric-tile-ocean">
-          <p className="metric-label">{props.locale === "ar" ? "تسليمات متصاعدة بعد الرد" : "Escalated reply handoffs"}</p>
-          <p className="metric-value">{operationalRiskSummary.totalEscalatedReplyHandoffCount}</p>
-          <p className="metric-detail">
-            {props.locale === "ar"
-              ? "حالات حيّة انتقل فيها الرد البشري إلى مالك جديد ثم أصبحت متأخرة أو محملة بتدخلات مفتوحة."
-              : "Live cases where a human reply was handed to a new owner and that handoff is now overdue or intervention-backed."}
-          </p>
-        </article>
+        {showQaHistory ? (
+          <article className="metric-tile metric-tile-rose">
+            <p className="metric-label">{props.locale === "ar" ? "حدود مفتوحة الآن" : "Open governance holds"}</p>
+            <p className="metric-value">{currentOpenCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "عدد العناصر التي ما زالت عالقة في حدود الجودة الحية."
+                : "Items that are still sitting inside a live governance boundary."}
+            </p>
+          </article>
+        ) : null}
+        {showQaHistory ? (
+          <article className="metric-tile metric-tile-sand">
+            <p className="metric-label">{props.locale === "ar" ? "فتحات النافذة الحالية" : "Opened in window"}</p>
+            <p className="metric-value">{openedCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "كل فتحات الجودة المسجلة داخل نافذة التقرير الحالية."
+                : "All governance openings captured inside the active reporting window."}
+            </p>
+          </article>
+        ) : null}
+        {showQaHistory ? (
+          <article className="metric-tile metric-tile-mint">
+            <p className="metric-label">{props.locale === "ar" ? "حسم النافذة الحالية" : "Resolved in window"}</p>
+            <p className="metric-value">{resolvedCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "القرارات التي أغلقت حدود الجودة خلال نفس النافذة."
+                : "Decisions that resolved governance boundaries during the same window."}
+            </p>
+          </article>
+        ) : null}
+        {showQaHistory ? (
+          <article className="metric-tile">
+            <p className="metric-label">{props.locale === "ar" ? "الأحداث المطابقة للفلاتر" : "Events matching filters"}</p>
+            <p className="metric-value">{filteredCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "إجمالي السجل المطابق بعد تطبيق الفلاتر الحالية قبل التصدير."
+                : "Filtered event count after the current scope is applied, before export."}
+            </p>
+          </article>
+        ) : null}
+        {showOperationalRisk ? (
+          <article className="metric-tile metric-tile-ocean">
+            <p className="metric-label">{props.locale === "ar" ? "تسليمات متصاعدة بعد الرد" : "Escalated reply handoffs"}</p>
+            <p className="metric-value">{operationalRiskSummary.totalEscalatedReplyHandoffCount}</p>
+            <p className="metric-detail">
+              {props.locale === "ar"
+                ? "حالات حيّة انتقل فيها الرد البشري إلى مالك جديد ثم أصبحت متأخرة أو محملة بتدخلات مفتوحة."
+                : "Live cases where a human reply was handed to a new owner and that handoff is now overdue or intervention-backed."}
+            </p>
+          </article>
+        ) : null}
       </div>
 
       <div className="two-column-grid">
         <Panel title={props.locale === "ar" ? "فلاتر سريعة" : "Quick filters"}>
           <div className="page-stack">
             <FilterTabs
+              activeValue={props.view}
+              locale={props.locale}
+              options={[
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, "blended"),
+                  label: props.locale === "ar" ? "مزدوج" : "Blended",
+                  value: "blended"
+                },
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, "qa_history"),
+                  label: props.locale === "ar" ? "تاريخ الجودة" : "QA history",
+                  value: "qa_history"
+                },
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, "operational_risk"),
+                  label: props.locale === "ar" ? "مخاطر التشغيل" : "Operational risk",
+                  value: "operational_risk"
+                }
+              ]}
+              title={props.locale === "ar" ? "وضع التقرير" : "Report mode"}
+            />
+
+            <FilterTabs
               activeValue={String(props.filters.windowDays)}
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 7 }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 7 }, props.view),
                   label: props.locale === "ar" ? "7 أيام" : "7 days",
                   value: "7"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 30 }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 30 }, props.view),
                   label: props.locale === "ar" ? "30 يوماً" : "30 days",
                   value: "30"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 60 }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 60 }, props.view),
                   label: props.locale === "ar" ? "60 يوماً" : "60 days",
                   value: "60"
                 }
@@ -138,106 +176,126 @@ export function ManagerGovernanceReport(props: {
               title={props.locale === "ar" ? "النافذة الزمنية" : "Time window"}
             />
 
+            {showQaHistory ? (
             <FilterTabs
               activeValue={props.filters.kind ?? "all"}
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: undefined }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: undefined }, props.view),
                   label: props.locale === "ar" ? "الكل" : "All",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "case_message" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "case_message" }, props.view),
                   label: props.locale === "ar" ? "إيرادات" : "Revenue",
                   value: "case_message"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "handover_customer_update" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "handover_customer_update" }, props.view),
                   label: props.locale === "ar" ? "تسليم" : "Handover",
                   value: "handover_customer_update"
                 }
               ]}
               title={props.locale === "ar" ? "السطح" : "Surface"}
             />
+            ) : null}
 
+            {showQaHistory ? (
             <FilterTabs
               activeValue={props.filters.status ?? "all"}
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: undefined }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: undefined }, props.view),
                   label: props.locale === "ar" ? "كل الحالات" : "All statuses",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "pending_review" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "pending_review" }, props.view),
                   label: props.locale === "ar" ? "قيد الانتظار" : "Pending",
                   value: "pending_review"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "approved" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "approved" }, props.view),
                   label: props.locale === "ar" ? "معتمد" : "Approved",
                   value: "approved"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "follow_up_required" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "follow_up_required" }, props.view),
                   label: props.locale === "ar" ? "تحتاج متابعة" : "Follow-up",
                   value: "follow_up_required"
                 }
               ]}
               title={props.locale === "ar" ? "الحالة" : "Status"}
             />
+            ) : null}
 
+            {showQaHistory ? (
             <FilterTabs
               activeValue={props.filters.subjectType ?? "all"}
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: undefined }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: undefined }, props.view),
                   label: props.locale === "ar" ? "كل الموضوعات" : "All subjects",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "case_message" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "case_message" }, props.view),
                   label: props.locale === "ar" ? "رسالة محادثة" : "Conversation message",
                   value: "case_message"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "prepared_reply_draft" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "prepared_reply_draft" }, props.view),
                   label: props.locale === "ar" ? "مسودة رد" : "Reply draft",
                   value: "prepared_reply_draft"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "scheduling_invite" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "scheduling_invite" }, props.view),
                   label: props.locale === "ar" ? "دعوة جدولة" : "Scheduling invite",
                   value: "scheduling_invite"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "appointment_confirmation" }),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "appointment_confirmation" }, props.view),
                   label: props.locale === "ar" ? "تأكيد موعد" : "Appointment confirmation",
                   value: "appointment_confirmation"
                 }
               ]}
               title={props.locale === "ar" ? "موضوع المراجعة" : "Review subject"}
             />
+            ) : null}
           </div>
         </Panel>
 
         <Panel title={props.locale === "ar" ? "التصدير والاستخدام" : "Export and usage"}>
           <div className="page-stack">
             <p className="panel-summary">
-              {props.locale === "ar"
-                ? "نزّل نفس النطاق الحالي كملف CSV لمشاركته مع التشغيل أو المراجعة اليومية دون فقدان سياق الإشارات أو الأدلة."
-                : "Download the current filtered scope as CSV for operations review without losing policy signals, evidence, or reviewer context."}
+              {props.view === "operational_risk"
+                ? props.locale === "ar"
+                  ? "وضع مخاطر التشغيل يعرض ضغط التسليمات الحية فقط. تصدير CSV يبقى مخصصاً لسجل أحداث الجودة التاريخي."
+                  : "Operational risk mode focuses on live handoff pressure only. CSV export remains reserved for historical QA-event reporting."
+                : props.locale === "ar"
+                  ? "نزّل نفس النطاق الحالي كملف CSV لمشاركته مع التشغيل أو المراجعة اليومية دون فقدان سياق الإشارات أو الأدلة."
+                  : "Download the current filtered scope as CSV for operations review without losing policy signals, evidence, or reviewer context."}
             </p>
             <div className="status-row-wrap">
-              <StatusBadge>{props.locale === "ar" ? "CSV جاهز" : "CSV export ready"}</StatusBadge>
-              <StatusBadge>{props.locale === "ar" ? `${filteredCount} صفاً مطابقاً` : `${filteredCount} matching rows`}</StatusBadge>
+              <StatusBadge>{props.view === "operational_risk" ? (props.locale === "ar" ? "عرض حي" : "Live view") : props.locale === "ar" ? "CSV جاهز" : "CSV export ready"}</StatusBadge>
+              <StatusBadge>
+                {props.view === "operational_risk"
+                  ? props.locale === "ar"
+                    ? `${operationalRiskSummary.totalEscalatedReplyHandoffCount} مخاطر حية`
+                    : `${operationalRiskSummary.totalEscalatedReplyHandoffCount} live risks`
+                  : props.locale === "ar"
+                    ? `${filteredCount} صفاً مطابقاً`
+                    : `${filteredCount} matching rows`}
+              </StatusBadge>
             </div>
-            <Link className="inline-link" href={exportHref}>
-              {props.locale === "ar" ? "تنزيل تقرير CSV" : "Download CSV report"}
-            </Link>
+            {showQaHistory ? (
+              <Link className="inline-link" href={exportHref}>
+                {props.locale === "ar" ? "تنزيل تقرير CSV" : "Download CSV report"}
+              </Link>
+            ) : null}
             <Link className="inline-link" href={`/${props.locale}/manager`}>
               {props.locale === "ar" ? "العودة إلى بوابة الإدارة" : "Return to the manager gateway"}
             </Link>
@@ -245,6 +303,7 @@ export function ManagerGovernanceReport(props: {
         </Panel>
       </div>
 
+      {showOperationalRisk ? (
       <Panel title={props.locale === "ar" ? "ضغط تسليمات الردود" : "Reply handoff pressure"}>
         {operationalRiskSummary.owners.length > 0 ? (
           <div className="lead-table-wrapper">
@@ -307,7 +366,9 @@ export function ManagerGovernanceReport(props: {
           />
         )}
       </Panel>
+      ) : null}
 
+      {showQaHistory ? (
       <Panel title={props.locale === "ar" ? "سجل أحداث الحوكمة" : "Governance event log"}>
         {props.governanceEvents && props.governanceEvents.items.length > 0 ? (
           <div className="lead-table-wrapper">
@@ -395,6 +456,7 @@ export function ManagerGovernanceReport(props: {
           />
         )}
       </Panel>
+      ) : null}
     </div>
   );
 }
@@ -453,6 +515,18 @@ function buildGovernanceExportHref(locale: SupportedLocale, filters: ListGoverna
   }
 
   return `/${locale}/manager/governance/export?${query.toString()}`;
+}
+
+function getReportViewLabel(locale: SupportedLocale, view: GovernanceReportView) {
+  if (view === "qa_history") {
+    return locale === "ar" ? "تاريخ الجودة" : "QA history";
+  }
+
+  if (view === "operational_risk") {
+    return locale === "ar" ? "مخاطر التشغيل" : "Operational risk";
+  }
+
+  return locale === "ar" ? "مزدوج" : "Blended";
 }
 
 function getActionLabel(locale: SupportedLocale, action: PersistedGovernanceEventRecord["action"]) {

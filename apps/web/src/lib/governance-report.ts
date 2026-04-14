@@ -5,11 +5,25 @@ type SearchParamsInput =
   | URLSearchParams
   | undefined;
 
+export type GovernanceReportView = "blended" | "operational_risk" | "qa_history";
+
 export function parseGovernanceReportSearchParams(searchParams: SearchParamsInput): ListGovernanceEventsQuery {
   const rawSearchParams =
     searchParams instanceof URLSearchParams ? Object.fromEntries(searchParams.entries()) : normalizeSearchParamRecord(searchParams);
 
   return listGovernanceEventsQuerySchema.parse(rawSearchParams);
+}
+
+export function parseGovernanceReportView(searchParams: SearchParamsInput): GovernanceReportView {
+  const rawSearchParams =
+    searchParams instanceof URLSearchParams ? Object.fromEntries(searchParams.entries()) : normalizeSearchParamRecord(searchParams);
+  const rawView = rawSearchParams.view;
+
+  if (rawView === "qa_history" || rawView === "operational_risk") {
+    return rawView;
+  }
+
+  return "blended";
 }
 
 export function buildGovernanceReportSearchParams(query: Partial<ListGovernanceEventsQuery>) {
@@ -46,8 +60,18 @@ export function buildGovernanceReportSearchParams(query: Partial<ListGovernanceE
   return searchParams;
 }
 
-export function buildGovernanceReportHref(locale: SupportedLocale, query: Partial<ListGovernanceEventsQuery>) {
-  const serialized = buildGovernanceReportSearchParams(query).toString();
+export function buildGovernanceReportHref(
+  locale: SupportedLocale,
+  query: Partial<ListGovernanceEventsQuery>,
+  view: GovernanceReportView = "blended"
+) {
+  const searchParams = buildGovernanceReportSearchParams(query);
+
+  if (view !== "blended") {
+    searchParams.set("view", view);
+  }
+
+  const serialized = searchParams.toString();
 
   return serialized.length > 0 ? `/${locale}/manager/governance?${serialized}` : `/${locale}/manager/governance`;
 }

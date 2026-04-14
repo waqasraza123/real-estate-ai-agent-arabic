@@ -64,6 +64,7 @@
 - The next persisted Phase 5 revenue-handoff-visibility boundary is now live locally: revenue surfaces now derive whether the latest human reply sender still owns the active follow-up or has handed it to a different current owner, and manager metrics now count those post-reply handoffs directly
 - The next persisted Phase 5 revenue-handoff-escalation boundary is now live locally: handed-off human-reply follow-up now derives an explicit escalation signal when it is overdue or intervention-backed, and revenue manager surfaces expose a dedicated escalated-handoff queue for that risk
 - The next persisted Phase 5 governance-operational-risk-reporting boundary is now live locally: the manager governance report now overlays live escalated reply-handoff pressure from persisted case state, including top current owners carrying that risk, without extending the exportable QA-event contract
+- The next persisted Phase 5 governance-report-mode boundary is now live locally: the manager governance report can now switch between blended, QA-history, and operational-risk modes so live handoff pressure can be reviewed independently from exportable QA-event history
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -108,6 +109,7 @@
 - Added the next persisted Phase 5 revenue-handoff-visibility slice with derived post-reply ownership labels from existing owner plus latest-reply state, revenue-manager handoff metrics, lead-surface visibility for same-owner vs handed-off follow-up, and fast coverage for the new handoff derivation
 - Added the next persisted Phase 5 revenue-handoff-escalation slice with derived overdue or intervention-backed handoff labels, a dedicated escalated-handoff revenue-manager queue, lead-surface escalation visibility on handed-off replies, and fast coverage for the new escalation derivation
 - Added the next persisted Phase 5 governance-operational-risk-reporting slice with a governance-workspace summary for escalated reply handoffs, manager-report visibility for live handoff pressure by current owner, governance-route wiring to the persisted case list, and fast coverage for the new reporting helper
+- Added the next persisted Phase 5 governance-report-mode slice with explicit blended vs QA-history vs operational-risk report views, query-string persistence for the selected mode, operational-risk-aware report copy and export guardrails, and fast coverage for the new view-state helpers
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -157,6 +159,7 @@
 - Revenue ownership visibility for the latest human reply is derived from the existing `ownerName` plus `latestHumanReply.sentByName`, so post-reply handoff inspection does not require a second persisted ownership record
 - Escalated post-reply handoffs are derived from the existing ownership handoff plus the live follow-up risk signals (`followUpStatus` and `openInterventionsCount`), so no parallel escalation record is persisted for that manager queue
 - The governance report continues to treat exportable history as QA-event-only data, while live operational handoff pressure is overlaid from the current persisted case list inside the web layer rather than being backfilled into governance-event exports
+- Governance report mode selection is a web-layer concern carried in the report URL, while the API event-query contract remains reserved for historical QA-event filtering
 - Prepared handover customer updates now carry their own persisted QA gate state, and dispatch-ready promotion is blocked whenever the latest draft review is pending or marked for follow-up
 - Manager governance analytics now derive directly from the existing case-summary QA fields so revenue and handover command centers can show governance pressure without a separate reporting backend
 - Historical governance reporting now comes from a dedicated summary endpoint aggregated from persisted QA records plus audit events, rather than expanding the case-list contract with trend data

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGovernanceReportHref, buildGovernanceReportSearchParams, parseGovernanceReportSearchParams } from "./governance-report";
+import {
+  buildGovernanceReportHref,
+  buildGovernanceReportSearchParams,
+  parseGovernanceReportSearchParams,
+  parseGovernanceReportView
+} from "./governance-report";
 
 describe("governance report filters", () => {
   it("parses defaults from empty search params", () => {
@@ -8,6 +13,7 @@ describe("governance report filters", () => {
       limit: 50,
       windowDays: 30
     });
+    expect(parseGovernanceReportView(undefined)).toBe("blended");
   });
 
   it("keeps the first value when repeated params are present", () => {
@@ -41,5 +47,16 @@ describe("governance report filters", () => {
         windowDays: 30
       })
     ).toBe("/en/manager/governance?kind=case_message&subjectType=prepared_reply_draft&windowDays=30");
+
+    expect(
+      buildGovernanceReportHref(
+        "en",
+        {
+          kind: "case_message",
+          windowDays: 30
+        },
+        "operational_risk"
+      )
+    ).toBe("/en/manager/governance?kind=case_message&windowDays=30&view=operational_risk");
   });
 });
