@@ -5,6 +5,7 @@ import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildRevenueManagerBatchExportCsv,
   buildRevenueManagerBatchHistory,
+  buildRevenueManagerDriftedCaseIdsByReason,
   buildRevenueManagerDriftedCaseIds,
   buildRevenueManagerScope,
   parseRevenueManagerFilters
@@ -43,7 +44,13 @@ export async function GET(request: Request, context: { params: Promise<{ locale:
       : null;
   const revenueScope =
     filters.batchDrift === "changed_later"
-      ? buildRevenueManagerScope(persistedCases, filters, { changedCaseIds: new Set(buildRevenueManagerDriftedCaseIds(baseBatchHistory)) })
+      ? buildRevenueManagerScope(persistedCases, filters, {
+          changedCaseIds: new Set(
+            filters.batchDriftReason
+              ? buildRevenueManagerDriftedCaseIdsByReason(baseBatchHistory, filters.batchDriftReason)
+              : buildRevenueManagerDriftedCaseIds(baseBatchHistory)
+          )
+        })
       : baseRevenueScope;
 
   if (!revenueScope.batchScope || revenueScope.focusedCases.length === 0) {
@@ -62,7 +69,9 @@ export async function GET(request: Request, context: { params: Promise<{ locale:
 
   const filename = `revenue-batch-${revenueScope.batchScope.batchId.slice(0, 8)}${
     filters.batchDrift === "changed_later" ? "-changed-later" : ""
-  }-${locale}.csv`;
+  }${filters.batchDriftReason ? `-${filters.batchDriftReason.replace(/_/g, "-")}` : ""}-${
+    locale
+  }.csv`;
 
   return new Response(csv, {
     headers: {

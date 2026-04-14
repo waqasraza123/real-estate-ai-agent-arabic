@@ -12,10 +12,12 @@ type PersistedRevenueManagerCase = PersistedCaseDetail | PersistedCaseSummary;
 
 export type RevenueManagerQueueFilter = "all" | "escalated_handoffs";
 export type RevenueManagerBatchDriftFilter = "changed_later";
+export type RevenueManagerBatchDriftReasonFilter = "follow_up_only" | "later_bulk_reset_only" | "mixed";
 
 export interface RevenueManagerFilters {
   bulkBatchId?: string;
   batchDrift?: RevenueManagerBatchDriftFilter;
+  batchDriftReason?: RevenueManagerBatchDriftReasonFilter;
   ownerName?: string;
   queue: RevenueManagerQueueFilter;
 }
@@ -105,6 +107,7 @@ export function parseRevenueManagerFilters(searchParams: SearchParamsInput): Rev
     searchParams instanceof URLSearchParams ? Object.fromEntries(searchParams.entries()) : normalizeSearchParamRecord(searchParams);
   const bulkBatchId = sanitizeBatchId(rawSearchParams.bulkBatchId);
   const batchDrift = sanitizeBatchDrift(rawSearchParams.batchDrift);
+  const batchDriftReason = sanitizeBatchDriftReason(rawSearchParams.batchDriftReason);
   const ownerName = sanitizeOwnerName(rawSearchParams.ownerName);
   const filters: RevenueManagerFilters = {
     queue: rawSearchParams.queue === "escalated_handoffs" ? "escalated_handoffs" : "all"
@@ -120,6 +123,10 @@ export function parseRevenueManagerFilters(searchParams: SearchParamsInput): Rev
 
   if (batchDrift && bulkBatchId) {
     filters.batchDrift = batchDrift;
+  }
+
+  if (batchDrift && batchDriftReason && bulkBatchId) {
+    filters.batchDriftReason = batchDriftReason;
   }
 
   return filters;
@@ -146,6 +153,10 @@ export function buildRevenueManagerHref(
 
   if (filters.batchDrift) {
     searchParams.set("batchDrift", filters.batchDrift);
+  }
+
+  if (filters.batchDriftReason) {
+    searchParams.set("batchDriftReason", filters.batchDriftReason);
   }
 
   const serialized = searchParams.toString();
@@ -353,9 +364,16 @@ export function buildRevenueManagerDriftedCaseIds(batchHistory: RevenueManagerBa
     return [];
   }
 
-  return batchHistory.historyCases
-    .filter((historyCase) => historyCase.entries.some((entry) => entry.type !== "scoped_batch_reset"))
-    .map((historyCase) => historyCase.caseId);
+  return buildRevenueManagerBatchDriftReasonSummaries(batchHistory).map((historyCase) => historyCase.caseId);
+}
+
+export function buildRevenueManagerDriftedCaseIdsByReason(
+  batchHistory: RevenueManagerBatchHistorySummary | null,
+  reason: RevenueManagerBatchDriftReasonFilter
+) {
+  return buildRevenueManagerBatchDriftReasonSummaries(batchHistory)
+    .filter((summary) => getRevenueManagerBatchDriftReasonFilter(summary) === reason)
+    .map((summary) => summary.caseId);
 }
 
 export function buildRevenueManagerBatchDriftReasonSummaries(batchHistory: RevenueManagerBatchHistorySummary | null) {
@@ -430,6 +448,16 @@ export function buildRevenueManagerBatchDriftReasonMixSummary(
   );
 }
 
+export function getRevenueManagerBatchDriftReasonFilter(
+  summary: RevenueManagerBatchDriftReasonSummary
+): RevenueManagerBatchDriftReasonFilter {
+  if (summary.reasons.length > 1) {
+    return "mixed";
+  }
+
+  return summary.reasons[0] === "later_bulk_reset" ? "later_bulk_reset_only" : "follow_up_only";
+}
+
 function normalizeSearchParamRecord(searchParams: SearchParamsInput) {
   if (!searchParams) {
     return {};
@@ -469,6 +497,10 @@ function buildRevenueManagerSearchParams(filters: Partial<RevenueManagerFilters>
     searchParams.set("batchDrift", filters.batchDrift);
   }
 
+  if (filters.batchDriftReason) {
+    searchParams.set("batchDriftReason", filters.batchDriftReason);
+  }
+
   return searchParams;
 }
 
@@ -486,6 +518,18 @@ function sanitizeBatchId(batchId: string | undefined) {
 
 function sanitizeBatchDrift(batchDrift: string | undefined): RevenueManagerBatchDriftFilter | undefined {
   return batchDrift === "changed_later" ? "changed_later" : undefined;
+}
+
+function sanitizeBatchDriftReason(batchDriftReason: string | undefined): RevenueManagerBatchDriftReasonFilter | undefined {
+  if (
+    batchDriftReason === "follow_up_only" ||
+    batchDriftReason === "later_bulk_reset_only" ||
+    batchDriftReason === "mixed"
+  ) {
+    return batchDriftReason;
+  }
+
+  return undefined;
 }
 
 function isUuid(value: string) {

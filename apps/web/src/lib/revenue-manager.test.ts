@@ -6,6 +6,7 @@ import {
   buildRevenueManagerBatchDriftReasonMixSummary,
   buildRevenueManagerBatchDriftReasonSummaries,
   buildRevenueManagerBatchHistory,
+  buildRevenueManagerDriftedCaseIdsByReason,
   buildRevenueManagerDriftedCaseIds,
   buildRevenueManagerBatchExportCsv,
   buildRevenueManagerExportHref,
@@ -69,6 +70,7 @@ describe("revenue manager filters", () => {
   it("keeps the first value when repeated params are present", () => {
     expect(
       parseRevenueManagerFilters({
+        batchDriftReason: ["mixed"],
         batchDrift: ["changed_later"],
         bulkBatchId: ["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"],
         ownerName: [" Manager Desk North ", "Revenue Ops"],
@@ -76,6 +78,7 @@ describe("revenue manager filters", () => {
       })
     ).toEqual({
       batchDrift: "changed_later",
+      batchDriftReason: "mixed",
       bulkBatchId: "33333333-3333-4333-8333-333333333333",
       ownerName: "Manager Desk North",
       queue: "escalated_handoffs"
@@ -90,6 +93,7 @@ describe("revenue manager filters", () => {
         "en",
         {
           batchDrift: "changed_later",
+          batchDriftReason: "follow_up_only",
           bulkBatchId: "33333333-3333-4333-8333-333333333333",
           ownerName: "Manager Desk North",
           queue: "escalated_handoffs"
@@ -97,15 +101,18 @@ describe("revenue manager filters", () => {
         { hash: "revenue-focused-queue" }
       )
     ).toBe(
-      "/en/manager/revenue?queue=escalated_handoffs&ownerName=Manager+Desk+North&bulkBatchId=33333333-3333-4333-8333-333333333333&batchDrift=changed_later#revenue-focused-queue"
+      "/en/manager/revenue?queue=escalated_handoffs&ownerName=Manager+Desk+North&bulkBatchId=33333333-3333-4333-8333-333333333333&batchDrift=changed_later&batchDriftReason=follow_up_only#revenue-focused-queue"
     );
     expect(
       buildRevenueManagerExportHref("en", {
         batchDrift: "changed_later",
+        batchDriftReason: "mixed",
         bulkBatchId: "33333333-3333-4333-8333-333333333333",
         queue: "escalated_handoffs"
       })
-    ).toBe("/en/manager/revenue/export?queue=escalated_handoffs&bulkBatchId=33333333-3333-4333-8333-333333333333&batchDrift=changed_later");
+    ).toBe(
+      "/en/manager/revenue/export?queue=escalated_handoffs&bulkBatchId=33333333-3333-4333-8333-333333333333&batchDrift=changed_later&batchDriftReason=mixed"
+    );
   });
 
   it("scopes operational-risk drill-downs to the selected owner and queue", () => {
@@ -512,6 +519,9 @@ describe("revenue manager filters", () => {
       laterBulkResetOnlyCaseCount: 0,
       mixedReasonCaseCount: 1
     });
+    expect(buildRevenueManagerDriftedCaseIdsByReason(history, "mixed")).toEqual(["batch-escalated"]);
+    expect(buildRevenueManagerDriftedCaseIdsByReason(history, "follow_up_only")).toEqual([]);
+    expect(buildRevenueManagerDriftedCaseIdsByReason(history, "later_bulk_reset_only")).toEqual([]);
   });
 
   it("summarizes drift-reason mix across follow-up-only, bulk-only, and mixed cases", () => {
@@ -646,5 +656,392 @@ describe("revenue manager filters", () => {
       laterBulkResetOnlyCaseCount: 1,
       mixedReasonCaseCount: 1
     });
+    expect(
+      buildRevenueManagerDriftedCaseIdsByReason(
+        {
+          casesWithHistoryCount: 3,
+          casesWithLaterChangesCount: 3,
+          historyCases: [
+            {
+              caseId: "follow-up-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer follow-up-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                }
+              ]
+            },
+            {
+              caseId: "bulk-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer bulk-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "44444444-4444-4444-8444-444444444444",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            },
+            {
+              caseId: "mixed",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer mixed",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "55555555-5555-4555-8555-555555555555",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T12:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T13:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            }
+          ],
+          laterBulkResetCount: 2,
+          postBatchFollowUpUpdateCount: 2
+        },
+        "follow_up_only"
+      )
+    ).toEqual(["follow-up-only"]);
+    expect(
+      buildRevenueManagerDriftedCaseIdsByReason(
+        {
+          casesWithHistoryCount: 3,
+          casesWithLaterChangesCount: 3,
+          historyCases: [
+            {
+              caseId: "follow-up-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer follow-up-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                }
+              ]
+            },
+            {
+              caseId: "bulk-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer bulk-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "44444444-4444-4444-8444-444444444444",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            },
+            {
+              caseId: "mixed",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer mixed",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "55555555-5555-4555-8555-555555555555",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T12:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T13:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            }
+          ],
+          laterBulkResetCount: 2,
+          postBatchFollowUpUpdateCount: 2
+        },
+        "later_bulk_reset_only"
+      )
+    ).toEqual(["bulk-only"]);
+    expect(
+      buildRevenueManagerDriftedCaseIdsByReason(
+        {
+          casesWithHistoryCount: 3,
+          casesWithLaterChangesCount: 3,
+          historyCases: [
+            {
+              caseId: "follow-up-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer follow-up-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "follow-up-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer follow-up-only",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                }
+              ]
+            },
+            {
+              caseId: "bulk-only",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer bulk-only",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "44444444-4444-4444-8444-444444444444",
+                  caseId: "bulk-only",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer bulk-only",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            },
+            {
+              caseId: "mixed",
+              currentOwnerName: "Manager Desk North",
+              currentRiskStatus: "still_escalated",
+              customerName: "Customer mixed",
+              entries: [
+                {
+                  batchCaseCount: 3,
+                  batchId: "33333333-3333-4333-8333-333333333333",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T09:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Original reset",
+                  nextActionDueAt: "2026-04-13T10:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Revenue Ops Queue",
+                  type: "scoped_batch_reset"
+                },
+                {
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T11:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Manual follow-up",
+                  nextActionDueAt: "2026-04-13T12:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  type: "follow_up_update"
+                },
+                {
+                  batchCaseCount: 2,
+                  batchId: "55555555-5555-4555-8555-555555555555",
+                  caseId: "mixed",
+                  createdAt: "2026-04-13T12:00:00.000Z",
+                  currentOwnerName: "Manager Desk North",
+                  currentRiskStatus: "still_escalated",
+                  customerName: "Customer mixed",
+                  nextAction: "Later batch reset",
+                  nextActionDueAt: "2026-04-13T13:00:00.000Z",
+                  ownerName: "Manager Desk North",
+                  scopedOwnerName: "Manager Desk North",
+                  type: "later_bulk_reset"
+                }
+              ]
+            }
+          ],
+          laterBulkResetCount: 2,
+          postBatchFollowUpUpdateCount: 2
+        },
+        "mixed"
+      )
+    ).toEqual(["mixed"]);
   });
 });

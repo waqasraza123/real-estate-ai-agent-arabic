@@ -5,6 +5,7 @@ import { tryGetPersistedCaseDetail, tryGetPersistedGovernanceSummary, tryListPer
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildRevenueManagerBatchHistory,
+  buildRevenueManagerDriftedCaseIdsByReason,
   buildRevenueManagerDriftedCaseIds,
   buildRevenueManagerScope,
   parseRevenueManagerFilters
@@ -37,7 +38,9 @@ export default async function RevenueManagerPage(props: PageProps) {
     filters.bulkBatchId && baseRevenueScope.batchScope
       ? buildRevenueManagerBatchHistory(baseRevenueScope, availableBatchCaseDetails)
       : null;
-  const driftedBatchCaseIds = buildRevenueManagerDriftedCaseIds(baseBatchHistory);
+  const driftedBatchCaseIds = filters.batchDriftReason
+    ? buildRevenueManagerDriftedCaseIdsByReason(baseBatchHistory, filters.batchDriftReason)
+    : buildRevenueManagerDriftedCaseIds(baseBatchHistory);
   const revenueScope =
     filters.batchDrift === "changed_later"
       ? buildRevenueManagerScope(persistedCases, filters, { changedCaseIds: new Set(driftedBatchCaseIds) })

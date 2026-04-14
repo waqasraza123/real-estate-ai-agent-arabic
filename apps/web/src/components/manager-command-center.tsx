@@ -60,8 +60,10 @@ import {
   buildRevenueManagerExportHref,
   buildRevenueManagerHref,
   buildRevenueManagerScope,
+  getRevenueManagerBatchDriftReasonFilter,
   revenueManagerFocusedQueueId,
   type RevenueManagerBatchHistorySummary,
+  type RevenueManagerBatchDriftReasonFilter,
   type RevenueManagerFilters
 } from "@/lib/revenue-manager";
 
@@ -762,6 +764,7 @@ export function RevenueManagerCommandCenter(props: {
   const followUpGuardNote = getOperatorPermissionGuardNote(props.locale, "manage_case_follow_up");
   const hasScopedBatchView = Boolean(revenueScope.batchScope);
   const hasChangedLaterBatchView = hasScopedBatchView && props.filters.batchDrift === "changed_later";
+  const hasChangedLaterReasonScopedView = hasChangedLaterBatchView && Boolean(props.filters.batchDriftReason);
   const batchScopeSavedAt = revenueScope.batchScope ? new Date(revenueScope.batchScope.savedAt).toLocaleString(props.locale) : null;
   const batchOwnerGroups = revenueScope.batchOwnerGroups;
   const hasScopedView = props.filters.queue !== "all" || Boolean(props.filters.ownerName) || hasScopedBatchView;
@@ -785,8 +788,22 @@ export function RevenueManagerCommandCenter(props: {
           { hash: revenueManagerFocusedQueueId }
         )
       : null;
+  const changedLaterBatchScopeHref =
+    hasChangedLaterReasonScopedView && props.filters.bulkBatchId
+      ? buildRevenueManagerHref(
+          props.locale,
+          {
+            batchDrift: "changed_later",
+            bulkBatchId: props.filters.bulkBatchId
+          },
+          { hash: revenueManagerFocusedQueueId }
+        )
+      : null;
   const operationalRiskReportHref = buildGovernanceReportHref(props.locale, { windowDays: 30 }, "operational_risk");
   const scopedReturnPath = buildRevenueManagerHref(props.locale, props.filters, { hash: revenueManagerFocusedQueueId });
+  const batchDriftReasonScopeLabel = props.filters.batchDriftReason
+    ? getRevenueManagerBatchDriftReasonScopeLabel(props.locale, props.filters.batchDriftReason)
+    : null;
 
   if (props.persistedCases.length === 0) {
     return (
@@ -970,10 +987,14 @@ export function RevenueManagerCommandCenter(props: {
             <p className="panel-summary">
               {hasScopedBatchView && revenueScope.batchScope
                 ? props.locale === "ar"
-                  ? hasChangedLaterBatchView
+                  ? hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
+                    ? `يعرض هذا النطاق فقط الحالات المتأثرة من الدفعة الجماعية المحفوظة ${batchScopeSavedAt} التي تغيّرت لاحقاً بسبب ${batchDriftReasonScopeLabel} بعد إعادة الضبط الأصلية من نطاق ${revenueScope.batchScope.scopedOwnerName}.`
+                    : hasChangedLaterBatchView
                     ? `يعرض هذا النطاق فقط الحالات المتأثرة من الدفعة الجماعية المحفوظة ${batchScopeSavedAt} التي تغيّرت لاحقاً بعد إعادة الضبط الأصلية من نطاق ${revenueScope.batchScope.scopedOwnerName}.`
                     : `يعرض هذا النطاق الحالات الحية المتأثرة مباشرة بالدفعة الجماعية المحفوظة ${batchScopeSavedAt} من نطاق ${revenueScope.batchScope.scopedOwnerName}.`
-                  : hasChangedLaterBatchView
+                  : hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
+                    ? `This scope shows only the affected cases from the bulk follow-up batch saved ${batchScopeSavedAt} that changed later because of ${batchDriftReasonScopeLabel} after the original reset from ${revenueScope.batchScope.scopedOwnerName}.`
+                    : hasChangedLaterBatchView
                     ? `This scope shows only the affected cases from the bulk follow-up batch saved ${batchScopeSavedAt} that changed later after the original reset from ${revenueScope.batchScope.scopedOwnerName}.`
                     : `This scope shows the exact live cases affected by the bulk follow-up batch saved ${batchScopeSavedAt} from ${revenueScope.batchScope.scopedOwnerName}.`
                 : props.filters.queue === "escalated_handoffs"
@@ -992,11 +1013,15 @@ export function RevenueManagerCommandCenter(props: {
               <StatusBadge>
                 {hasScopedBatchView
                   ? props.locale === "ar"
-                    ? hasChangedLaterBatchView
-                      ? "نطاق الانجراف اللاحق"
+                    ? hasChangedLaterReasonScopedView
+                      ? "نطاق سبب الانجراف"
+                      : hasChangedLaterBatchView
+                        ? "نطاق الانجراف اللاحق"
                       : "نطاق نتيجة الدفعة"
-                    : hasChangedLaterBatchView
-                      ? "Later-drift scope"
+                    : hasChangedLaterReasonScopedView
+                      ? "Drift-reason scope"
+                      : hasChangedLaterBatchView
+                        ? "Later-drift scope"
                       : "Bulk-result scope"
                   : props.filters.queue === "escalated_handoffs"
                     ? props.locale === "ar"
@@ -1013,6 +1038,7 @@ export function RevenueManagerCommandCenter(props: {
                   {props.locale === "ar" ? "الحالات التي تغيّرت لاحقاً فقط" : "Changed-later cases only"}
                 </StatusBadge>
               ) : null}
+              {hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel ? <StatusBadge>{batchDriftReasonScopeLabel}</StatusBadge> : null}
               <StatusBadge tone={revenueScope.focusedCases.length > 0 ? "warning" : "success"}>
                 {props.locale === "ar"
                   ? `${revenueScope.focusedCases.length} حالات مطابقة`
@@ -1052,9 +1078,18 @@ export function RevenueManagerCommandCenter(props: {
                   {props.locale === "ar" ? "فتح كامل الحالات المتأثرة" : "Open full affected-case scope"}
                 </Link>
               ) : null}
+              {changedLaterBatchScopeHref ? (
+                <Link className="inline-link" href={changedLaterBatchScopeHref}>
+                  {props.locale === "ar" ? "فتح كل الحالات التي تغيّرت لاحقاً" : "Open all changed-later cases"}
+                </Link>
+              ) : null}
               {batchExportHref ? (
                 <Link className="inline-link" href={batchExportHref}>
-                  {hasChangedLaterBatchView
+                  {hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
+                    ? props.locale === "ar"
+                      ? `تنزيل CSV لنطاق ${batchDriftReasonScopeLabel}`
+                      : `Download ${batchDriftReasonScopeLabel} CSV`
+                    : hasChangedLaterBatchView
                     ? props.locale === "ar"
                       ? "تنزيل CSV للحالات التي تغيّرت لاحقاً"
                       : "Download changed-case CSV"
@@ -1067,11 +1102,15 @@ export function RevenueManagerCommandCenter(props: {
             <p className="field-note">
               {hasScopedBatchView
                 ? props.locale === "ar"
-                  ? hasChangedLaterBatchView
-                    ? "يعرض هذا المسار فقط الحالات التي انجرفت بعد إعادة الضبط الجماعية الأصلية، مع إبقاء المسار إلى كامل الدفعة وتصدير CSV لهذا النطاق الضيق متاحين عند الحاجة."
+                  ? hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
+                    ? `يعرض هذا المسار فقط الحالات التي انجرفت بعد إعادة الضبط الجماعية الأصلية بسبب ${batchDriftReasonScopeLabel}، مع إبقاء المسار إلى كل الحالات التي تغيّرت لاحقاً وإلى كامل الدفعة وتصدير CSV لهذا النطاق الضيق متاحين عند الحاجة.`
+                    : hasChangedLaterBatchView
+                      ? "يعرض هذا المسار فقط الحالات التي انجرفت بعد إعادة الضبط الجماعية الأصلية، مع إبقاء المسار إلى كامل الدفعة وتصدير CSV لهذا النطاق الضيق متاحين عند الحاجة."
                     : "يعرض هذا المسار الأثر الكامل للدفعة عبر الحالات المصعّدة والمصفّاة مع إبقاء التحويل إلى طابور المالك الحالي وتصدير CSV للحالات المتأثرة متاحين عندما تحتاج المراجعة التشغيلية إلى أثر قابل للمشاركة."
-                  : hasChangedLaterBatchView
-                    ? "This route narrows the batch to only the cases that drifted after the original bulk reset, while still keeping a path back to the full batch and a matching CSV export for that tighter scope."
+                  : hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
+                    ? `This route narrows the batch to only the cases that drifted after the original bulk reset because of ${batchDriftReasonScopeLabel}, while still keeping a path back to all changed-later cases, the full batch, and a matching CSV export for that tighter scope.`
+                    : hasChangedLaterBatchView
+                      ? "This route narrows the batch to only the cases that drifted after the original bulk reset, while still keeping a path back to the full batch and a matching CSV export for that tighter scope."
                     : "This route shows the full batch outcome across both escalated and cleared cases, while still letting managers jump into the current owner queue and export the affected-case CSV for operational review."
                 : props.locale === "ar"
                   ? "يمكن لمدير الإيرادات إعادة تعيين المالك أو حفظ خطوة المتابعة التالية مباشرة من هذا النطاق لتصفية التدخل المفتوح."
@@ -1345,6 +1384,10 @@ export function RevenueManagerCommandCenter(props: {
                   caseItem.latestHumanReply
                 );
                 const batchDriftReasonSummary = hasChangedLaterBatchView ? batchDriftReasonSummaryByCaseId.get(caseItem.caseId) : undefined;
+                const driftReasonMatchesScope =
+                  props.filters.batchDriftReason && batchDriftReasonSummary
+                    ? getRevenueManagerBatchDriftReasonFilter(batchDriftReasonSummary) === props.filters.batchDriftReason
+                    : false;
                 const latestHumanReplyEscalationLabel = getPersistedLatestHumanReplyEscalationLabel(
                   props.locale,
                   caseItem.ownerName,
@@ -1386,6 +1429,9 @@ export function RevenueManagerCommandCenter(props: {
                       {hasChangedLaterBatchView && batchDriftReasonSummary ? (
                         <>
                           <div className="status-row-wrap">
+                            {driftReasonMatchesScope && batchDriftReasonScopeLabel ? (
+                              <StatusBadge tone="warning">{batchDriftReasonScopeLabel}</StatusBadge>
+                            ) : null}
                             {batchDriftReasonSummary.postBatchFollowUpUpdateCount > 0 ? (
                               <StatusBadge tone="warning">
                                 {props.locale === "ar"
@@ -2069,6 +2115,21 @@ function filterGovernanceDailyActivity(report: PersistedGovernanceSummary | null
 
 function filterGovernanceRecentEvents(report: PersistedGovernanceSummary | null, kind: GovernanceSignalCount["kind"]) {
   return (report?.recentEvents ?? []).filter((event) => event.kind === kind);
+}
+
+function getRevenueManagerBatchDriftReasonScopeLabel(
+  locale: SupportedLocale,
+  reason: RevenueManagerBatchDriftReasonFilter
+) {
+  if (reason === "follow_up_only") {
+    return locale === "ar" ? "متابعة فقط" : "follow-up only";
+  }
+
+  if (reason === "later_bulk_reset_only") {
+    return locale === "ar" ? "دفعة جماعية فقط" : "bulk reset only";
+  }
+
+  return locale === "ar" ? "أسباب مختلطة" : "mixed reasons";
 }
 
 function getGovernanceRecentEventSummary(

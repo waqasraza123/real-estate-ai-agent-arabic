@@ -555,6 +555,54 @@ export function ManagerGovernanceReport(props: {
                             {props.locale === "ar" ? "فتح الحالات التي تغيّرت لاحقاً" : "Open changed-later cases"}
                           </Link>
                         ) : null}
+                        {batch.drift && batch.drift.followUpUpdateOnlyCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerHref(
+                              props.locale,
+                              {
+                                batchDrift: "changed_later",
+                                batchDriftReason: "follow_up_only",
+                                bulkBatchId: batch.batchId
+                              },
+                              { hash: revenueManagerFocusedQueueId }
+                            )}
+                          >
+                            {props.locale === "ar" ? "فتح حالات المتابعة فقط" : "Open follow-up-only cases"}
+                          </Link>
+                        ) : null}
+                        {batch.drift && batch.drift.laterBulkResetOnlyCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerHref(
+                              props.locale,
+                              {
+                                batchDrift: "changed_later",
+                                batchDriftReason: "later_bulk_reset_only",
+                                bulkBatchId: batch.batchId
+                              },
+                              { hash: revenueManagerFocusedQueueId }
+                            )}
+                          >
+                            {props.locale === "ar" ? "فتح حالات الدفعات فقط" : "Open bulk-reset-only cases"}
+                          </Link>
+                        ) : null}
+                        {batch.drift && batch.drift.mixedReasonCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerHref(
+                              props.locale,
+                              {
+                                batchDrift: "changed_later",
+                                batchDriftReason: "mixed",
+                                bulkBatchId: batch.batchId
+                              },
+                              { hash: revenueManagerFocusedQueueId }
+                            )}
+                          >
+                            {props.locale === "ar" ? "فتح الحالات المختلطة" : "Open mixed-reason cases"}
+                          </Link>
+                        ) : null}
                         <Link
                           className="inline-link"
                           href={buildRevenueManagerHref(
