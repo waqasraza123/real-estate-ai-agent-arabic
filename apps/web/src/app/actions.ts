@@ -40,6 +40,7 @@ import {
 } from "@real-estate-ai/contracts";
 
 import { initialFormActionState, type FormActionState } from "@/lib/form-action-state";
+import { canUseOperatorRoleAccessKey } from "@/lib/operator-access";
 import {
   defaultOperatorRole,
   getInsufficientRoleError,
@@ -81,10 +82,18 @@ import {
 
 export async function setOperatorRoleAction(formData: FormData) {
   const roleResult = operatorRoleSchema.safeParse(formData.get("operatorRole"));
+  const accessKeyValue = formData.get("accessKey");
   const returnPathValue = formData.get("returnPath");
   const returnPath = typeof returnPathValue === "string" && returnPathValue.startsWith("/") ? returnPathValue : "/en";
   const cookieStore = await cookies();
   const operatorRole = roleResult.success ? roleResult.data : defaultOperatorRole;
+  const accessKey = typeof accessKeyValue === "string" ? accessKeyValue : "";
+
+  if (!canUseOperatorRoleAccessKey(operatorRole, accessKey)) {
+    const separator = returnPath.includes("?") ? "&" : "?";
+
+    redirect(`${returnPath}${separator}role_access=denied`);
+  }
 
   cookieStore.set(operatorSessionCookieName, createSignedOperatorSession(operatorRole), {
     httpOnly: true,
