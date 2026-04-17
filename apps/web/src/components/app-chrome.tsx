@@ -24,8 +24,6 @@ import {
   chromeShellClassName,
   chromeSidebarClassName,
   chromeStatusClassName,
-  cx,
-  legacyUiBridgeClassName,
   localeLinkClassName,
   localeSwitchClassName,
   sidebarLabelClassName,
@@ -140,7 +138,7 @@ export function AppChrome(props: {
           </nav>
         </aside>
 
-        <main className={cx(chromeMainClassName, legacyUiBridgeClassName)} data-testid="chrome-main" id="main-content" tabIndex={-1}>
+        <main className={chromeMainClassName} data-testid="chrome-main" id="main-content" tabIndex={-1}>
           {props.children}
         </main>
       </div>

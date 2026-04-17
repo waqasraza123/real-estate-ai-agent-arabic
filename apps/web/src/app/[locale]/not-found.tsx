@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages, isSupportedLocale } from "@real-estate-ai/i18n";
-import { Panel } from "@real-estate-ai/ui";
+import { Panel, pageStackClassName, panelSummaryClassName, primaryLinkClassName } from "@real-estate-ai/ui";
 
 interface PageProps {
   params?: Promise<{ locale?: string }>;
@@ -10,14 +10,14 @@ interface PageProps {
 
 export default async function NotFoundPage(props: PageProps) {
   const resolvedParams = props.params ? await props.params : undefined;
-  const locale: SupportedLocale = resolvedParams?.locale && isSupportedLocale(resolvedParams.locale) ? resolvedParams.locale : "en";
+  const locale: SupportedLocale = resolvedParams?.locale && isSupportedLocale(resolvedParams.locale) ? resolvedParams.locale : "ar";
   const messages = getMessages(locale);
 
   return (
-    <div className="page-stack">
+    <div className={pageStackClassName}>
       <Panel title={messages.app.name}>
-        <p className="panel-summary">{messages.common.placeholderNotice}</p>
-        <Link className="primary-link" href={`/${locale}`}>
+        <p className={panelSummaryClassName}>{messages.common.placeholderNotice}</p>
+        <Link className={primaryLinkClassName} href={`/${locale}`}>
           {messages.navigation.landing}
         </Link>
       </Panel>

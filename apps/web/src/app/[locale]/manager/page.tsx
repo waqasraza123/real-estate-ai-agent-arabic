@@ -1,5 +1,6 @@
 import { canOperatorRoleAccessWorkspace, type SupportedLocale } from "@real-estate-ai/contracts";
 import { getMessages } from "@real-estate-ai/i18n";
+import { pageStackClassName } from "@real-estate-ai/ui";
 
 import { redirect } from "next/navigation";
 
@@ -25,7 +26,7 @@ export default async function ManagerPage(props: PageProps) {
 
   if (!canAccessRevenueManagerWorkspace && !canAccessHandoverManagerWorkspace) {
     return (
-      <div className="page-stack">
+      <div className={pageStackClassName}>
         <ScreenIntro badge={messages.app.phaseLabel} summary={messages.manager.summary} title={messages.manager.title} />
         <WorkspaceAccessPanel
           actionHref={`/${locale}/dashboard`}

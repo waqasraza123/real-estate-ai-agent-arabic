@@ -1,5 +1,5 @@
 import { canOperatorRoleAccessWorkspace, type PersistedCaseDetail, type SupportedLocale } from "@real-estate-ai/contracts";
-import { Panel } from "@real-estate-ai/ui";
+import { Panel, pageStackClassName, panelSummaryClassName } from "@real-estate-ai/ui";
 
 import { ManagerGovernanceReport } from "@/components/manager-governance-report";
 import { ScreenIntro } from "@/components/screen-intro";
@@ -34,7 +34,7 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
 
   if (!canAccessManagerReport) {
     return (
-      <div className="page-stack">
+      <div className={pageStackClassName}>
         <ScreenIntro
           badge={locale === "ar" ? "تقرير الحوكمة" : "Governance report"}
           summary={
@@ -45,8 +45,8 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
           title={locale === "ar" ? "تقرير الحوكمة" : "Governance report"}
         />
         <Panel title={locale === "ar" ? "وصول إداري مطلوب" : "Manager access required"}>
-          <div className="page-stack">
-            <p className="panel-summary">
+          <div className={pageStackClassName}>
+            <p className={panelSummaryClassName}>
               {locale === "ar"
                 ? "افتح بوابة الإدارة أو مساحة العمل المتاحة لهذا الدور للوصول إلى تقارير الحوكمة الحية."
                 : "Open the manager gateway or an available workspace for this role to access live governance reporting."}

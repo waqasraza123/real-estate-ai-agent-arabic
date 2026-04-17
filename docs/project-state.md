@@ -22,7 +22,7 @@
 - Shared localization now lives behind typed domain resources in `packages/i18n`, with Arabic as the authored default, English as the secondary locale, and shared helpers for locale direction, labels, and formatter locale selection
 - Shared web formatting now routes date and number presentation through locale-aware helpers in `apps/web/src/lib/format.ts`, and the web shell now uses local Arabic-capable system font stacks instead of runtime Google font fetches
 - The web frontend is now Tailwind-first: `apps/web` uses Tailwind, Tailwind Forms, `tailwindcss-animate`, and a selective Flowbite plugin foundation, while the prior custom global CSS system has been removed in favor of utility-driven primitives and theme tokens
-- `packages/ui` is now the shared Tailwind design-system layer for the app shell, cards, buttons, inputs, tables, badges, empty states, and skeletons, with Arabic-first spacing, premium light-theme tokens, motion utilities, and a temporary Tailwind descendant bridge for remaining route-level legacy markup during migration completion
+- `packages/ui` is now the shared Tailwind design-system layer for the app shell, cards, buttons, inputs, tables, badges, empty states, and skeletons, with Arabic-first spacing, premium light-theme tokens, motion utilities, and no remaining descendant-bridge fallback inside `apps/web`
 
 ## Non-Negotiable Rules
 - Never store secrets in repository memory files
