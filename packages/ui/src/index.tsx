@@ -50,11 +50,35 @@ export const technicalValueClassName = "text-left [direction:ltr] [unicode-bidi:
 
 export const cardBaseClassName =
   "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel transition duration-300 ease-out hover:-translate-y-0.5 hover:shadow-panel-lg sm:p-6";
-export const alertCardClassName = cx(cardBaseClassName, "border-warning-200/80 bg-warning-50/70");
-export const criticalAlertCardClassName = cx(cardBaseClassName, "border-danger-200/80 bg-danger-50/70");
-export const successCardClassName = cx(cardBaseClassName, "border-success-200/80 bg-success-50/70");
+export const cardTitleClassName = "text-base font-semibold tracking-[-0.02em] text-ink";
+export const bodyTextClassName = "text-sm leading-7 text-ink-soft";
+const cardDescendantTitleClassName = "[&_h3]:text-base [&_h3]:font-semibold [&_h3]:tracking-[-0.02em] [&_h3]:text-ink";
+const cardDescendantBodyClassName = "[&_p]:text-sm [&_p]:leading-7 [&_p]:text-ink-soft";
+export const metricLabelClassName = "text-xs font-semibold tracking-[0.18em] text-ink-soft";
+export const metricValueClassName = "text-4xl font-semibold tracking-[-0.04em] text-ink";
+export const metricDetailClassName = "text-sm leading-7 text-ink-soft";
+export function metricTileClassName(tone: "ocean" | "sand" | "mint" | "rose") {
+  const toneClassName =
+    tone === "ocean"
+      ? "border-ai-100/90 bg-gradient-to-b from-ai-50 to-white"
+      : tone === "sand"
+        ? "border-sand-100/90 bg-gradient-to-b from-sand-50 to-white"
+        : tone === "mint"
+          ? "border-brand-100/90 bg-gradient-to-b from-brand-50 to-white"
+          : "border-danger-100/90 bg-gradient-to-b from-danger-50 to-white";
+
+  return cx("flex min-h-44 flex-col justify-between rounded-4xl border p-5 shadow-panel transition duration-300 hover:-translate-y-0.5 hover:shadow-panel-lg", toneClassName);
+}
+export const alertCardClassName = cx(cardBaseClassName, "border-warning-200/80 bg-warning-50/70", cardDescendantTitleClassName, cardDescendantBodyClassName);
+export const criticalAlertCardClassName = cx(cardBaseClassName, "border-danger-200/80 bg-danger-50/70", cardDescendantTitleClassName, cardDescendantBodyClassName);
+export const successCardClassName = cx(cardBaseClassName, "border-success-200/80 bg-success-50/70", cardDescendantTitleClassName, cardDescendantBodyClassName);
 export const caseLinkCardClassName =
-  "group rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel transition duration-300 ease-out hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-panel-lg sm:flex sm:items-start sm:justify-between sm:gap-4 sm:p-6";
+  cx(
+    "group rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel transition duration-300 ease-out hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-panel-lg sm:flex sm:items-start sm:justify-between sm:gap-4 sm:p-6",
+    cardDescendantTitleClassName,
+    cardDescendantBodyClassName
+  );
+export const caseLinkAsideClassName = "mt-4 flex flex-wrap items-center gap-2 sm:mt-0";
 export const caseStackCardClassName = cx(cardBaseClassName, "space-y-3");
 export const slotCardClassName = cx(cardBaseClassName, "space-y-3");
 export const messageThreadClassName = "flex flex-col gap-4";
@@ -62,6 +86,9 @@ export const messageCardClassName = "rounded-4xl border border-canvas-line/80 bg
 export const messageMetaClassName = "text-xs text-ink-muted [unicode-bidi:plaintext]";
 export const timelineListClassName = "flex flex-col gap-4";
 export const timelineItemClassName = "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel";
+export const interventionCardClassName = cx("rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel", cardDescendantTitleClassName, cardDescendantBodyClassName);
+export const interventionOpenCardClassName = cx(interventionCardClassName, "border-warning-200/80 bg-warning-50/70");
+export const interventionResolvedCardClassName = cx(interventionCardClassName, "border-success-200/80 bg-success-50/70");
 export const detailListClassName = "grid gap-4 rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel sm:grid-cols-2";
 export const detailGridClassName = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3";
 export const detailLabelClassName = "text-xs font-semibold tracking-[0.18em] text-ink-soft";
@@ -70,6 +97,7 @@ export const documentRowClassName =
   "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel transition duration-300 ease-out sm:flex sm:items-start sm:justify-between sm:gap-4";
 export const documentRowActionsClassName = "mt-4 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end";
 export const slotGridClassName = "grid gap-3 sm:grid-cols-2";
+export const bulkFollowUpShellClassName = "flex flex-col gap-4 rounded-4xl border border-ai-100/80 bg-ai-50/70 p-5 shadow-panel";
 export const dataTableWrapperClassName = "overflow-x-auto";
 export const dataTableClassName = "min-w-[62rem] w-full border-separate border-spacing-0";
 export const dataTableHeadClassName = "border-b border-canvas-line/80";
@@ -609,20 +637,11 @@ export function MetricTile(props: {
   detail: string;
   tone: "ocean" | "sand" | "mint" | "rose";
 }) {
-  const toneClassName =
-    props.tone === "ocean"
-      ? "border-ai-100/90 bg-gradient-to-b from-ai-50 to-white"
-      : props.tone === "sand"
-        ? "border-sand-100/90 bg-gradient-to-b from-sand-50 to-white"
-        : props.tone === "mint"
-          ? "border-brand-100/90 bg-gradient-to-b from-brand-50 to-white"
-          : "border-danger-100/90 bg-gradient-to-b from-danger-50 to-white";
-
   return (
-    <div className={cx("flex min-h-44 flex-col justify-between rounded-4xl border p-5 shadow-panel transition duration-300 hover:-translate-y-0.5 hover:shadow-panel-lg", toneClassName)}>
-      <p className="text-xs font-semibold tracking-[0.18em] text-ink-soft">{props.label}</p>
-      <p className="text-4xl font-semibold tracking-[-0.04em] text-ink">{props.value}</p>
-      <p className="text-sm leading-7 text-ink-soft">{props.detail}</p>
+    <div className={metricTileClassName(props.tone)}>
+      <p className={metricLabelClassName}>{props.label}</p>
+      <p className={metricValueClassName}>{props.value}</p>
+      <p className={metricDetailClassName}>{props.detail}</p>
     </div>
   );
 }

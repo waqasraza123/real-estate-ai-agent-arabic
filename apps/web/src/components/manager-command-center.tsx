@@ -9,7 +9,31 @@ import {
 } from "@real-estate-ai/contracts";
 import { demoDataset, getLocalizedText } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
-import { Panel, StatusBadge } from "@real-estate-ai/ui";
+import {
+  alertCardClassName,
+  bulkFollowUpShellClassName,
+  caseLinkAsideClassName,
+  caseLinkCardClassName,
+  caseMetaClassName,
+  criticalAlertCardClassName,
+  fieldNoteClassName,
+  inlineLinkClassName,
+  interventionCardClassName,
+  interventionOpenCardClassName,
+  metricDetailClassName,
+  metricGridClassName,
+  metricLabelClassName,
+  metricTileClassName,
+  metricValueClassName,
+  pageStackClassName,
+  panelSummaryClassName,
+  Panel,
+  rowBetweenClassName,
+  stackTightClassName,
+  StatusBadge,
+  statusRowWrapClassName,
+  twoColumnGridClassName
+} from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
@@ -90,17 +114,17 @@ export function HandoverManagerCommandCenter(props: {
 
   if (props.persistedCases.length === 0) {
     return (
-      <div className="page-stack">
+      <div className={pageStackClassName}>
         <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
 
         <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-          <div className="page-stack">
-            <p className="panel-summary">
+          <div className={pageStackClassName}>
+            <p className={panelSummaryClassName}>
               {props.locale === "ar"
                 ? `يعمل هذا المركز بدور ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)} مع واجهة تجريبية جاهزة لمسارات التخطيط والتنفيذ والإغلاق.`
                 : `This command center is running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)} with a fixture-backed shell for planning, execution, and closure queues.`}
             </p>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               <StatusBadge>{getOperatorRoleLabel(props.locale, props.currentOperatorRole)}</StatusBadge>
               {actionableSurfaceLabels.map((label) => (
                 <StatusBadge key={label} tone="success">
@@ -111,48 +135,48 @@ export function HandoverManagerCommandCenter(props: {
           </div>
         </Panel>
 
-        <div className="metric-grid">
-          <article className="metric-tile metric-tile-mint">
-            <p className="metric-label">{props.locale === "ar" ? "سجلات التسليم التجريبية" : "Fixture handovers"}</p>
-            <p className="metric-value">{demoDataset.handoverCases.length}</p>
-            <p className="metric-detail">
+        <div className={metricGridClassName}>
+          <article className={metricTileClassName("mint")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "سجلات التسليم التجريبية" : "Fixture handovers"}</p>
+            <p className={metricValueClassName}>{demoDataset.handoverCases.length}</p>
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "واجهة جاهزة لإظهار الحدود التشغيلية حتى قبل تشغيل البيانات الحية."
                 : "A seeded surface showing the intended operational boundaries before live data is available."}
             </p>
           </article>
-          <article className="metric-tile metric-tile-sand">
-            <p className="metric-label">{props.locale === "ar" ? "المراحل الجاهزة" : "Ready milestones"}</p>
-            <p className="metric-value">
+          <article className={metricTileClassName("sand")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "المراحل الجاهزة" : "Ready milestones"}</p>
+            <p className={metricValueClassName}>
               {
                 demoDataset.handoverCases.flatMap((handoverCase) => handoverCase.milestones).filter((milestone) => milestone.status === "ready")
                   .length
               }
             </p>
-            <p className="metric-detail">
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "مراحل قابلة للانتقال إلى خطوة مديرية تالية."
                 : "Milestones already staged for the next manager-owned boundary."}
             </p>
           </article>
-          <article className="metric-tile metric-tile-rose">
-            <p className="metric-label">{props.locale === "ar" ? "عوائق مفتوحة" : "Open blockers"}</p>
-            <p className="metric-value">
+          <article className={metricTileClassName("rose")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "عوائق مفتوحة" : "Open blockers"}</p>
+            <p className={metricValueClassName}>
               {
                 demoDataset.handoverCases.flatMap((handoverCase) => handoverCase.milestones).filter((milestone) => milestone.status === "blocked")
                   .length
               }
             </p>
-            <p className="metric-detail">
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "توضح كيف سيظهر خطر التسليم حتى قبل تفعيل الرحلة الحية بالكامل."
                 : "Shows how handover risk will surface before the live workflow is fully enabled."}
             </p>
           </article>
-          <article className="metric-tile metric-tile-ocean">
-            <p className="metric-label">{props.locale === "ar" ? "بوابات جودة المسودات" : "Draft QA gates"}</p>
-            <p className="metric-value">0</p>
-            <p className="metric-detail">
+          <article className={metricTileClassName("ocean")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "بوابات جودة المسودات" : "Draft QA gates"}</p>
+            <p className={metricValueClassName}>0</p>
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "ستظهر هنا ضغوط جودة المسودات الصادرة عندما تتوفر سجلات تسليم حيّة."
                 : "Outbound draft-governance pressure will surface here once live handover records are available."}
@@ -160,20 +184,20 @@ export function HandoverManagerCommandCenter(props: {
           </article>
         </div>
 
-        <div className="two-column-grid">
+        <div className={twoColumnGridClassName}>
           <Panel title={props.locale === "ar" ? "طابور التسليم التجريبي" : "Fixture handover queue"}>
             <StatefulStack
               emptySummary={messages.states.emptyMilestonesSummary}
               emptyTitle={messages.states.emptyMilestonesTitle}
               items={demoDataset.handoverCases}
               renderItem={(handoverCase) => (
-                <Link key={handoverCase.id} className="case-link-card" href={`/${props.locale}/handover/${handoverCase.id}`}>
+                <Link key={handoverCase.id} className={caseLinkCardClassName} href={`/${props.locale}/handover/${handoverCase.id}`}>
                   <div>
-                    <p className="case-link-meta">{getLocalizedText(handoverCase.projectName, props.locale)}</p>
+                    <p className={caseMetaClassName}>{getLocalizedText(handoverCase.projectName, props.locale)}</p>
                     <h3>{handoverCase.customerName}</h3>
                     <p>{getLocalizedText(handoverCase.readinessLabel, props.locale)}</p>
                   </div>
-                  <div className="case-link-aside">
+                  <div className={caseLinkAsideClassName}>
                     <StatusBadge>{handoverCase.milestones.length}</StatusBadge>
                     <StatusBadge tone="warning">
                       {
@@ -193,9 +217,9 @@ export function HandoverManagerCommandCenter(props: {
               emptyTitle={messages.states.emptyCasesTitle}
               items={demoDataset.cases}
               renderItem={(caseItem) => (
-                <Link key={caseItem.id} className="case-link-card" href={`/${props.locale}/handover/${caseItem.handoverCaseId}`}>
+                <Link key={caseItem.id} className={caseLinkCardClassName} href={`/${props.locale}/handover/${caseItem.handoverCaseId}`}>
                   <div>
-                    <p className="case-link-meta">{caseItem.referenceCode}</p>
+                    <p className={caseMetaClassName}>{caseItem.referenceCode}</p>
                     <h3>{caseItem.customerName}</h3>
                     <p>{getLocalizedText(caseItem.nextAction, props.locale)}</p>
                   </div>
@@ -219,7 +243,7 @@ export function HandoverManagerCommandCenter(props: {
           />
         </Panel>
 
-        <div className="two-column-grid">
+        <div className={twoColumnGridClassName}>
           <Panel title={props.locale === "ar" ? "اتجاه جودة المسودات" : "Draft QA trend"}>
             <GovernanceActivityPanel
               emptySummary={
@@ -267,17 +291,17 @@ export function HandoverManagerCommandCenter(props: {
   }
 
   return (
-    <div className="page-stack">
+    <div className={pageStackClassName}>
       <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
 
       <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-        <div className="page-stack">
-          <p className="panel-summary">
+        <div className={pageStackClassName}>
+          <p className={panelSummaryClassName}>
             {props.locale === "ar"
               ? `يعمل هذا المركز الآن بدور ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. يتم فصل طوابير التخطيط والتنفيذ والإغلاق في مسار مستقل عن متابعة الإيرادات.`
               : `This command center is currently running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. Planning, execution, and closure queues now live on a dedicated route separate from revenue follow-up.`}
           </p>
-          <div className="status-row-wrap">
+          <div className={statusRowWrapClassName}>
             <StatusBadge>{getOperatorRoleLabel(props.locale, props.currentOperatorRole)}</StatusBadge>
             {actionableSurfaceLabels.map((label) => (
               <StatusBadge key={label} tone="success">
@@ -286,57 +310,57 @@ export function HandoverManagerCommandCenter(props: {
             ))}
           </div>
           {canAccessRevenueManagerWorkspace ? (
-            <Link className="inline-link" href={getManagerWorkspacePath(props.locale, "manager_revenue")}>
+            <Link className={inlineLinkClassName} href={getManagerWorkspacePath(props.locale, "manager_revenue")}>
               {props.locale === "ar" ? "الانتقال إلى قيادة الإيرادات" : "Switch to revenue command center"}
             </Link>
           ) : null}
-          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+          <Link className={inlineLinkClassName} href={`/${props.locale}/manager/governance`}>
             {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
           </Link>
         </div>
       </Panel>
 
-      <div className="metric-grid">
-        <article className="metric-tile metric-tile-mint">
-          <p className="metric-label">{props.locale === "ar" ? "تخطيط التسليم" : "Handover planning"}</p>
-          <p className="metric-value">{planningCases.length}</p>
-          <p className="metric-detail">
+      <div className={metricGridClassName}>
+        <article className={metricTileClassName("mint")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "تخطيط التسليم" : "Handover planning"}</p>
+          <p className={metricValueClassName}>{planningCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "سجلات حيّة ما زالت داخل حدود الجاهزية أو الجدولة."
               : "Live records still inside readiness and customer-scheduling boundaries."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-sand">
-          <p className="metric-label">{props.locale === "ar" ? "تنفيذ التسليم" : "Handover execution"}</p>
-          <p className="metric-value">{executionCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("sand")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "تنفيذ التسليم" : "Handover execution"}</p>
+          <p className={metricValueClassName}>{executionCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "سجلات مجدولة أو قيد التنفيذ تحتاج وضوحاً تشغيلياً."
               : "Scheduled and in-progress records that still need active operational control."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "إغلاق التسليم" : "Handover closure"}</p>
-          <p className="metric-value">{closureCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("rose")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "إغلاق التسليم" : "Handover closure"}</p>
+          <p className={metricValueClassName}>{closureCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "سجلات مكتملة دخلت مرحلة المراجعة أو المتابعة أو الأرشفة."
               : "Completed records now inside review, aftercare, or administrative archive boundaries."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-ocean">
-          <p className="metric-label">{props.locale === "ar" ? "حوكمة المسودات" : "Draft governance"}</p>
-          <p className="metric-value">{governanceSummary.handoverAttentionCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("ocean")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "حوكمة المسودات" : "Draft governance"}</p>
+          <p className={metricValueClassName}>{governanceSummary.handoverAttentionCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "مسودات تحديث العميل التي لا تزال متوقفة بانتظار جودة أو تحتاج إعادة صياغة."
               : "Prepared customer updates that are still blocked on QA or need draft changes before they can move on."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "مراجعات قديمة" : "Stale pending QA"}</p>
-          <p className="metric-value">{governanceSummary.stalePendingCasesCount}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("rose")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "مراجعات قديمة" : "Stale pending QA"}</p>
+          <p className={metricValueClassName}>{governanceSummary.stalePendingCasesCount}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "عناصر جودة معلقة لأكثر من يوم وتحتاج تصعيداً أو إعادة توجيه واضحة."
               : "Governance items that have been pending for more than a day and likely need escalation or re-routing."}
@@ -362,14 +386,14 @@ export function HandoverManagerCommandCenter(props: {
               }
 
               return (
-                <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                <Link key={caseItem.caseId} className={caseLinkCardClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
                   <div>
-                    <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                    <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                     <h3>{caseItem.customerName}</h3>
                     <p>{caseItem.nextAction}</p>
-                    <p className="case-link-meta">{handoverDisplay.updatedAt}</p>
+                    <p className={caseMetaClassName}>{handoverDisplay.updatedAt}</p>
                   </div>
-                  <div className="case-link-aside">
+                  <div className={caseLinkAsideClassName}>
                     <StatusBadge tone={handoverDisplay.statusTone}>{handoverDisplay.statusLabel}</StatusBadge>
                     <StatusBadge>{handoverDisplay.surfaceLabel}</StatusBadge>
                   </div>
@@ -380,7 +404,7 @@ export function HandoverManagerCommandCenter(props: {
         </Panel>
       ) : null}
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "طابور حوكمة المسودات" : "Draft governance queue"}>
           <StatefulStack
             emptySummary={
@@ -398,30 +422,30 @@ export function HandoverManagerCommandCenter(props: {
               }
 
               return (
-                <article key={caseItem.caseId} className="alert-row alert-row-high">
-                  <div className="row-between">
-                    <div className="stack-tight">
+                <article key={caseItem.caseId} className={criticalAlertCardClassName}>
+                  <div className={rowBetweenClassName}>
+                    <div className={stackTightClassName}>
                       <h3>{caseItem.customerName}</h3>
-                      <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                     </div>
-                    <div className="status-row-wrap">
+                    <div className={statusRowWrapClassName}>
                       <StatusBadge tone={qaReviewDisplay.reviewStatusTone}>{qaReviewDisplay.reviewStatusLabel}</StatusBadge>
                       <StatusBadge>{qaReviewDisplay.typeLabel}</StatusBadge>
                     </div>
                   </div>
                   <p>{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.reviewSampleSummary}</p>
-                  <p className="case-link-meta">{qaReviewDisplay.updatedAt}</p>
-                  <div className="status-row-wrap">
+                  <p className={caseMetaClassName}>{qaReviewDisplay.updatedAt}</p>
+                  <div className={statusRowWrapClassName}>
                     {qaReviewDisplay.policySignalLabels.map((label) => (
                       <StatusBadge key={`${caseItem.caseId}-${label}`}>{label}</StatusBadge>
                     ))}
                   </div>
-                  <div className="status-row-wrap">
-                    <Link className="inline-link" href={`/${props.locale}/handover/${qaReviewDisplay.handoverCaseId}`}>
+                  <div className={statusRowWrapClassName}>
+                    <Link className={inlineLinkClassName} href={`/${props.locale}/handover/${qaReviewDisplay.handoverCaseId}`}>
                       {props.locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
                     </Link>
                     {canAccessQaWorkspace ? (
-                      <Link className="inline-link" href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
                         {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
                       </Link>
                     ) : null}
@@ -446,7 +470,7 @@ export function HandoverManagerCommandCenter(props: {
         </Panel>
       </div>
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "اتجاه جودة المسودات" : "Draft QA trend"}>
           <GovernanceActivityPanel
             emptySummary={
@@ -474,7 +498,7 @@ export function HandoverManagerCommandCenter(props: {
         </Panel>
       </div>
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         {managerCapabilities.canManageExecution ? (
           <Panel title={props.locale === "ar" ? "طابور تنفيذ التسليم" : "Handover execution queue"}>
             <StatefulStack
@@ -493,14 +517,14 @@ export function HandoverManagerCommandCenter(props: {
                 }
 
                 return (
-                  <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                  <Link key={caseItem.caseId} className={caseLinkCardClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
                     <div>
-                      <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                       <h3>{caseItem.customerName}</h3>
                       <p>{caseItem.nextAction}</p>
-                      <p className="case-link-meta">{handoverDisplay.updatedAt}</p>
+                      <p className={caseMetaClassName}>{handoverDisplay.updatedAt}</p>
                     </div>
-                    <div className="case-link-aside">
+                    <div className={caseLinkAsideClassName}>
                       <StatusBadge tone={handoverDisplay.statusTone}>{handoverDisplay.statusLabel}</StatusBadge>
                       <StatusBadge>{handoverDisplay.surfaceLabel}</StatusBadge>
                     </div>
@@ -529,14 +553,14 @@ export function HandoverManagerCommandCenter(props: {
                 }
 
                 return (
-                  <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                  <Link key={caseItem.caseId} className={caseLinkCardClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
                     <div>
-                      <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                       <h3>{caseItem.customerName}</h3>
                       <p>{caseItem.nextAction}</p>
-                      <p className="case-link-meta">{handoverDisplay.updatedAt}</p>
+                      <p className={caseMetaClassName}>{handoverDisplay.updatedAt}</p>
                     </div>
-                    <div className="case-link-aside">
+                    <div className={caseLinkAsideClassName}>
                       <StatusBadge tone={handoverDisplay.statusTone}>{handoverDisplay.statusLabel}</StatusBadge>
                       <StatusBadge>{handoverDisplay.surfaceLabel}</StatusBadge>
                     </div>
@@ -565,7 +589,7 @@ export function ManagerWorkspaceGateway(props: {
   const currentRoleLabel = getOperatorRoleLabel(props.locale, props.currentOperatorRole);
 
   return (
-    <div className="page-stack">
+    <div className={pageStackClassName}>
       <ScreenIntro
         badge={messages.manager.title}
         summary={
@@ -577,18 +601,18 @@ export function ManagerWorkspaceGateway(props: {
       />
 
       <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-        <div className="page-stack">
-          <p className="panel-summary">
+        <div className={pageStackClassName}>
+          <p className={panelSummaryClassName}>
             {props.locale === "ar"
               ? `يعمل مدخل الإدارة الآن بدور ${currentRoleLabel}. بما أن هذا الدور يملك أكثر من مساحة إدارية، فقد تم إبقاء هذا المسار كبوابة اختيار واضحة.`
               : `The manager entry is currently running as ${currentRoleLabel}. Because this role can operate more than one manager surface, this route now acts as an explicit workspace gateway.`}
           </p>
-          <div className="status-row-wrap">
+          <div className={statusRowWrapClassName}>
             <StatusBadge>{currentRoleLabel}</StatusBadge>
             <StatusBadge tone="success">{getManagerWorkspaceCopy(props.locale, "manager_revenue").title}</StatusBadge>
             <StatusBadge tone="success">{getManagerWorkspaceCopy(props.locale, "manager_handover").title}</StatusBadge>
           </div>
-          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+          <Link className={inlineLinkClassName} href={`/${props.locale}/manager/governance`}>
             {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
           </Link>
         </div>
@@ -596,13 +620,13 @@ export function ManagerWorkspaceGateway(props: {
 
       {props.persistedCases.length > 0 ? (
         <Panel title={props.locale === "ar" ? "ضغط الحوكمة الحالي" : "Current governance pressure"}>
-          <div className="page-stack">
-            <p className="panel-summary">
+          <div className={pageStackClassName}>
+            <p className={panelSummaryClassName}>
               {props.locale === "ar"
                 ? `${governanceSummary.totalAttentionCasesCount} عنصر حوكمة مفتوح عبر الإيرادات والتسليم، منها ${governanceSummary.pendingCasesCount} بانتظار القرار و${governanceSummary.followUpRequiredCasesCount} تحتاج تصحيحاً.`
                 : `${governanceSummary.totalAttentionCasesCount} governance items are open across revenue and handover, with ${governanceSummary.pendingCasesCount} waiting for a decision and ${governanceSummary.followUpRequiredCasesCount} needing corrective follow-up.`}
             </p>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               <StatusBadge tone="critical">
                 {props.locale === "ar" ? `${governanceSummary.pendingCasesCount} بانتظار المراجعة` : `${governanceSummary.pendingCasesCount} pending`}
               </StatusBadge>
@@ -626,18 +650,18 @@ export function ManagerWorkspaceGateway(props: {
               ) : null}
             </div>
           {canAccessQaWorkspace ? (
-            <Link className="inline-link" href={`/${props.locale}/qa`}>
+            <Link className={inlineLinkClassName} href={`/${props.locale}/qa`}>
               {props.locale === "ar" ? "فتح مركز الجودة" : "Open QA review center"}
             </Link>
           ) : null}
-          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+          <Link className={inlineLinkClassName} href={`/${props.locale}/manager/governance`}>
             {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
           </Link>
         </div>
       </Panel>
       ) : null}
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "اتجاه الحوكمة لسبعة أيام" : "7-day governance trend"}>
           <GovernanceActivityPanel
             emptySummary={
@@ -665,7 +689,7 @@ export function ManagerWorkspaceGateway(props: {
         </Panel>
       </div>
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <WorkspaceAccessPanel
           actionHref={getManagerWorkspacePath(props.locale, "manager_revenue")}
           actionLabel={props.locale === "ar" ? "فتح قيادة الإيرادات" : "Open revenue command center"}
@@ -715,7 +739,7 @@ export function ManagerWorkspaceUnavailable(props: {
   const fallbackAction = getManagerWorkspaceFallbackAction(props.locale, props.currentOperatorRole);
 
   return (
-    <div className="page-stack">
+    <div className={pageStackClassName}>
       <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
       <WorkspaceAccessPanel
         actionHref={fallbackAction.href}
@@ -814,17 +838,17 @@ export function RevenueManagerCommandCenter(props: {
 
   if (props.persistedCases.length === 0) {
     return (
-      <div className="page-stack">
+      <div className={pageStackClassName}>
         <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
 
         <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-          <div className="page-stack">
-            <p className="panel-summary">
+          <div className={pageStackClassName}>
+            <p className={panelSummaryClassName}>
               {props.locale === "ar"
                 ? `يعمل هذا المركز بدور ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)} مع طابور متابعة تجريبي جاهز للتحول إلى بيانات حية.`
                 : `This command center is running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)} with a fixture-backed follow-up queue ready to move onto live data.`}
             </p>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               <StatusBadge>{getOperatorRoleLabel(props.locale, props.currentOperatorRole)}</StatusBadge>
               {managerCapabilities.canManageFollowUp ? (
                 <StatusBadge tone="success">{props.locale === "ar" ? "المتابعة" : "Follow-up"}</StatusBadge>
@@ -833,29 +857,29 @@ export function RevenueManagerCommandCenter(props: {
           </div>
         </Panel>
 
-        <div className="metric-grid">
-          <article className="metric-tile metric-tile-ocean">
-            <p className="metric-label">{props.locale === "ar" ? "تنبيهات الإدارة" : "Manager alerts"}</p>
-            <p className="metric-value">{demoDataset.managerAlerts.length}</p>
-            <p className="metric-detail">
+        <div className={metricGridClassName}>
+          <article className={metricTileClassName("ocean")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "تنبيهات الإدارة" : "Manager alerts"}</p>
+            <p className={metricValueClassName}>{demoDataset.managerAlerts.length}</p>
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "تنبيهات مزروعة لإثبات وضوح طوابير التدخل التجاري."
                 : "Fixture alerts proving the intended commercial intervention queue."}
             </p>
           </article>
-          <article className="metric-tile metric-tile-sand">
-            <p className="metric-label">{props.locale === "ar" ? "حالات مرتبطة" : "Linked cases"}</p>
-            <p className="metric-value">{demoDataset.cases.length}</p>
-            <p className="metric-detail">
+          <article className={metricTileClassName("sand")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "حالات مرتبطة" : "Linked cases"}</p>
+            <p className={metricValueClassName}>{demoDataset.cases.length}</p>
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "سجل حالات جاهز للانتقال من المتابعة إلى الإجراءات التالية."
                 : "A case list already wired for follow-up ownership and next-step visibility."}
             </p>
           </article>
-          <article className="metric-tile metric-tile-rose">
-            <p className="metric-label">{props.locale === "ar" ? "ضغوط الحوكمة" : "Governance pressure"}</p>
-            <p className="metric-value">0</p>
-            <p className="metric-detail">
+          <article className={metricTileClassName("rose")}>
+            <p className={metricLabelClassName}>{props.locale === "ar" ? "ضغوط الحوكمة" : "Governance pressure"}</p>
+            <p className={metricValueClassName}>0</p>
+            <p className={metricDetailClassName}>
               {props.locale === "ar"
                 ? "ستظهر مراجعات جودة الرسائل هنا عندما تتوفر حالات حيّة محفوظة."
                 : "Conversation-governance holds will surface here once persisted live cases are available."}
@@ -863,15 +887,15 @@ export function RevenueManagerCommandCenter(props: {
           </article>
         </div>
 
-        <div className="two-column-grid">
+        <div className={twoColumnGridClassName}>
           <Panel title={props.locale === "ar" ? "طابور متابعة الإيرادات" : "Revenue follow-up queue"}>
             <StatefulStack
               emptySummary={messages.states.emptyAlertsSummary}
               emptyTitle={messages.states.emptyAlertsTitle}
               items={demoDataset.managerAlerts}
               renderItem={(alert) => (
-                <article key={alert.id} className={`alert-row alert-row-${alert.severity}`}>
-                  <div className="row-between">
+                <article key={alert.id} className={alert.severity === "high" ? criticalAlertCardClassName : alertCardClassName}>
+                  <div className={rowBetweenClassName}>
                     <h3>{getLocalizedText(alert.title, props.locale)}</h3>
                     <StatusBadge tone={alert.severity === "high" ? "critical" : "warning"}>{alert.severity}</StatusBadge>
                   </div>
@@ -887,9 +911,9 @@ export function RevenueManagerCommandCenter(props: {
               emptyTitle={messages.states.emptyCasesTitle}
               items={demoDataset.cases}
               renderItem={(caseItem) => (
-                <Link key={caseItem.id} className="case-link-card" href={`/${props.locale}/leads/${caseItem.id}`}>
+                <Link key={caseItem.id} className={caseLinkCardClassName} href={`/${props.locale}/leads/${caseItem.id}`}>
                   <div>
-                    <p className="case-link-meta">{caseItem.referenceCode}</p>
+                    <p className={caseMetaClassName}>{caseItem.referenceCode}</p>
                     <h3>{caseItem.customerName}</h3>
                     <p>{getLocalizedText(caseItem.nextAction, props.locale)}</p>
                   </div>
@@ -913,7 +937,7 @@ export function RevenueManagerCommandCenter(props: {
           />
         </Panel>
 
-        <div className="two-column-grid">
+        <div className={twoColumnGridClassName}>
           <Panel title={props.locale === "ar" ? "اتجاه جودة المحادثات" : "Conversation QA trend"}>
             <GovernanceActivityPanel
               emptySummary={
@@ -961,28 +985,28 @@ export function RevenueManagerCommandCenter(props: {
   }
 
   return (
-    <div className="page-stack">
+    <div className={pageStackClassName}>
       <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
 
       <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-        <div className="page-stack">
-          <p className="panel-summary">
+        <div className={pageStackClassName}>
+          <p className={panelSummaryClassName}>
             {props.locale === "ar"
               ? `يعمل هذا المركز الآن بدور ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. تمت إزالة طوابير التسليم من هذا المسار حتى تبقى متابعة الإيرادات واضحة وقابلة للتنفيذ.`
               : `This command center is currently running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. Handover queues have moved off this route so revenue follow-up can stay focused and actionable.`}
           </p>
-          <div className="status-row-wrap">
+          <div className={statusRowWrapClassName}>
             <StatusBadge>{getOperatorRoleLabel(props.locale, props.currentOperatorRole)}</StatusBadge>
             {managerCapabilities.canManageFollowUp ? (
               <StatusBadge tone="success">{props.locale === "ar" ? "المتابعة" : "Follow-up"}</StatusBadge>
             ) : null}
           </div>
           {canAccessHandoverManagerWorkspace ? (
-            <Link className="inline-link" href={getManagerWorkspacePath(props.locale, "manager_handover")}>
+            <Link className={inlineLinkClassName} href={getManagerWorkspacePath(props.locale, "manager_handover")}>
               {props.locale === "ar" ? "الانتقال إلى قيادة التسليم" : "Switch to handover command center"}
             </Link>
           ) : null}
-          <Link className="inline-link" href={`/${props.locale}/manager/governance`}>
+          <Link className={inlineLinkClassName} href={`/${props.locale}/manager/governance`}>
             {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
           </Link>
         </div>
@@ -990,8 +1014,8 @@ export function RevenueManagerCommandCenter(props: {
 
       {hasScopedView ? (
         <Panel title={props.locale === "ar" ? "نطاق الطابور الحالي" : "Current queue scope"}>
-          <div className="page-stack" id={revenueManagerFocusedQueueId}>
-            <p className="panel-summary">
+          <div className={pageStackClassName} id={revenueManagerFocusedQueueId}>
+            <p className={panelSummaryClassName}>
               {hasScopedBatchView && revenueScope.batchScope
                 ? props.locale === "ar"
                   ? hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
@@ -1016,7 +1040,7 @@ export function RevenueManagerCommandCenter(props: {
                   ? "يعمل هذا العرض داخل نطاق مخصص لقرار تشغيلي أكثر تركيزاً."
                   : "This view is running inside a narrower operational scope."}
             </p>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               <StatusBadge>
                 {hasScopedBatchView
                   ? props.locale === "ar"
@@ -1067,7 +1091,7 @@ export function RevenueManagerCommandCenter(props: {
               ) : null}
             </div>
             {hasScopedBatchView && revenueScope.batchScope ? (
-              <div className="status-row-wrap">
+              <div className={statusRowWrapClassName}>
                 {revenueScope.batchScope.currentOwnerNames.map((ownerName) => (
                   <StatusBadge key={`${revenueScope.batchScope?.batchId}:${ownerName}`}>{ownerName}</StatusBadge>
                 ))}
@@ -1076,29 +1100,29 @@ export function RevenueManagerCommandCenter(props: {
                 </StatusBadge>
               </div>
             ) : null}
-            <div className="status-row-wrap">
-              <Link className="inline-link" href={clearScopeHref}>
+            <div className={statusRowWrapClassName}>
+              <Link className={inlineLinkClassName} href={clearScopeHref}>
                 {props.locale === "ar" ? "مسح النطاق" : "Clear scope"}
               </Link>
-              <Link className="inline-link" href={operationalRiskReportHref}>
+              <Link className={inlineLinkClassName} href={operationalRiskReportHref}>
                 {props.locale === "ar" ? "العودة إلى تقرير المخاطر التشغيلية" : "Return to operational-risk report"}
               </Link>
               {fullBatchScopeHref ? (
-                <Link className="inline-link" href={fullBatchScopeHref}>
+                <Link className={inlineLinkClassName} href={fullBatchScopeHref}>
                   {props.locale === "ar" ? "فتح كامل الحالات المتأثرة" : "Open full affected-case scope"}
                 </Link>
               ) : null}
               {changedLaterBatchScopeHref ? (
-                <Link className="inline-link" href={changedLaterBatchScopeHref}>
+                <Link className={inlineLinkClassName} href={changedLaterBatchScopeHref}>
                   {props.locale === "ar" ? "فتح كل الحالات التي تغيّرت لاحقاً" : "Open all changed-later cases"}
                 </Link>
               ) : null}
             </div>
             {batchExportOptions.length > 0 ? (
-              <div className="page-stack">
+              <div className={pageStackClassName}>
                 {batchExportOptions.map((option) => (
-                  <div key={`batch-export:${option.recipient}`} className="stack-tight">
-                    <Link className="inline-link" href={option.href}>
+                  <div key={`batch-export:${option.recipient}`} className={stackTightClassName}>
+                    <Link className={inlineLinkClassName} href={option.href}>
                       {getRevenueExportOptionLabel(
                         props.locale,
                         option.recipient,
@@ -1107,14 +1131,14 @@ export function RevenueManagerCommandCenter(props: {
                         batchDriftReasonScopeLabel
                       )}
                     </Link>
-                    <span className="field-note">
+                    <span className={fieldNoteClassName}>
                       {getRevenueExportOptionSummary(props.locale, option.recipient, hasChangedLaterBatchView)}
                     </span>
                   </div>
                 ))}
               </div>
             ) : null}
-            <p className="field-note">
+            <p className={fieldNoteClassName}>
               {hasScopedBatchView
                 ? props.locale === "ar"
                   ? hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
@@ -1132,8 +1156,8 @@ export function RevenueManagerCommandCenter(props: {
                   : "Revenue managers can reassign the owner or save the next follow-up directly from this scope to clear the open intervention."}
             </p>
             {hasScopedBatchView && batchOwnerGroups.length > 0 ? (
-              <div className="page-stack">
-                <p className="case-link-meta">
+              <div className={pageStackClassName}>
+                <p className={caseMetaClassName}>
                   {props.locale === "ar"
                     ? "يتم تجميع الدفعة حسب المالك الحالي حتى يظهر أين انجرفت الحالات بعد إعادة الضبط الجماعي وأين ما زالت تحتاج إجراءً مشتركاً."
                     : "The batch is grouped by current owner so managers can see where cases drifted after the bulk reset and where shared action is still possible."}
@@ -1149,17 +1173,17 @@ export function RevenueManagerCommandCenter(props: {
                   );
 
                   return (
-                    <article key={`${revenueScope.batchScope?.batchId}:${ownerGroup.ownerName}`} className="alert-row alert-row-high">
-                      <div className="row-between">
-                        <div className="stack-tight">
+                    <article key={`${revenueScope.batchScope?.batchId}:${ownerGroup.ownerName}`} className={criticalAlertCardClassName}>
+                      <div className={rowBetweenClassName}>
+                        <div className={stackTightClassName}>
                           <h3>{ownerGroup.ownerName}</h3>
-                          <p className="case-link-meta">
+                          <p className={caseMetaClassName}>
                             {props.locale === "ar"
                               ? `${ownerGroup.caseCount} حالات من هذه الدفعة تحت هذا المالك الآن`
                               : `${ownerGroup.caseCount} batch cases now sit with this owner`}
                           </p>
                         </div>
-                        <div className="status-row-wrap">
+                        <div className={statusRowWrapClassName}>
                           <StatusBadge tone={ownerGroup.stillEscalatedCaseCount > 0 ? "warning" : "success"}>
                             {props.locale === "ar"
                               ? `${ownerGroup.stillEscalatedCaseCount} ما زالت متصاعدة`
@@ -1172,9 +1196,9 @@ export function RevenueManagerCommandCenter(props: {
                           </StatusBadge>
                         </div>
                       </div>
-                      <div className="status-row-wrap">
+                      <div className={statusRowWrapClassName}>
                         <Link
-                          className="inline-link"
+                          className={inlineLinkClassName}
                           href={buildRevenueManagerHref(
                             props.locale,
                             {
@@ -1188,8 +1212,8 @@ export function RevenueManagerCommandCenter(props: {
                         </Link>
                       </div>
                       {stillEscalatedCases.length > 1 ? (
-                        <div className="bulk-follow-up-shell">
-                          <p className="case-link-meta">
+                        <div className={bulkFollowUpShellClassName}>
+                          <p className={caseMetaClassName}>
                             {props.locale === "ar"
                               ? "يمكن تطبيق إعادة ضبط جماعية جديدة فقط على الحالات المتصاعدة التي ما زالت تحت هذا المالك الحالي."
                               : "A fresh bulk reset can be applied only to the still-escalated cases that currently sit with this owner."}
@@ -1208,13 +1232,13 @@ export function RevenueManagerCommandCenter(props: {
                           />
                         </div>
                       ) : stillEscalatedCases.length === 1 ? (
-                        <p className="case-link-meta">
+                        <p className={caseMetaClassName}>
                           {props.locale === "ar"
                             ? "تبقى حالة واحدة متصاعدة فقط تحت هذا المالك، لذا يظهر إجراء المتابعة الفردي في قائمة الحالات أدناه."
                             : "Only one escalated case remains under this owner, so the individual follow-up form stays on the case list below."}
                         </p>
                       ) : (
-                        <p className="case-link-meta">
+                        <p className={caseMetaClassName}>
                           {props.locale === "ar"
                             ? "كل حالات هذه المجموعة خرجت من المخاطرة الحالية ولا تحتاج إعادة ضبط جماعية جديدة."
                             : "Every case in this owner group is already clear of the current risk, so no new bulk reset is needed here."}
@@ -1226,17 +1250,17 @@ export function RevenueManagerCommandCenter(props: {
               </div>
             ) : null}
             {hasScopedBatchView && props.batchHistory && props.batchHistory.historyCases.length > 0 ? (
-              <div className="page-stack">
-                <div className="row-between">
-                  <div className="stack-tight">
-                    <p className="case-link-meta">{props.locale === "ar" ? "سجل الدفعة داخل المنتج" : "In-product batch history"}</p>
-                    <p className="field-note">
+              <div className={pageStackClassName}>
+                <div className={rowBetweenClassName}>
+                  <div className={stackTightClassName}>
+                    <p className={caseMetaClassName}>{props.locale === "ar" ? "سجل الدفعة داخل المنتج" : "In-product batch history"}</p>
+                    <p className={fieldNoteClassName}>
                       {props.locale === "ar"
                         ? "يعرض هذا السجل إعادة الضبط الجماعية الأصلية ثم أي تحديثات متابعة لاحقة على الحالات المتأثرة نفسها."
                         : "This history shows the original bulk reset and any later follow-up saves on the same affected cases."}
                     </p>
                   </div>
-                  <div className="status-row-wrap">
+                  <div className={statusRowWrapClassName}>
                     <StatusBadge>
                       {props.locale === "ar"
                         ? `${props.batchHistory.casesWithHistoryCount} حالات بسجل`
@@ -1264,13 +1288,13 @@ export function RevenueManagerCommandCenter(props: {
                   </div>
                 </div>
                 {props.batchHistory.historyCases.map((historyCase) => (
-                  <article key={`history:${historyCase.caseId}`} className="alert-row alert-row-medium">
-                    <div className="row-between">
-                      <div className="stack-tight">
+                  <article key={`history:${historyCase.caseId}`} className={alertCardClassName}>
+                    <div className={rowBetweenClassName}>
+                      <div className={stackTightClassName}>
                         <h3>{historyCase.customerName}</h3>
-                        <p className="case-link-meta">{buildCaseReferenceCode(historyCase.caseId)}</p>
+                        <p className={caseMetaClassName}>{buildCaseReferenceCode(historyCase.caseId)}</p>
                       </div>
-                      <div className="status-row-wrap">
+                      <div className={statusRowWrapClassName}>
                         <StatusBadge>{historyCase.currentOwnerName}</StatusBadge>
                         <StatusBadge tone={historyCase.currentRiskStatus === "still_escalated" ? "warning" : "success"}>
                           {historyCase.currentRiskStatus === "still_escalated"
@@ -1283,7 +1307,7 @@ export function RevenueManagerCommandCenter(props: {
                         </StatusBadge>
                       </div>
                     </div>
-                    <div className="page-stack">
+                    <div className={pageStackClassName}>
                       {historyCase.entries.map((entry) => {
                         const savedAt = formatDateTime(entry.createdAt, props.locale);
                         const dueAt = formatDateTime(entry.nextActionDueAt, props.locale);
@@ -1301,8 +1325,8 @@ export function RevenueManagerCommandCenter(props: {
                                 : "Later follow-up update";
 
                         return (
-                          <div key={`${historyCase.caseId}:${entry.createdAt}:${entry.nextAction}`} className="page-stack">
-                            <div className="status-row-wrap">
+                          <div key={`${historyCase.caseId}:${entry.createdAt}:${entry.nextAction}`} className={pageStackClassName}>
+                            <div className={statusRowWrapClassName}>
                               <StatusBadge tone={entry.type === "scoped_batch_reset" ? "success" : "warning"}>{entryLabel}</StatusBadge>
                               <StatusBadge>{entry.ownerName}</StatusBadge>
                               {entry.scopedOwnerName ? <StatusBadge>{entry.scopedOwnerName}</StatusBadge> : null}
@@ -1314,7 +1338,7 @@ export function RevenueManagerCommandCenter(props: {
                                 : `Saved the next step as "${entry.nextAction}", due ${dueAt}.`}
                             </p>
                             {entry.type === "later_bulk_reset" && entry.batchCaseCount ? (
-                              <p className="case-link-meta">
+                              <p className={caseMetaClassName}>
                                 {props.locale === "ar"
                                   ? `جاء هذا الحفظ من دفعة لاحقة على ${entry.batchCaseCount} حالات.`
                                   : `This save came from a later ${entry.batchCaseCount}-case bulk action.`}
@@ -1329,8 +1353,8 @@ export function RevenueManagerCommandCenter(props: {
               </div>
             ) : null}
             {canShowBulkOperationalRiskActioning && props.filters.ownerName ? (
-              <div className="bulk-follow-up-shell">
-                <p className="case-link-meta">
+              <div className={bulkFollowUpShellClassName}>
+                <p className={caseMetaClassName}>
                   {props.locale === "ar"
                     ? "الإجراء الجماعي يبقى محصوراً داخل هذا المالك الحالي نفسه ويستخدم حد خطة المتابعة الموثق نفسه لكل حالة محددة."
                     : "Bulk actioning stays restricted to this current owner scope and uses the same audited follow-up boundary on each selected case."}
@@ -1349,7 +1373,7 @@ export function RevenueManagerCommandCenter(props: {
                 />
               </div>
             ) : null}
-            <p className="field-note">{followUpGuardNote}</p>
+            <p className={fieldNoteClassName}>{followUpGuardNote}</p>
             <StatefulStack
               emptySummary={
                 hasScopedBatchView
@@ -1412,13 +1436,13 @@ export function RevenueManagerCommandCenter(props: {
                 );
 
                 return (
-                  <article key={caseItem.caseId} className="alert-row alert-row-high">
-                    <div className="row-between">
-                      <div className="stack-tight">
+                  <article key={caseItem.caseId} className={criticalAlertCardClassName}>
+                    <div className={rowBetweenClassName}>
+                      <div className={stackTightClassName}>
                         <h3>{caseItem.customerName}</h3>
-                        <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                        <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                       </div>
-                      <div className="status-row-wrap">
+                      <div className={statusRowWrapClassName}>
                         <StatusBadge tone={isStillEscalated ? "warning" : "success"}>{getPersistedFollowUpLabel(props.locale, caseItem)}</StatusBadge>
                         {caseItem.openInterventionsCount > 0 ? (
                           <StatusBadge tone="warning">{getInterventionCountLabel(props.locale, caseItem.openInterventionsCount)}</StatusBadge>
@@ -1440,10 +1464,10 @@ export function RevenueManagerCommandCenter(props: {
                       </div>
                     </div>
                     <p>{caseItem.nextAction}</p>
-                    <div className="stack-tight">
+                    <div className={stackTightClassName}>
                       {hasChangedLaterBatchView && batchDriftReasonSummary ? (
                         <>
-                          <div className="status-row-wrap">
+                          <div className={statusRowWrapClassName}>
                             {driftReasonMatchesScope && batchDriftReasonScopeLabel ? (
                               <StatusBadge tone="warning">{batchDriftReasonScopeLabel}</StatusBadge>
                             ) : null}
@@ -1470,40 +1494,40 @@ export function RevenueManagerCommandCenter(props: {
                               </StatusBadge>
                             ) : null}
                           </div>
-                          <p className="case-link-meta">
+                          <p className={caseMetaClassName}>
                             {props.locale === "ar"
                               ? `آخر سبب انجراف سُجّل ${formatDateTime(batchDriftReasonSummary.latestDriftAt, props.locale)}.`
                               : `Latest drift reason was recorded ${formatDateTime(batchDriftReasonSummary.latestDriftAt, props.locale)}.`}
                           </p>
                         </>
                       ) : null}
-                      <p className="case-link-meta">
+                      <p className={caseMetaClassName}>
                         {caseItem.latestHumanReply?.sentByName}
                         {" · "}
                         {latestHumanReplySentAt}
                       </p>
-                      {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
-                      {latestHumanReplyEscalationLabel ? <p className="case-link-meta">{latestHumanReplyEscalationLabel}</p> : null}
+                      {latestHumanReplyOwnershipLabel ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipLabel}</p> : null}
+                      {latestHumanReplyEscalationLabel ? <p className={caseMetaClassName}>{latestHumanReplyEscalationLabel}</p> : null}
                       {caseItem.latestManagerFollowUp && latestManagerFollowUpLabel && latestManagerFollowUpSavedAt ? (
                         <>
-                          <p className="case-link-meta">
+                          <p className={caseMetaClassName}>
                             {latestManagerFollowUpLabel}
                             {" · "}
                             {caseItem.latestManagerFollowUp.ownerName}
                             {" · "}
                             {latestManagerFollowUpSavedAt}
                           </p>
-                          {latestManagerFollowUpNote ? <p className="case-link-meta">{latestManagerFollowUpNote}</p> : null}
+                          {latestManagerFollowUpNote ? <p className={caseMetaClassName}>{latestManagerFollowUpNote}</p> : null}
                         </>
                       ) : null}
                     </div>
-                    <div className="status-row-wrap">
-                      <Link className="inline-link" href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                    <div className={statusRowWrapClassName}>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
                         {props.locale === "ar" ? "فتح الحالة" : "Open case"}
                       </Link>
                       {hasScopedBatchView && isStillEscalated ? (
                         <Link
-                          className="inline-link"
+                          className={inlineLinkClassName}
                           href={buildRevenueManagerHref(
                             props.locale,
                             {
@@ -1519,8 +1543,8 @@ export function RevenueManagerCommandCenter(props: {
                     </div>
                     {hasScopedBatchView ? (
                       isStillEscalated ? (
-                        <div className="page-stack">
-                          <p className="case-link-meta">{followUpManagerCopy.title}</p>
+                        <div className={pageStackClassName}>
+                          <p className={caseMetaClassName}>{followUpManagerCopy.title}</p>
                           <ManagerFollowUpForm
                             canManage={canManageFollowUp}
                             caseId={caseItem.caseId}
@@ -1533,15 +1557,15 @@ export function RevenueManagerCommandCenter(props: {
                           />
                         </div>
                       ) : (
-                        <p className="case-link-meta">
+                        <p className={caseMetaClassName}>
                           {props.locale === "ar"
                             ? "هذه الحالة خرجت من المخاطرة بعد الدفعة الأخيرة ولا تحتاج إعادة تعيين متابعة الآن."
                             : "This case is now clear after the bulk batch and does not need another follow-up reset right now."}
                         </p>
                       )
                     ) : (
-                      <div className="page-stack">
-                        <p className="case-link-meta">{followUpManagerCopy.title}</p>
+                      <div className={pageStackClassName}>
+                        <p className={caseMetaClassName}>{followUpManagerCopy.title}</p>
                         <ManagerFollowUpForm
                           canManage={canManageFollowUp}
                           caseId={caseItem.caseId}
@@ -1562,74 +1586,74 @@ export function RevenueManagerCommandCenter(props: {
         </Panel>
       ) : null}
 
-      <div className="metric-grid">
-        <article className="metric-tile metric-tile-ocean">
-          <p className="metric-label">{props.locale === "ar" ? "طابور المتابعة" : "Follow-up queue"}</p>
-          <p className="metric-value">{revenueAttentionCases.length}</p>
-          <p className="metric-detail">
+      <div className={metricGridClassName}>
+        <article className={metricTileClassName("ocean")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "طابور المتابعة" : "Follow-up queue"}</p>
+          <p className={metricValueClassName}>{revenueAttentionCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "حالات تجاوزت مواعيد المتابعة أو تحتوي على تدخلات مفتوحة."
               : "Cases with overdue follow-up or open manager interventions."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-sand">
-          <p className="metric-label">{props.locale === "ar" ? "التدخلات المفتوحة" : "Open interventions"}</p>
-          <p className="metric-value">{openInterventionsCount}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("sand")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "التدخلات المفتوحة" : "Open interventions"}</p>
+          <p className={metricValueClassName}>{openInterventionsCount}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "إجمالي التدخلات غير المحلولة عبر الحالات الحية."
               : "The total unresolved intervention count across live cases."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "الأتمتة المتوقفة" : "Paused automation"}</p>
-          <p className="metric-value">{pausedAutomationCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("rose")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "الأتمتة المتوقفة" : "Paused automation"}</p>
+          <p className={metricValueClassName}>{pausedAutomationCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "حالات أوقفت فيها الأتمتة بقرار إداري واضح."
               : "Cases where automation was paused behind an explicit managerial decision."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-sand">
-          <p className="metric-label">{props.locale === "ar" ? "أتمتة معلقة بالجودة" : "QA-held automation"}</p>
-          <p className="metric-value">{governanceHeldAutomationCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("sand")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "أتمتة معلقة بالجودة" : "QA-held automation"}</p>
+          <p className={metricValueClassName}>{governanceHeldAutomationCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "حالات لا تستطيع فيها المتابعة التلقائية الاستمرار حتى تُغلق مراجعة الجودة الحالية."
               : "Cases where follow-up automation is blocked until the current QA boundary is cleared."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-mint">
-          <p className="metric-label">{props.locale === "ar" ? "حوكمة المحادثات" : "Conversation governance"}</p>
-          <p className="metric-value">{governanceSummary.revenueAttentionCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("mint")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "حوكمة المحادثات" : "Conversation governance"}</p>
+          <p className={metricValueClassName}>{governanceSummary.revenueAttentionCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "حالات ما زالت رسائلها داخل مراجعة الجودة أو تحتاج متابعة تصحيحية."
               : "Cases whose customer-facing message state is still blocked on QA or needs corrective follow-up."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "مراجعات قديمة" : "Stale pending QA"}</p>
-          <p className="metric-value">{governanceSummary.stalePendingCasesCount}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("rose")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "مراجعات قديمة" : "Stale pending QA"}</p>
+          <p className={metricValueClassName}>{governanceSummary.stalePendingCasesCount}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "مراجعات جودة معلقة لأكثر من يوم وقد تحتاج تصعيداً من الإدارة."
               : "QA items that have been pending for more than a day and may need managerial escalation."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-ocean">
-          <p className="metric-label">{props.locale === "ar" ? "تسليمات ما بعد الرد" : "Post-reply handoffs"}</p>
-          <p className="metric-value">{postReplyHandoffCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("ocean")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "تسليمات ما بعد الرد" : "Post-reply handoffs"}</p>
+          <p className={metricValueClassName}>{postReplyHandoffCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "حالات أرسل فيها شخص آخر آخر رد بشري ثم انتقلت المتابعة الحالية إلى مالك مختلف."
               : "Cases where the latest human reply was sent by one operator and the active follow-up now sits with a different owner."}
           </p>
         </article>
-        <article className="metric-tile metric-tile-rose">
-          <p className="metric-label">{props.locale === "ar" ? "تسليمات متصاعدة" : "Escalated handoffs"}</p>
-          <p className="metric-value">{escalatedPostReplyHandoffCases.length}</p>
-          <p className="metric-detail">
+        <article className={metricTileClassName("rose")}>
+          <p className={metricLabelClassName}>{props.locale === "ar" ? "تسليمات متصاعدة" : "Escalated handoffs"}</p>
+          <p className={metricValueClassName}>{escalatedPostReplyHandoffCases.length}</p>
+          <p className={metricDetailClassName}>
             {props.locale === "ar"
               ? "تسليمات بعد الرد أصبحت الآن متأخرة أو عليها تدخل إداري مفتوح."
               : "Post-reply handoffs that are already overdue or carrying open managerial intervention pressure."}
@@ -1637,7 +1661,7 @@ export function RevenueManagerCommandCenter(props: {
         </article>
       </div>
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "طابور متابعة الإيرادات" : "Revenue follow-up queue"}>
           <StatefulStack
             emptySummary={messages.states.emptyAlertsSummary}
@@ -1666,13 +1690,13 @@ export function RevenueManagerCommandCenter(props: {
               );
 
               return (
-                <article key={caseItem.caseId} className="alert-row alert-row-high">
-                  <div className="row-between">
-                    <div className="stack-tight">
+                <article key={caseItem.caseId} className={criticalAlertCardClassName}>
+                  <div className={rowBetweenClassName}>
+                    <div className={stackTightClassName}>
                       <h3>{caseItem.customerName}</h3>
-                      <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                     </div>
-                    <div className="status-row-wrap">
+                    <div className={statusRowWrapClassName}>
                       <StatusBadge tone={caseItem.followUpStatus === "attention" ? "critical" : "warning"}>
                         {getPersistedFollowUpLabel(props.locale, caseItem)}
                       </StatusBadge>
@@ -1685,42 +1709,42 @@ export function RevenueManagerCommandCenter(props: {
                   </div>
                   <p>{caseItem.nextAction}</p>
                   {caseItem.latestHumanReply ? (
-                    <div className="stack-tight">
-                      <p className="case-link-meta">
+                    <div className={stackTightClassName}>
+                      <p className={caseMetaClassName}>
                         {latestHumanReplyLabel}
                         {" · "}
                         {caseItem.latestHumanReply.sentByName}
                         {" · "}
                         {latestHumanReplySentAt}
                       </p>
-                      {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
-                      {latestHumanReplyEscalationLabel ? <p className="case-link-meta">{latestHumanReplyEscalationLabel}</p> : null}
+                      {latestHumanReplyOwnershipLabel ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipLabel}</p> : null}
+                      {latestHumanReplyEscalationLabel ? <p className={caseMetaClassName}>{latestHumanReplyEscalationLabel}</p> : null}
                     </div>
                   ) : null}
                   {caseItem.latestManagerFollowUp && latestManagerFollowUpLabel && latestManagerFollowUpSavedAt ? (
-                    <div className="stack-tight">
-                      <p className="case-link-meta">
+                    <div className={stackTightClassName}>
+                      <p className={caseMetaClassName}>
                         {latestManagerFollowUpLabel}
                         {" · "}
                         {caseItem.latestManagerFollowUp.ownerName}
                         {" · "}
                         {latestManagerFollowUpSavedAt}
                       </p>
-                      {latestManagerFollowUpNote ? <p className="case-link-meta">{latestManagerFollowUpNote}</p> : null}
+                      {latestManagerFollowUpNote ? <p className={caseMetaClassName}>{latestManagerFollowUpNote}</p> : null}
                     </div>
                   ) : null}
-                  <p className="case-link-meta">{formatCaseLastChange(caseItem, props.locale)}</p>
-                  <div className="status-row-wrap">
+                  <p className={caseMetaClassName}>{formatCaseLastChange(caseItem, props.locale)}</p>
+                  <div className={statusRowWrapClassName}>
                     <StatusBadge>{getPersistedAutomationLabel(props.locale, caseItem.automationStatus)}</StatusBadge>
                     {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
                     <StatusBadge>{getPersistedCaseStageLabel(props.locale, caseItem.stage)}</StatusBadge>
                   </div>
-                  <div className="status-row-wrap">
-                    <Link className="inline-link" href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                  <div className={statusRowWrapClassName}>
+                    <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
                       {props.locale === "ar" ? "فتح الحالة" : "Open case"}
                     </Link>
                     {handoverDisplay && canAccessHandoverWorkspace ? (
-                      <Link className="inline-link" href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
                         {props.locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
                       </Link>
                     ) : null}
@@ -1759,38 +1783,38 @@ export function RevenueManagerCommandCenter(props: {
               );
 
               return (
-                <Link key={caseItem.caseId} className="case-link-card" href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                <Link key={caseItem.caseId} className={caseLinkCardClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
                   <div>
-                    <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                    <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                     <h3>{caseItem.customerName}</h3>
                     <p>{caseItem.nextAction}</p>
                     {caseItem.latestHumanReply ? (
-                      <div className="stack-tight">
-                        <p className="case-link-meta">
+                      <div className={stackTightClassName}>
+                        <p className={caseMetaClassName}>
                           {latestHumanReplyLabel}
                           {" · "}
                           {caseItem.latestHumanReply.sentByName}
                           {" · "}
                           {latestHumanReplySentAt}
                         </p>
-                        {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
-                        {latestHumanReplyEscalationLabel ? <p className="case-link-meta">{latestHumanReplyEscalationLabel}</p> : null}
+                        {latestHumanReplyOwnershipLabel ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipLabel}</p> : null}
+                        {latestHumanReplyEscalationLabel ? <p className={caseMetaClassName}>{latestHumanReplyEscalationLabel}</p> : null}
                       </div>
                     ) : null}
                     {caseItem.latestManagerFollowUp && latestManagerFollowUpLabel && latestManagerFollowUpSavedAt ? (
-                      <div className="stack-tight">
-                        <p className="case-link-meta">
+                      <div className={stackTightClassName}>
+                        <p className={caseMetaClassName}>
                           {latestManagerFollowUpLabel}
                           {" · "}
                           {caseItem.latestManagerFollowUp.ownerName}
                           {" · "}
                           {latestManagerFollowUpSavedAt}
                         </p>
-                        {latestManagerFollowUpNote ? <p className="case-link-meta">{latestManagerFollowUpNote}</p> : null}
+                        {latestManagerFollowUpNote ? <p className={caseMetaClassName}>{latestManagerFollowUpNote}</p> : null}
                       </div>
                     ) : null}
                   </div>
-                  <div className="case-link-aside">
+                  <div className={caseLinkAsideClassName}>
                     <StatusBadge tone={caseItem.followUpStatus === "attention" ? "critical" : "success"}>
                       {getPersistedFollowUpLabel(props.locale, caseItem)}
                     </StatusBadge>
@@ -1836,13 +1860,13 @@ export function RevenueManagerCommandCenter(props: {
             );
 
             return (
-              <article key={caseItem.caseId} className="alert-row alert-row-high">
-                <div className="row-between">
-                  <div className="stack-tight">
+              <article key={caseItem.caseId} className={criticalAlertCardClassName}>
+                <div className={rowBetweenClassName}>
+                  <div className={stackTightClassName}>
                     <h3>{caseItem.customerName}</h3>
-                    <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                    <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                   </div>
-                  <div className="status-row-wrap">
+                  <div className={statusRowWrapClassName}>
                     <StatusBadge tone="warning">{getPersistedFollowUpLabel(props.locale, caseItem)}</StatusBadge>
                     {caseItem.openInterventionsCount > 0 ? (
                       <StatusBadge tone="warning">{getInterventionCountLabel(props.locale, caseItem.openInterventionsCount)}</StatusBadge>
@@ -1850,17 +1874,17 @@ export function RevenueManagerCommandCenter(props: {
                   </div>
                 </div>
                 <p>{caseItem.nextAction}</p>
-                <div className="stack-tight">
-                  <p className="case-link-meta">
+                <div className={stackTightClassName}>
+                  <p className={caseMetaClassName}>
                     {caseItem.latestHumanReply?.sentByName}
                     {" · "}
                     {latestHumanReplySentAt}
                   </p>
-                  {latestHumanReplyOwnershipLabel ? <p className="case-link-meta">{latestHumanReplyOwnershipLabel}</p> : null}
-                  {latestHumanReplyEscalationLabel ? <p className="case-link-meta">{latestHumanReplyEscalationLabel}</p> : null}
+                  {latestHumanReplyOwnershipLabel ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipLabel}</p> : null}
+                  {latestHumanReplyEscalationLabel ? <p className={caseMetaClassName}>{latestHumanReplyEscalationLabel}</p> : null}
                 </div>
-                <div className="status-row-wrap">
-                  <Link className="inline-link" href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                <div className={statusRowWrapClassName}>
+                  <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
                     {props.locale === "ar" ? "فتح الحالة" : "Open case"}
                   </Link>
                 </div>
@@ -1871,7 +1895,7 @@ export function RevenueManagerCommandCenter(props: {
       </Panel>
       ) : null}
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "طابور حوكمة الإيرادات" : "Revenue governance queue"}>
           <StatefulStack
             emptySummary={
@@ -1889,13 +1913,13 @@ export function RevenueManagerCommandCenter(props: {
               }
 
               return (
-                <article key={caseItem.caseId} className="alert-row alert-row-high">
-                  <div className="row-between">
-                    <div className="stack-tight">
+                <article key={caseItem.caseId} className={criticalAlertCardClassName}>
+                  <div className={rowBetweenClassName}>
+                    <div className={stackTightClassName}>
                       <h3>{caseItem.customerName}</h3>
-                      <p className="case-link-meta">{buildCaseReferenceCode(caseItem.caseId)}</p>
+                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
                     </div>
-                    <div className="status-row-wrap">
+                    <div className={statusRowWrapClassName}>
                       <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
                       <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
                       <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
@@ -1903,18 +1927,18 @@ export function RevenueManagerCommandCenter(props: {
                   </div>
                   {qaReviewDisplay.draftMessage ? <p>{qaReviewDisplay.draftMessage}</p> : null}
                   <p>{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}</p>
-                  <p className="case-link-meta">{qaReviewDisplay.updatedAt}</p>
-                  <div className="status-row-wrap">
+                  <p className={caseMetaClassName}>{qaReviewDisplay.updatedAt}</p>
+                  <div className={statusRowWrapClassName}>
                     {qaReviewDisplay.policySignalLabels.map((label) => (
                       <StatusBadge key={`${caseItem.caseId}-${label}`}>{label}</StatusBadge>
                     ))}
                   </div>
-                  <div className="status-row-wrap">
-                    <Link className="inline-link" href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                  <div className={statusRowWrapClassName}>
+                    <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
                       {props.locale === "ar" ? "فتح الحالة" : "Open case"}
                     </Link>
                     {canAccessQaWorkspace ? (
-                      <Link className="inline-link" href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
                         {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
                       </Link>
                     ) : null}
@@ -1939,7 +1963,7 @@ export function RevenueManagerCommandCenter(props: {
         </Panel>
       </div>
 
-      <div className="two-column-grid">
+      <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "اتجاه جودة المحادثات" : "Conversation QA trend"}>
           <GovernanceActivityPanel
             emptySummary={
@@ -1984,9 +2008,9 @@ function GovernanceHotspotsPanel(props: {
       renderItem={(signalCount) => (
         <article
           key={`${signalCount.kind}-${signalCount.signal}`}
-          className={signalCount.kind === "handover_customer_update" ? "intervention-row intervention-row-open" : "intervention-row"}
+          className={signalCount.kind === "handover_customer_update" ? interventionOpenCardClassName : interventionCardClassName}
         >
-          <div className="row-between">
+          <div className={rowBetweenClassName}>
             <h3>{getGovernanceSignalLabel(props.locale, signalCount)}</h3>
             <StatusBadge tone={signalCount.count > 1 ? "critical" : "warning"}>{signalCount.count}</StatusBadge>
           </div>
@@ -2025,10 +2049,10 @@ function GovernanceActivityPanel(props: {
       emptyTitle={props.emptyTitle}
       items={props.items}
       renderItem={(item) => (
-        <article key={item.date} className="intervention-row">
-          <div className="row-between">
+        <article key={item.date} className={interventionCardClassName}>
+          <div className={rowBetweenClassName}>
             <h3>{formatShortDate(`${item.date}T00:00:00.000Z`, props.locale)}</h3>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               <StatusBadge tone={item.openedCount > item.resolvedCount ? "warning" : "success"}>
                 {props.locale === "ar" ? `${item.openedCount} فتحت` : `${item.openedCount} opened`}
               </StatusBadge>
@@ -2075,13 +2099,13 @@ function GovernanceRecentEventsPanel(props: {
           event.status === "approved" ? "success" : event.status === "follow_up_required" ? "warning" : ("critical" as const);
 
         return (
-          <article key={`${event.caseId}-${event.createdAt}-${event.kind}-${event.action}`} className="intervention-row">
-            <div className="row-between">
-              <div className="stack-tight">
+          <article key={`${event.caseId}-${event.createdAt}-${event.kind}-${event.action}`} className={interventionCardClassName}>
+            <div className={rowBetweenClassName}>
+              <div className={stackTightClassName}>
                 <h3>{event.customerName}</h3>
-                <p className="case-link-meta">{formatDateTime(event.createdAt, props.locale)}</p>
+                <p className={caseMetaClassName}>{formatDateTime(event.createdAt, props.locale)}</p>
               </div>
-              <div className="status-row-wrap">
+              <div className={statusRowWrapClassName}>
                 <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
                 {event.subjectType && event.kind === "handover_customer_update" ? (
                   <StatusBadge>
@@ -2094,7 +2118,7 @@ function GovernanceRecentEventsPanel(props: {
               </div>
             </div>
             <p>{getGovernanceRecentEventSummary(props.locale, event)}</p>
-            <div className="status-row-wrap">
+            <div className={statusRowWrapClassName}>
               {event.policySignals.map((signal) => (
                 <StatusBadge key={`${event.caseId}-${event.createdAt}-${signal}`}>
                   {getGovernanceSignalLabel(props.locale, {
