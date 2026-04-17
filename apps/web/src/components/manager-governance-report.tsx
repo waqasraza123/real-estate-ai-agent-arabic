@@ -10,7 +10,6 @@ import {
   type SupportedLocale
 } from "@real-estate-ai/contracts";
 import {
-  cx,
   dataTableCellClassName,
   dataTableClassName,
   dataTableHeaderCellClassName,
@@ -31,6 +30,7 @@ import {
   twoColumnGridClassName
 } from "@real-estate-ai/ui";
 
+import { SegmentedLinkTabs } from "@/components/segmented-link-tabs";
 import { ScreenIntro } from "@/components/screen-intro";
 import type { ExportRecipient } from "@/lib/export-summary";
 import { formatDateTime } from "@/lib/format";
@@ -232,10 +232,9 @@ export function ManagerGovernanceReport(props: {
       <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "فلاتر سريعة" : "Quick filters"}>
           <div className={pageStackClassName}>
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={props.view}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, props.filters, "blended", {
                     exportRecipient: props.exportRecipient
@@ -261,10 +260,9 @@ export function ManagerGovernanceReport(props: {
               title={props.locale === "ar" ? "وضع التقرير" : "Report mode"}
             />
 
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={String(props.filters.windowDays)}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 7 }, props.view, {
                     exportRecipient: props.exportRecipient
@@ -291,10 +289,9 @@ export function ManagerGovernanceReport(props: {
             />
 
             {showQaHistory ? (
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={props.filters.kind ?? "all"}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: undefined }, props.view, {
                     exportRecipient: props.exportRecipient
@@ -325,10 +322,9 @@ export function ManagerGovernanceReport(props: {
             ) : null}
 
             {showQaHistory ? (
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={props.filters.status ?? "all"}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, { ...props.filters, status: undefined }, props.view, {
                     exportRecipient: props.exportRecipient
@@ -369,10 +365,9 @@ export function ManagerGovernanceReport(props: {
             ) : null}
 
             {showQaHistory ? (
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={props.filters.subjectType ?? "all"}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: undefined }, props.view, {
                     exportRecipient: props.exportRecipient
@@ -458,10 +453,9 @@ export function ManagerGovernanceReport(props: {
                 </StatusBadge>
               ) : null}
             </div>
-            <FilterTabs
+            <SegmentedLinkTabs
               activeValue={props.exportRecipient}
-              locale={props.locale}
-              options={[
+              items={[
                 {
                   href: buildGovernanceReportHref(props.locale, props.filters, props.view, { exportRecipient: "manager" }),
                   label: props.locale === "ar" ? "إدارة" : "Manager",
@@ -1016,39 +1010,6 @@ export function ManagerGovernanceReport(props: {
         )}
       </Panel>
       ) : null}
-    </div>
-  );
-}
-
-function FilterTabs(props: {
-  activeValue: string;
-  locale: SupportedLocale;
-  options: Array<{
-    href: string;
-    label: string;
-    value: string;
-  }>;
-  title: string;
-}) {
-  return (
-    <div className={pageStackClassName}>
-      <p className={panelSummaryClassName}>{props.title}</p>
-      <div className="flex flex-wrap items-center gap-2 rounded-full border border-canvas-line/80 bg-white/80 p-1 shadow-panel">
-        {props.options.map((option) => (
-          <Link
-            key={`${props.title}:${option.value}`}
-            className={cx(
-              "inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition",
-              option.value === props.activeValue
-                ? "bg-brand-600 text-white shadow-brand-glow"
-                : "text-ink-soft hover:bg-brand-50 hover:text-brand-700"
-            )}
-            href={option.href}
-          >
-            {option.label}
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

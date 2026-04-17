@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type { SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
-import { cx } from "@real-estate-ai/ui";
+
+import { SegmentedLinkTabs } from "@/components/segmented-link-tabs";
 
 export function CaseRouteTabs(props: {
   caseId: string;
@@ -42,20 +42,5 @@ export function CaseRouteTabs(props: {
     label: string;
   }>;
 
-  return (
-    <nav className="flex flex-wrap items-center gap-2 rounded-full border border-canvas-line/80 bg-white/80 p-1 shadow-panel">
-      {tabs.map((tab) => (
-        <Link
-          key={tab.href}
-          className={cx(
-            "inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition",
-            pathname === tab.href ? "bg-brand-600 text-white shadow-brand-glow" : "text-ink-soft hover:bg-brand-50 hover:text-brand-700"
-          )}
-          href={tab.href}
-        >
-          {tab.label}
-        </Link>
-      ))}
-    </nav>
-  );
+  return <SegmentedLinkTabs activeValue={pathname} items={tabs.map((tab) => ({ ...tab, value: tab.href }))} />;
 }

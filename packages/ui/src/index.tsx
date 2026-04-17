@@ -107,6 +107,14 @@ export const dataTableCellClassName = "border-b border-canvas-line/80 px-0 py-4 
 export const tableLinkClassName = "group inline-flex flex-col gap-1 transition duration-200 hover:-translate-y-0.5";
 export const tableLinkTitleClassName = "text-sm font-semibold text-ink";
 export const tableLinkMetaClassName = "text-sm text-ink-muted [unicode-bidi:plaintext]";
+export const segmentedLinkTabsClassName =
+  "flex flex-wrap items-center gap-2 rounded-full border border-canvas-line/80 bg-white/80 p-1 shadow-panel";
+export function segmentedLinkTabClassName(active: boolean) {
+  return cx(
+    "inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition",
+    active ? "bg-brand-600 text-white shadow-brand-glow" : "text-ink-soft hover:bg-brand-50 hover:text-brand-700"
+  );
+}
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 rounded-full text-sm font-semibold transition duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-55",
@@ -261,6 +269,42 @@ export function Panel(props: {
       {props.title ? <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-ink">{props.title}</h2> : null}
       {props.children}
     </section>
+  );
+}
+
+export function DetailGrid(props: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cx(detailGridClassName, props.className)}>{props.children}</div>;
+}
+
+export function DetailItem(props: {
+  className?: string;
+  label: string;
+  span?: "default" | "full";
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className={cx(props.span === "full" ? fieldSpanFullClassName : undefined, props.className)}>
+      <p className={detailLabelClassName}>{props.label}</p>
+      <div className={cx(detailValueClassName, props.valueClassName)}>{props.value}</div>
+    </div>
+  );
+}
+
+export function DetailListItem(props: {
+  className?: string;
+  label: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className={props.className}>
+      <dt className={detailLabelClassName}>{props.label}</dt>
+      <dd className={cx(detailValueClassName, props.valueClassName)}>{props.value}</dd>
+    </div>
   );
 }
 

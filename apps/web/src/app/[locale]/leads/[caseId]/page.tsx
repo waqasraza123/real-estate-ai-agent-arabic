@@ -10,6 +10,9 @@ import {
   criticalAlertCardClassName,
   detailGridClassName,
   detailLabelClassName,
+  DetailGrid,
+  DetailItem,
+  DetailListItem,
   detailListClassName,
   inlineLinkClassName,
   pageStackClassName,
@@ -148,32 +151,14 @@ export default async function LeadProfilePage(props: PageProps) {
 
         <div className={twoColumnGridClassName}>
           <Panel title={persistedCase.customerName}>
-            <div className={detailGridClassName}>
-              <div>
-                <p className={detailLabelClassName}>{messages.common.stage}</p>
-                <StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>
-              </div>
-              <div>
-                <p className={detailLabelClassName}>{messages.common.currentOwner}</p>
-                <p className="text-sm leading-7 text-ink">{persistedCase.ownerName}</p>
-              </div>
-              <div>
-                <p className={detailLabelClassName}>{messages.common.nextAction}</p>
-                <p className="text-sm leading-7 text-ink">{persistedCase.nextAction}</p>
-              </div>
-              <div>
-                <p className={detailLabelClassName}>{locale === "ar" ? "موعد المتابعة" : "Follow-up due"}</p>
-                <p className="text-sm leading-7 text-ink">{formatDueAt(persistedCase, locale)}</p>
-              </div>
-              <div>
-                <p className={detailLabelClassName}>{messages.common.lastChange}</p>
-                <p className="text-sm leading-7 text-ink">{formatCaseLastChange(persistedCase, locale)}</p>
-              </div>
-              <div>
-                <p className={detailLabelClassName}>{locale === "ar" ? "مصدر الحالة" : "Lead source"}</p>
-                <p className="text-sm leading-7 text-ink">{getPersistedSourceLabel(locale)}</p>
-              </div>
-            </div>
+            <DetailGrid>
+              <DetailItem label={messages.common.stage} value={<StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>} />
+              <DetailItem label={messages.common.currentOwner} value={persistedCase.ownerName} />
+              <DetailItem label={messages.common.nextAction} value={persistedCase.nextAction} />
+              <DetailItem label={locale === "ar" ? "موعد المتابعة" : "Follow-up due"} value={formatDueAt(persistedCase, locale)} />
+              <DetailItem label={messages.common.lastChange} value={formatCaseLastChange(persistedCase, locale)} />
+              <DetailItem label={locale === "ar" ? "مصدر الحالة" : "Lead source"} value={getPersistedSourceLabel(locale)} />
+            </DetailGrid>
             <div className={`mt-5 ${statusRowWrapClassName}`}>
               <StatusBadge tone={persistedCase.followUpStatus === "attention" ? "critical" : "success"}>
                 {getPersistedFollowUpLabel(locale, persistedCase)}
@@ -192,22 +177,10 @@ export default async function LeadProfilePage(props: PageProps) {
 
           <Panel title={locale === "ar" ? "التفاصيل الأساسية" : "Core intake details"}>
             <dl className={detailListClassName}>
-              <div>
-                <dt className={detailLabelClassName}>{locale === "ar" ? "البريد الإلكتروني" : "Email"}</dt>
-                <dd className="mt-1 text-sm leading-7 text-ink">{persistedCase.email}</dd>
-              </div>
-              <div>
-                <dt className={detailLabelClassName}>{locale === "ar" ? "الهاتف" : "Phone"}</dt>
-                <dd className="mt-1 text-sm leading-7 text-ink">{persistedCase.phone ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className={detailLabelClassName}>{locale === "ar" ? "المشروع المطلوب" : "Project interest"}</dt>
-                <dd className="mt-1 text-sm leading-7 text-ink">{persistedCase.projectInterest}</dd>
-              </div>
-              <div>
-                <dt className={detailLabelClassName}>{locale === "ar" ? "لغة العميل" : "Customer language"}</dt>
-                <dd className="mt-1 text-sm leading-7 text-ink">{persistedCase.preferredLocale === "ar" ? "العربية" : "English"}</dd>
-              </div>
+              <DetailListItem label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={persistedCase.email} />
+              <DetailListItem label={locale === "ar" ? "الهاتف" : "Phone"} value={persistedCase.phone ?? "—"} />
+              <DetailListItem label={locale === "ar" ? "المشروع المطلوب" : "Project interest"} value={persistedCase.projectInterest} />
+              <DetailListItem label={locale === "ar" ? "لغة العميل" : "Customer language"} value={persistedCase.preferredLocale === "ar" ? "العربية" : "English"} />
             </dl>
           </Panel>
         </div>

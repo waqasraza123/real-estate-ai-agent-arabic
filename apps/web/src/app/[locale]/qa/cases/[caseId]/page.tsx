@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { canOperatorRoleAccessWorkspace, canOperatorRolePerform, type SupportedLocale } from "@real-estate-ai/contracts";
 import {
   caseMetaClassName,
-  detailGridClassName,
-  detailLabelClassName,
+  DetailGrid,
+  DetailItem,
+  DetailListItem,
   detailListClassName,
   inlineLinkClassName,
   pageStackClassName,
@@ -79,36 +80,26 @@ export default async function QaCaseDetailPage(props: PageProps) {
 
       <div className={twoColumnGridClassName}>
         <Panel title={persistedCase.customerName}>
-          <div className={detailGridClassName}>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "مرحلة الحالة" : "Case stage"}</p>
-              <StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "الحالة الحالية" : "Current state"}</p>
-              <StatusBadge tone={currentQaReview?.statusTone ?? currentCustomerUpdateQaReview?.reviewStatusTone ?? "warning"}>
-                {currentQaReview?.statusLabel ??
-                  currentCustomerUpdateQaReview?.reviewStatusLabel ??
-                  (locale === "ar" ? "لا توجد مراجعة" : "No QA review")}
-              </StatusBadge>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "المالك الحالي" : "Current owner"}</p>
-              <p className="text-sm leading-7 text-ink">{persistedCase.ownerName}</p>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "متابعة الحالة" : "Follow-up health"}</p>
-              <p className="text-sm leading-7 text-ink">{getPersistedFollowUpLabel(locale, persistedCase)}</p>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "آخر تغيير" : "Last change"}</p>
-              <p className="text-sm leading-7 text-ink">{formatCaseLastChange(persistedCase, locale)}</p>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{locale === "ar" ? "المشروع" : "Project"}</p>
-              <p className="text-sm leading-7 text-ink">{persistedCase.projectInterest}</p>
-            </div>
-          </div>
+          <DetailGrid>
+            <DetailItem
+              label={locale === "ar" ? "مرحلة الحالة" : "Case stage"}
+              value={<StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>}
+            />
+            <DetailItem
+              label={locale === "ar" ? "الحالة الحالية" : "Current state"}
+              value={
+                <StatusBadge tone={currentQaReview?.statusTone ?? currentCustomerUpdateQaReview?.reviewStatusTone ?? "warning"}>
+                  {currentQaReview?.statusLabel ??
+                    currentCustomerUpdateQaReview?.reviewStatusLabel ??
+                    (locale === "ar" ? "لا توجد مراجعة" : "No QA review")}
+                </StatusBadge>
+              }
+            />
+            <DetailItem label={locale === "ar" ? "المالك الحالي" : "Current owner"} value={persistedCase.ownerName} />
+            <DetailItem label={locale === "ar" ? "متابعة الحالة" : "Follow-up health"} value={getPersistedFollowUpLabel(locale, persistedCase)} />
+            <DetailItem label={locale === "ar" ? "آخر تغيير" : "Last change"} value={formatCaseLastChange(persistedCase, locale)} />
+            <DetailItem label={locale === "ar" ? "المشروع" : "Project"} value={persistedCase.projectInterest} />
+          </DetailGrid>
           <div className={`mt-5 ${statusRowWrapClassName}`}>
             {currentQaReview ? (
               <>
@@ -147,30 +138,14 @@ export default async function QaCaseDetailPage(props: PageProps) {
                     ))}
                   </div>
                   <dl className={detailListClassName}>
-                    {currentQaReview.draftMessage ? (
-                      <div>
-                        <dt className={detailLabelClassName}>{locale === "ar" ? "الرد المجهز" : "Prepared reply draft"}</dt>
-                        <dd className="mt-1 text-sm leading-7 text-ink">{currentQaReview.draftMessage}</dd>
-                      </div>
-                    ) : null}
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "الجهة الطالبة" : "Requested by"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentQaReview.requestedByName}</dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "الأدلة المطابقة" : "Matched evidence"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">
-                        {currentQaReview.triggerEvidence.length > 0 ? currentQaReview.triggerEvidence.join(", ") : "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "آخر تحديث" : "Last updated"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentQaReview.updatedAt}</dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "قرار المراجع" : "Reviewer decision"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentQaReview.reviewSummary ?? "—"}</dd>
-                    </div>
+                    {currentQaReview.draftMessage ? <DetailListItem label={locale === "ar" ? "الرد المجهز" : "Prepared reply draft"} value={currentQaReview.draftMessage} /> : null}
+                    <DetailListItem label={locale === "ar" ? "الجهة الطالبة" : "Requested by"} value={currentQaReview.requestedByName} />
+                    <DetailListItem
+                      label={locale === "ar" ? "الأدلة المطابقة" : "Matched evidence"}
+                      value={currentQaReview.triggerEvidence.length > 0 ? currentQaReview.triggerEvidence.join(", ") : "—"}
+                    />
+                    <DetailListItem label={locale === "ar" ? "آخر تحديث" : "Last updated"} value={currentQaReview.updatedAt} />
+                    <DetailListItem label={locale === "ar" ? "قرار المراجع" : "Reviewer decision"} value={currentQaReview.reviewSummary ?? "—"} />
                   </dl>
                 </div>
               ) : null}
@@ -187,26 +162,17 @@ export default async function QaCaseDetailPage(props: PageProps) {
                     ))}
                   </div>
                   <dl className={detailListClassName}>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "المسودة المجهزة" : "Prepared draft"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentCustomerUpdateQaReview.deliverySummary ?? "—"}</dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "الأدلة المطابقة" : "Matched evidence"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">
-                        {currentCustomerUpdateQaReview.triggerEvidence.length > 0
+                    <DetailListItem label={locale === "ar" ? "المسودة المجهزة" : "Prepared draft"} value={currentCustomerUpdateQaReview.deliverySummary ?? "—"} />
+                    <DetailListItem
+                      label={locale === "ar" ? "الأدلة المطابقة" : "Matched evidence"}
+                      value={
+                        currentCustomerUpdateQaReview.triggerEvidence.length > 0
                           ? currentCustomerUpdateQaReview.triggerEvidence.join(", ")
-                          : "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "آخر تحديث" : "Last updated"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentCustomerUpdateQaReview.updatedAt}</dd>
-                    </div>
-                    <div>
-                      <dt className={detailLabelClassName}>{locale === "ar" ? "قرار المراجع" : "Reviewer decision"}</dt>
-                      <dd className="mt-1 text-sm leading-7 text-ink">{currentCustomerUpdateQaReview.reviewSummary ?? "—"}</dd>
-                    </div>
+                          : "—"
+                      }
+                    />
+                    <DetailListItem label={locale === "ar" ? "آخر تحديث" : "Last updated"} value={currentCustomerUpdateQaReview.updatedAt} />
+                    <DetailListItem label={locale === "ar" ? "قرار المراجع" : "Reviewer decision"} value={currentCustomerUpdateQaReview.reviewSummary ?? "—"} />
                   </dl>
                 </div>
               ) : null}
