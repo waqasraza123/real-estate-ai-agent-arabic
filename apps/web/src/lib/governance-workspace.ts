@@ -40,6 +40,24 @@ export interface GovernanceOperationalRiskBulkBatch {
   stillEscalatedCaseCount: number;
 }
 
+export type GovernanceOperationalRiskExportScope =
+  | "full_batch"
+  | "changed_later"
+  | "follow_up_only"
+  | "later_bulk_reset_only"
+  | "mixed";
+
+export interface GovernanceOperationalRiskExportCandidate {
+  batchId: string;
+  caseCount: number;
+  priority: "high" | "medium" | "baseline";
+  savedAt: string;
+  scopedOwnerName: string;
+  scope: GovernanceOperationalRiskExportScope;
+  score: number;
+  stillEscalatedCaseCount: number;
+}
+
 export interface GovernanceOperationalRiskBatchDrift {
   casesWithHistoryCount: number;
   casesWithLaterChangesCount: number;
@@ -55,6 +73,7 @@ export interface GovernanceOperationalRiskSummary {
   bulkBatches: GovernanceOperationalRiskBulkBatch[];
   driftedCaseCount: number;
   escalatedReplyHandoffCases: PersistedGovernanceCase[];
+  exportCandidates: GovernanceOperationalRiskExportCandidate[];
   followUpUpdateOnlyDriftCaseCount: number;
   laterBulkResetCount: number;
   laterBulkResetOnlyDriftCaseCount: number;
@@ -244,12 +263,14 @@ export function buildGovernanceOperationalRiskSummary(
     (total, batch) => total + (batch.drift?.postBatchFollowUpUpdateCount ?? 0),
     0
   );
+  const exportCandidates = buildGovernanceOperationalRiskExportCandidates(recentBulkBatches);
 
   return {
     batchesWithDriftCount,
     bulkBatches: recentBulkBatches,
     driftedCaseCount,
     escalatedReplyHandoffCases,
+    exportCandidates,
     followUpUpdateOnlyDriftCaseCount,
     laterBulkResetCount,
     laterBulkResetOnlyDriftCaseCount,
@@ -270,6 +291,88 @@ export function buildGovernanceOperationalRiskSummary(
     postBatchFollowUpUpdateCount,
     totalEscalatedReplyHandoffCount: escalatedReplyHandoffCases.length
   };
+}
+
+function buildGovernanceOperationalRiskExportCandidates(
+  recentBulkBatches: GovernanceOperationalRiskBulkBatch[]
+): GovernanceOperationalRiskExportCandidate[] {
+  return recentBulkBatches
+    .flatMap((batch) => {
+      const candidates: GovernanceOperationalRiskExportCandidate[] = [
+        buildGovernanceOperationalRiskExportCandidate(batch, "full_batch", batch.caseCount)
+      ];
+
+      const drift = batch.drift;
+
+      if (!drift || drift.casesWithLaterChangesCount <= 0) {
+        return candidates;
+      }
+
+      candidates.push(buildGovernanceOperationalRiskExportCandidate(batch, "changed_later", drift.casesWithLaterChangesCount));
+
+      if (drift.followUpUpdateOnlyCaseCount > 0) {
+        candidates.push(buildGovernanceOperationalRiskExportCandidate(batch, "follow_up_only", drift.followUpUpdateOnlyCaseCount));
+      }
+
+      if (drift.laterBulkResetOnlyCaseCount > 0) {
+        candidates.push(
+          buildGovernanceOperationalRiskExportCandidate(batch, "later_bulk_reset_only", drift.laterBulkResetOnlyCaseCount)
+        );
+      }
+
+      if (drift.mixedReasonCaseCount > 0) {
+        candidates.push(buildGovernanceOperationalRiskExportCandidate(batch, "mixed", drift.mixedReasonCaseCount));
+      }
+
+      return candidates;
+    })
+    .sort((left, right) => {
+      if (left.score !== right.score) {
+        return right.score - left.score;
+      }
+
+      if (left.caseCount !== right.caseCount) {
+        return right.caseCount - left.caseCount;
+      }
+
+      return new Date(right.savedAt).getTime() - new Date(left.savedAt).getTime();
+    })
+    .slice(0, 5);
+}
+
+function buildGovernanceOperationalRiskExportCandidate(
+  batch: GovernanceOperationalRiskBulkBatch,
+  scope: GovernanceOperationalRiskExportScope,
+  caseCount: number
+): GovernanceOperationalRiskExportCandidate {
+  const scopeWeight = getGovernanceOperationalRiskExportScopeWeight(scope);
+  const score = scopeWeight + caseCount * 10 + batch.stillEscalatedCaseCount * 3;
+
+  return {
+    batchId: batch.batchId,
+    caseCount,
+    priority: score >= 300 ? "high" : score >= 200 ? "medium" : "baseline",
+    savedAt: batch.savedAt,
+    scopedOwnerName: batch.scopedOwnerName,
+    scope,
+    score,
+    stillEscalatedCaseCount: batch.stillEscalatedCaseCount
+  };
+}
+
+function getGovernanceOperationalRiskExportScopeWeight(scope: GovernanceOperationalRiskExportScope) {
+  switch (scope) {
+    case "mixed":
+      return 300;
+    case "changed_later":
+      return 250;
+    case "follow_up_only":
+      return 220;
+    case "later_bulk_reset_only":
+      return 210;
+    case "full_batch":
+      return 120;
+  }
 }
 
 function buildTopGovernanceSignals(

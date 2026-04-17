@@ -232,6 +232,18 @@ describe("manager governance summary", () => {
     expect(summary.laterBulkResetCount).toBe(0);
     expect(summary.postBatchFollowUpUpdateCount).toBe(0);
     expect(summary.escalatedReplyHandoffCases.map((caseItem) => caseItem.caseId)).toEqual(["handoff-owner-1", "handoff-owner-2"]);
+    expect(summary.exportCandidates).toEqual([
+      {
+        batchId: "33333333-3333-4333-8333-333333333333",
+        caseCount: 3,
+        priority: "baseline",
+        savedAt: "2026-04-13T11:15:00.000Z",
+        scopedOwnerName: "Revenue Ops Queue",
+        score: 156,
+        scope: "full_batch",
+        stillEscalatedCaseCount: 2
+      }
+    ]);
     expect(summary.owners).toEqual([
       {
         escalatedHandoffCount: 2,
@@ -418,6 +430,38 @@ describe("manager governance summary", () => {
         },
         savedAt: "2026-04-13T11:15:00.000Z",
         scopedOwnerName: "Revenue Ops Queue",
+        stillEscalatedCaseCount: 1
+      }
+    ]);
+    expect(summary.exportCandidates).toEqual([
+      {
+        batchId: "33333333-3333-4333-8333-333333333333",
+        caseCount: 1,
+        priority: "high",
+        savedAt: "2026-04-13T11:15:00.000Z",
+        scopedOwnerName: "Revenue Ops Queue",
+        score: 313,
+        scope: "mixed",
+        stillEscalatedCaseCount: 1
+      },
+      {
+        batchId: "33333333-3333-4333-8333-333333333333",
+        caseCount: 1,
+        priority: "medium",
+        savedAt: "2026-04-13T11:15:00.000Z",
+        scopedOwnerName: "Revenue Ops Queue",
+        score: 263,
+        scope: "changed_later",
+        stillEscalatedCaseCount: 1
+      },
+      {
+        batchId: "33333333-3333-4333-8333-333333333333",
+        caseCount: 3,
+        priority: "baseline",
+        savedAt: "2026-04-13T11:15:00.000Z",
+        scopedOwnerName: "Revenue Ops Queue",
+        score: 153,
+        scope: "full_batch",
         stillEscalatedCaseCount: 1
       }
     ]);

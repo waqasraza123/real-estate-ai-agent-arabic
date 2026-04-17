@@ -12,7 +12,11 @@ import {
 import { EmptyState, Panel, StatusBadge } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
-import type { GovernanceOperationalRiskSummary } from "@/lib/governance-workspace";
+import type {
+  GovernanceOperationalRiskExportCandidate,
+  GovernanceOperationalRiskExportScope,
+  GovernanceOperationalRiskSummary
+} from "@/lib/governance-workspace";
 import type { GovernanceReportView } from "@/lib/governance-report";
 import { getOperatorRoleLabel } from "@/lib/operator-role";
 import { buildCaseReferenceCode } from "@/lib/persisted-case-presenters";
@@ -360,6 +364,97 @@ export function ManagerGovernanceReport(props: {
           </div>
         </Panel>
       </div>
+
+      {showOperationalRisk ? (
+      <Panel title={props.locale === "ar" ? "أولويات التصدير المقترحة" : "Recommended export priorities"}>
+        {props.operationalRiskSummary.exportCandidates.length > 0 ? (
+          <div className="page-stack">
+            <p className="panel-summary">
+              {props.locale === "ar"
+                ? "يعرض هذا الملخص أي نطاقات CSV الحية تستحق السحب أولاً قبل فتح صفوف الدفعات، اعتماداً على حجم الانجراف وتعقيد سببه والحالات التي ما زالت متصاعدة."
+                : "This summary ranks which live CSV scopes are worth pulling first before opening batch rows, based on visible drift volume, drift complexity, and cases that are still escalated."}
+            </p>
+            <div className="lead-table-wrapper">
+              <table className="lead-table">
+                <thead>
+                  <tr>
+                    <th>{props.locale === "ar" ? "الأولوية" : "Priority"}</th>
+                    <th>{props.locale === "ar" ? "النطاق المقترح" : "Recommended scope"}</th>
+                    <th>{props.locale === "ar" ? "الحجم" : "Volume"}</th>
+                    <th>{props.locale === "ar" ? "الإجراء" : "Action"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {props.operationalRiskSummary.exportCandidates.map((candidate) => (
+                    <tr key={`${candidate.batchId}:${candidate.scope}`}>
+                      <td data-column-label={props.locale === "ar" ? "الأولوية" : "Priority"}>
+                        <div className="stack-tight">
+                          <StatusBadge tone={getExportCandidateTone(candidate.priority)}>
+                            {getExportCandidatePriorityLabel(props.locale, candidate.priority)}
+                          </StatusBadge>
+                          <span>{new Date(candidate.savedAt).toLocaleString(props.locale)}</span>
+                        </div>
+                      </td>
+                      <td data-column-label={props.locale === "ar" ? "النطاق المقترح" : "Recommended scope"}>
+                        <div className="table-link">
+                          <strong>{getOperationalRiskExportScopeLabel(props.locale, candidate.scope)}</strong>
+                          <span>
+                            {props.locale === "ar"
+                              ? `دفعة ${candidate.scopedOwnerName}`
+                              : `${candidate.scopedOwnerName} batch`}
+                          </span>
+                          <span>
+                            {props.locale === "ar"
+                              ? `الدرجة ${candidate.score}`
+                              : `Score ${candidate.score}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td data-column-label={props.locale === "ar" ? "الحجم" : "Volume"}>
+                        <div className="stack-tight">
+                          <StatusBadge tone={candidate.caseCount > 0 ? "warning" : "neutral"}>
+                            {props.locale === "ar"
+                              ? `${candidate.caseCount} حالات`
+                              : `${candidate.caseCount} cases`}
+                          </StatusBadge>
+                          <StatusBadge tone={candidate.stillEscalatedCaseCount > 0 ? "warning" : "success"}>
+                            {props.locale === "ar"
+                              ? `${candidate.stillEscalatedCaseCount} ما زالت متصاعدة`
+                              : `${candidate.stillEscalatedCaseCount} still escalated`}
+                          </StatusBadge>
+                        </div>
+                      </td>
+                      <td data-column-label={props.locale === "ar" ? "الإجراء" : "Action"}>
+                        <div className="stack-tight">
+                          <Link className="inline-link" href={buildOperationalRiskExportHref(props.locale, candidate)}>
+                            {props.locale === "ar" ? "تنزيل CSV المقترح" : "Download recommended CSV"}
+                          </Link>
+                          <Link
+                            className="inline-link"
+                            href={buildOperationalRiskDrillDownHref(props.locale, candidate)}
+                          >
+                            {props.locale === "ar" ? "فتح نفس النطاق" : "Open same scope"}
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            summary={
+              props.locale === "ar"
+                ? "ستظهر هنا توصيات التصدير عندما تحمل الدفعات الحديثة نطاقات حيّة تستحق السحب أو المراجعة."
+                : "Export recommendations will appear here when recent batches carry live scopes worth pulling or reviewing."
+            }
+            title={props.locale === "ar" ? "لا توجد أولويات تصدير بعد" : "No export priorities yet"}
+          />
+        )}
+      </Panel>
+      ) : null}
 
       {showOperationalRisk ? (
       <Panel title={props.locale === "ar" ? "ضغط تسليمات الردود" : "Reply handoff pressure"}>
@@ -840,6 +935,111 @@ function buildGovernanceExportHref(locale: SupportedLocale, filters: ListGoverna
   }
 
   return `/${locale}/manager/governance/export?${query.toString()}`;
+}
+
+function buildOperationalRiskDrillDownHref(locale: SupportedLocale, candidate: GovernanceOperationalRiskExportCandidate) {
+  const filters =
+    candidate.scope === "full_batch"
+      ? {
+          bulkBatchId: candidate.batchId
+        }
+      : {
+          batchDrift: "changed_later" as const,
+          ...(candidate.scope === "follow_up_only"
+            ? { batchDriftReason: "follow_up_only" as const }
+            : candidate.scope === "later_bulk_reset_only"
+              ? { batchDriftReason: "later_bulk_reset_only" as const }
+              : candidate.scope === "mixed"
+                ? { batchDriftReason: "mixed" as const }
+                : {}),
+          bulkBatchId: candidate.batchId
+        };
+
+  return buildRevenueManagerHref(locale, filters, { hash: revenueManagerFocusedQueueId });
+}
+
+function buildOperationalRiskExportHref(locale: SupportedLocale, candidate: GovernanceOperationalRiskExportCandidate) {
+  const filters =
+    candidate.scope === "full_batch"
+      ? {
+          bulkBatchId: candidate.batchId
+        }
+      : {
+          batchDrift: "changed_later" as const,
+          ...(candidate.scope === "follow_up_only"
+            ? { batchDriftReason: "follow_up_only" as const }
+            : candidate.scope === "later_bulk_reset_only"
+              ? { batchDriftReason: "later_bulk_reset_only" as const }
+              : candidate.scope === "mixed"
+                ? { batchDriftReason: "mixed" as const }
+                : {}),
+          bulkBatchId: candidate.batchId
+        };
+
+  return buildRevenueManagerExportHref(locale, filters);
+}
+
+function getOperationalRiskExportScopeLabel(locale: SupportedLocale, scope: GovernanceOperationalRiskExportScope) {
+  if (locale === "ar") {
+    switch (scope) {
+      case "full_batch":
+        return "كامل الحالات المتأثرة";
+      case "changed_later":
+        return "الحالات التي تغيّرت لاحقاً";
+      case "follow_up_only":
+        return "انجراف المتابعة فقط";
+      case "later_bulk_reset_only":
+        return "انجراف الدفعات فقط";
+      case "mixed":
+        return "انجراف مختلط";
+    }
+  }
+
+  switch (scope) {
+    case "full_batch":
+      return "Full affected cases";
+    case "changed_later":
+      return "Changed-later cases";
+    case "follow_up_only":
+      return "Follow-up-only drift";
+    case "later_bulk_reset_only":
+      return "Bulk-reset-only drift";
+    case "mixed":
+      return "Mixed-reason drift";
+  }
+}
+
+function getExportCandidatePriorityLabel(locale: SupportedLocale, priority: GovernanceOperationalRiskExportCandidate["priority"]) {
+  if (locale === "ar") {
+    switch (priority) {
+      case "high":
+        return "أولوية عالية";
+      case "medium":
+        return "أولوية متوسطة";
+      case "baseline":
+        return "أولوية أساسية";
+    }
+  }
+
+  switch (priority) {
+    case "high":
+      return "High priority";
+    case "medium":
+      return "Medium priority";
+    case "baseline":
+      return "Baseline";
+  }
+}
+
+function getExportCandidateTone(priority: GovernanceOperationalRiskExportCandidate["priority"]) {
+  switch (priority) {
+    case "high":
+      return "warning";
+    case "medium":
+      return "success";
+    case "baseline":
+      return "neutral";
+  }
 }
 
 function getReportViewLabel(locale: SupportedLocale, view: GovernanceReportView) {
