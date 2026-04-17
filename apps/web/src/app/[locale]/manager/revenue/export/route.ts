@@ -59,7 +59,10 @@ export async function GET(request: Request, context: { params: Promise<{ locale:
     });
   }
 
-  const csv = buildRevenueManagerBatchExportCsv(revenueScope);
+  const csv = buildRevenueManagerBatchExportCsv(revenueScope, {
+    filters,
+    locale: locale === "ar" ? "ar" : "en"
+  });
 
   if (!csv) {
     return new Response(locale === "ar" ? "تعذر إنشاء تصدير الدفعة" : "Unable to build batch export", {

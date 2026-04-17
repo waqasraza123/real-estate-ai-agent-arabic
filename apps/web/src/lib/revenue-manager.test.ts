@@ -254,7 +254,28 @@ describe("revenue manager filters", () => {
       }
     ]);
 
-    expect(buildRevenueManagerBatchExportCsv(scope)).toBe(`batchId,batchSavedAt,batchScopedOwnerName,batchVisibleCaseCount,batchStillEscalatedCaseCount,batchClearedCaseCount,currentOwnerName,currentOwnerGroupCaseCount,currentOwnerGroupStillEscalatedCaseCount,currentOwnerGroupClearedCaseCount,riskStatus,customerName,caseReference,caseId,projectInterest,preferredLocale,nextAction,nextActionDueAt,followUpStatus,openInterventionsCount,latestHumanReplySentBy,latestHumanReplySentAt,latestHumanReplyApprovedFromQa,latestManagerFollowUpSavedAt,latestManagerFollowUpOwnerName,latestManagerFollowUpNextAction
+    expect(
+      buildRevenueManagerBatchExportCsv(scope, {
+        filters: {
+          bulkBatchId: batchId
+        },
+        generatedAt: "2026-04-11T12:00:00.000Z",
+        locale: "en"
+      })
+    ).toBe(`section,field,value
+export_summary,generated_at,2026-04-11T12:00:00.000Z
+export_summary,intended_audience,Revenue and operations leadership
+export_summary,risk_posture,Mixed live pressure with cleared cases
+export_summary,selected_scope,Full affected cases
+export_summary,share_summary,"This export keeps the full live batch outcome across 2 cases, including 1 still escalated and 1 now cleared for operational review."
+export_summary,batch_id,33333333-3333-4333-8333-333333333333
+export_summary,batch_saved_at,2026-04-11T11:30:00.000Z
+export_summary,scoped_owner,Revenue Ops Queue
+export_summary,visible_case_count,2
+export_summary,still_escalated_case_count,1
+export_summary,cleared_case_count,1
+
+batchId,batchSavedAt,batchScopedOwnerName,batchVisibleCaseCount,batchStillEscalatedCaseCount,batchClearedCaseCount,currentOwnerName,currentOwnerGroupCaseCount,currentOwnerGroupStillEscalatedCaseCount,currentOwnerGroupClearedCaseCount,riskStatus,customerName,caseReference,caseId,projectInterest,preferredLocale,nextAction,nextActionDueAt,followUpStatus,openInterventionsCount,latestHumanReplySentBy,latestHumanReplySentAt,latestHumanReplyApprovedFromQa,latestManagerFollowUpSavedAt,latestManagerFollowUpOwnerName,latestManagerFollowUpNextAction
 33333333-3333-4333-8333-333333333333,2026-04-11T11:30:00.000Z,Revenue Ops Queue,2,1,1,Manager Desk North,1,1,0,still_escalated,Customer batch-escalated,CASE-BATCH-ES,batch-escalated,Sunrise Residences,en,Next follow-up,2026-04-12T08:00:00.000Z,attention,1,Amina Rahman,2026-04-11T10:00:00.000Z,true,2026-04-11T11:30:00.000Z,Manager Desk North,Reset the desk follow-up
 33333333-3333-4333-8333-333333333333,2026-04-11T11:30:00.000Z,Revenue Ops Queue,2,1,1,Manager Desk South,1,0,1,cleared,Customer batch-cleared,CASE-BATCH-CL,batch-cleared,Sunrise Residences,en,Next follow-up,2026-04-12T08:00:00.000Z,on_track,0,Omar Saleh,2026-04-11T09:30:00.000Z,false,2026-04-11T11:30:00.000Z,Manager Desk North,Reset the desk follow-up`);
   });

@@ -48,6 +48,12 @@ export interface RevenueManagerScope {
   ownerScopedQueues: ReturnType<typeof buildManagerWorkspaceQueues>;
 }
 
+interface RevenueManagerBatchExportOptions {
+  filters?: Partial<RevenueManagerFilters>;
+  generatedAt?: string;
+  locale?: SupportedLocale;
+}
+
 export type RevenueManagerBatchHistoryEntryType = "follow_up_update" | "later_bulk_reset" | "scoped_batch_reset";
 
 export interface RevenueManagerBatchHistoryEntry {
@@ -215,12 +221,16 @@ export function buildRevenueManagerScope(
   };
 }
 
-export function buildRevenueManagerBatchExportCsv(scope: RevenueManagerScope) {
+export function buildRevenueManagerBatchExportCsv(
+  scope: RevenueManagerScope,
+  options: RevenueManagerBatchExportOptions = {}
+) {
   if (!scope.batchScope) {
     return null;
   }
 
   const ownerGroups = new Map(scope.batchOwnerGroups.map((ownerGroup) => [ownerGroup.ownerName, ownerGroup]));
+  const summaryRows = buildRevenueManagerBatchExportSummaryRows(scope, options);
   const headers = [
     "batchId",
     "batchSavedAt",
@@ -288,7 +298,7 @@ export function buildRevenueManagerBatchExportCsv(scope: RevenueManagerScope) {
     ].map((value) => escapeCsvValue(typeof value === "string" ? value : value == null ? "" : String(value)));
   });
 
-  return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  return [...summaryRows, "", headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
 
 export function buildRevenueManagerBatchHistory(
@@ -502,6 +512,170 @@ function buildRevenueManagerSearchParams(filters: Partial<RevenueManagerFilters>
   }
 
   return searchParams;
+}
+
+function buildRevenueManagerBatchExportSummaryRows(
+  scope: RevenueManagerScope,
+  options: RevenueManagerBatchExportOptions
+) {
+  if (!scope.batchScope) {
+    return [];
+  }
+
+  const locale = options.locale ?? "en";
+  const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const audience = getRevenueManagerExportAudience(locale, scope, options.filters);
+  const riskPosture = getRevenueManagerExportRiskPosture(locale, scope);
+  const scopeLabel = getRevenueManagerExportScopeLabel(locale, options.filters);
+  const shareSummary = getRevenueManagerExportShareSummary(locale, scope, options.filters);
+  const rows = [
+    [locale === "ar" ? "القسم" : "section", locale === "ar" ? "الحقل" : "field", locale === "ar" ? "القيمة" : "value"],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "أنشئ في" : "generated_at", generatedAt],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "الجمهور المقصود" : "intended_audience", audience],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "وضع المخاطر" : "risk_posture", riskPosture],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "النطاق المختار" : "selected_scope", scopeLabel],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "خلاصة المشاركة" : "share_summary", shareSummary],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "معرّف الدفعة" : "batch_id", scope.batchScope.batchId],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "حُفظت الدفعة في" : "batch_saved_at", scope.batchScope.savedAt],
+    [locale === "ar" ? "ملخص التصدير" : "export_summary", locale === "ar" ? "نطاق المالك الأصلي" : "scoped_owner", scope.batchScope.scopedOwnerName],
+    [
+      locale === "ar" ? "ملخص التصدير" : "export_summary",
+      locale === "ar" ? "الحالات الظاهرة" : "visible_case_count",
+      String(scope.focusedCases.length)
+    ],
+    [
+      locale === "ar" ? "ملخص التصدير" : "export_summary",
+      locale === "ar" ? "الحالات المتصاعدة" : "still_escalated_case_count",
+      String(scope.batchScope.stillEscalatedCaseCount)
+    ],
+    [
+      locale === "ar" ? "ملخص التصدير" : "export_summary",
+      locale === "ar" ? "الحالات المصفّاة" : "cleared_case_count",
+      String(scope.batchScope.clearedCaseCount)
+    ]
+  ];
+
+  return rows.map((row) => row.map((value) => escapeCsvValue(value)).join(","));
+}
+
+function getRevenueManagerExportAudience(
+  locale: SupportedLocale,
+  scope: RevenueManagerScope,
+  filters?: Partial<RevenueManagerFilters>
+) {
+  if (locale === "ar") {
+    if (filters?.batchDriftReason === "mixed") {
+      return "قيادة الإيرادات مع مراجعة الجودة";
+    }
+
+    if (filters?.batchDrift === "changed_later") {
+      return "قيادة الإيرادات وملاك المتابعة الحاليون";
+    }
+
+    return scope.batchScope && scope.batchScope.stillEscalatedCaseCount > 0 ? "قيادة العمليات والإيرادات" : "مراجعة العمليات";
+  }
+
+  if (filters?.batchDriftReason === "mixed") {
+    return "Revenue leadership and QA follow-up";
+  }
+
+  if (filters?.batchDrift === "changed_later") {
+    return "Revenue managers and current follow-up owners";
+  }
+
+  return scope.batchScope && scope.batchScope.stillEscalatedCaseCount > 0 ? "Revenue and operations leadership" : "Operations review";
+}
+
+function getRevenueManagerExportRiskPosture(locale: SupportedLocale, scope: RevenueManagerScope) {
+  if (!scope.batchScope) {
+    return locale === "ar" ? "غير متاح" : "Unavailable";
+  }
+
+  if (scope.batchScope.stillEscalatedCaseCount > 0 && scope.batchScope.clearedCaseCount > 0) {
+    return locale === "ar" ? "ضغط حي مختلط مع حالات مفلترة" : "Mixed live pressure with cleared cases";
+  }
+
+  if (scope.batchScope.stillEscalatedCaseCount > 0) {
+    return locale === "ar" ? "ضغط حي يتطلب متابعة تشغيلية" : "Live pressure requiring operational follow-up";
+  }
+
+  return locale === "ar" ? "مراجعة استقرار بعد الاحتواء" : "Stability review after containment";
+}
+
+function getRevenueManagerExportScopeLabel(locale: SupportedLocale, filters?: Partial<RevenueManagerFilters>) {
+  if (locale === "ar") {
+    if (filters?.batchDriftReason === "follow_up_only") {
+      return "انجراف المتابعة فقط";
+    }
+
+    if (filters?.batchDriftReason === "later_bulk_reset_only") {
+      return "انجراف الدفعات فقط";
+    }
+
+    if (filters?.batchDriftReason === "mixed") {
+      return "انجراف مختلط";
+    }
+
+    if (filters?.batchDrift === "changed_later") {
+      return "الحالات التي تغيّرت لاحقاً";
+    }
+
+    return "كامل الحالات المتأثرة";
+  }
+
+  if (filters?.batchDriftReason === "follow_up_only") {
+    return "Follow-up-only drift";
+  }
+
+  if (filters?.batchDriftReason === "later_bulk_reset_only") {
+    return "Bulk-reset-only drift";
+  }
+
+  if (filters?.batchDriftReason === "mixed") {
+    return "Mixed-reason drift";
+  }
+
+  if (filters?.batchDrift === "changed_later") {
+    return "Changed-later cases";
+  }
+
+  return "Full affected cases";
+}
+
+function getRevenueManagerExportShareSummary(
+  locale: SupportedLocale,
+  scope: RevenueManagerScope,
+  filters?: Partial<RevenueManagerFilters>
+) {
+  if (!scope.batchScope) {
+    return locale === "ar" ? "لا يوجد نطاق دفعة صالح للمشاركة." : "No valid batch scope is available for sharing.";
+  }
+
+  const visibleCount = scope.focusedCases.length;
+  const stillEscalatedCount = scope.batchScope.stillEscalatedCaseCount;
+  const clearedCount = scope.batchScope.clearedCaseCount;
+
+  if (locale === "ar") {
+    if (filters?.batchDriftReason === "mixed") {
+      return `هذا الملف يركّز على ${visibleCount} حالات تحمل أسباب انجراف مختلطة، منها ${stillEscalatedCount} ما زالت متصاعدة و${clearedCount} خرجت من الخطر داخل النطاق الحالي.`;
+    }
+
+    if (filters?.batchDrift === "changed_later") {
+      return `هذا الملف يحصر ${visibleCount} حالات تغيّرت بعد إعادة الضبط الأصلية، مع ${stillEscalatedCount} حالات ما زالت متصاعدة و${clearedCount} حالات مفلترة داخل العرض الحالي.`;
+    }
+
+    return `هذا الملف يقدّم الأثر الكامل لـ ${visibleCount} حالات حيّة من الدفعة، مع ${stillEscalatedCount} حالات ما زالت متصاعدة و${clearedCount} حالات مفلترة للمراجعة التشغيلية.`;
+  }
+
+  if (filters?.batchDriftReason === "mixed") {
+    return `This export isolates ${visibleCount} mixed-reason drifted cases, including ${stillEscalatedCount} still escalated and ${clearedCount} now cleared inside the current scope.`;
+  }
+
+  if (filters?.batchDrift === "changed_later") {
+    return `This export narrows to ${visibleCount} cases that changed after the original bulk reset, with ${stillEscalatedCount} still escalated and ${clearedCount} now cleared in the visible scope.`;
+  }
+
+  return `This export keeps the full live batch outcome across ${visibleCount} cases, including ${stillEscalatedCount} still escalated and ${clearedCount} now cleared for operational review.`;
 }
 
 function sanitizeOwnerName(ownerName: string | undefined) {
