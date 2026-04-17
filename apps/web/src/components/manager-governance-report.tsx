@@ -17,7 +17,7 @@ import type { GovernanceReportView } from "@/lib/governance-report";
 import { getOperatorRoleLabel } from "@/lib/operator-role";
 import { buildCaseReferenceCode } from "@/lib/persisted-case-presenters";
 import { buildGovernanceReportHref } from "@/lib/governance-report";
-import { buildRevenueManagerHref, revenueManagerFocusedQueueId } from "@/lib/revenue-manager";
+import { buildRevenueManagerExportHref, buildRevenueManagerHref, revenueManagerFocusedQueueId } from "@/lib/revenue-manager";
 
 export function ManagerGovernanceReport(props: {
   currentOperatorRole: OperatorRole;
@@ -328,8 +328,8 @@ export function ManagerGovernanceReport(props: {
             <p className="panel-summary">
               {props.view === "operational_risk"
                 ? props.locale === "ar"
-                  ? "وضع مخاطر التشغيل يعرض ضغط التسليمات الحية فقط. تصدير CSV يبقى مخصصاً لسجل أحداث الجودة التاريخي."
-                  : "Operational risk mode focuses on live handoff pressure only. CSV export remains reserved for historical QA-event reporting."
+                  ? "وضع مخاطر التشغيل يعرض ضغط التسليمات الحية فقط. تصدير CSV على مستوى التقرير يبقى مخصصاً لسجل أحداث الجودة التاريخي، بينما توفّر صفوف الدفعات أدناه تصدير الحالات الحية الدقيقة لكل نطاق دفعة."
+                  : "Operational risk mode focuses on live handoff pressure only. Report-level CSV export remains reserved for historical QA-event reporting, while the bulk rows below can export exact live-case scopes per batch."
                 : props.locale === "ar"
                   ? "نزّل نفس النطاق الحالي كملف CSV لمشاركته مع التشغيل أو المراجعة اليومية دون فقدان سياق الإشارات أو الأدلة."
                   : "Download the current filtered scope as CSV for operations review without losing policy signals, evidence, or reviewer context."}
@@ -345,6 +345,9 @@ export function ManagerGovernanceReport(props: {
                     ? `${filteredCount} صفاً مطابقاً`
                     : `${filteredCount} matching rows`}
               </StatusBadge>
+              {props.view === "operational_risk" ? (
+                <StatusBadge>{props.locale === "ar" ? "تصدير دفعات حيّة متاح" : "Live batch export available"}</StatusBadge>
+              ) : null}
             </div>
             {showQaHistory ? (
               <Link className="inline-link" href={exportHref}>
@@ -555,6 +558,17 @@ export function ManagerGovernanceReport(props: {
                             {props.locale === "ar" ? "فتح الحالات التي تغيّرت لاحقاً" : "Open changed-later cases"}
                           </Link>
                         ) : null}
+                        {batch.drift && batch.drift.casesWithLaterChangesCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerExportHref(props.locale, {
+                              batchDrift: "changed_later",
+                              bulkBatchId: batch.batchId
+                            })}
+                          >
+                            {props.locale === "ar" ? "تنزيل CSV للحالات التي تغيّرت لاحقاً" : "Download changed-later CSV"}
+                          </Link>
+                        ) : null}
                         {batch.drift && batch.drift.followUpUpdateOnlyCaseCount > 0 ? (
                           <Link
                             className="inline-link"
@@ -569,6 +583,18 @@ export function ManagerGovernanceReport(props: {
                             )}
                           >
                             {props.locale === "ar" ? "فتح حالات المتابعة فقط" : "Open follow-up-only cases"}
+                          </Link>
+                        ) : null}
+                        {batch.drift && batch.drift.followUpUpdateOnlyCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerExportHref(props.locale, {
+                              batchDrift: "changed_later",
+                              batchDriftReason: "follow_up_only",
+                              bulkBatchId: batch.batchId
+                            })}
+                          >
+                            {props.locale === "ar" ? "تنزيل CSV للمتابعة فقط" : "Download follow-up-only CSV"}
                           </Link>
                         ) : null}
                         {batch.drift && batch.drift.laterBulkResetOnlyCaseCount > 0 ? (
@@ -587,6 +613,18 @@ export function ManagerGovernanceReport(props: {
                             {props.locale === "ar" ? "فتح حالات الدفعات فقط" : "Open bulk-reset-only cases"}
                           </Link>
                         ) : null}
+                        {batch.drift && batch.drift.laterBulkResetOnlyCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerExportHref(props.locale, {
+                              batchDrift: "changed_later",
+                              batchDriftReason: "later_bulk_reset_only",
+                              bulkBatchId: batch.batchId
+                            })}
+                          >
+                            {props.locale === "ar" ? "تنزيل CSV للدفعات فقط" : "Download bulk-reset-only CSV"}
+                          </Link>
+                        ) : null}
                         {batch.drift && batch.drift.mixedReasonCaseCount > 0 ? (
                           <Link
                             className="inline-link"
@@ -603,6 +641,18 @@ export function ManagerGovernanceReport(props: {
                             {props.locale === "ar" ? "فتح الحالات المختلطة" : "Open mixed-reason cases"}
                           </Link>
                         ) : null}
+                        {batch.drift && batch.drift.mixedReasonCaseCount > 0 ? (
+                          <Link
+                            className="inline-link"
+                            href={buildRevenueManagerExportHref(props.locale, {
+                              batchDrift: "changed_later",
+                              batchDriftReason: "mixed",
+                              bulkBatchId: batch.batchId
+                            })}
+                          >
+                            {props.locale === "ar" ? "تنزيل CSV للحالات المختلطة" : "Download mixed-reason CSV"}
+                          </Link>
+                        ) : null}
                         <Link
                           className="inline-link"
                           href={buildRevenueManagerHref(
@@ -614,6 +664,14 @@ export function ManagerGovernanceReport(props: {
                           )}
                         >
                           {props.locale === "ar" ? "فتح كامل الحالات المتأثرة" : "Open full affected cases"}
+                        </Link>
+                        <Link
+                          className="inline-link"
+                          href={buildRevenueManagerExportHref(props.locale, {
+                            bulkBatchId: batch.batchId
+                          })}
+                        >
+                          {props.locale === "ar" ? "تنزيل CSV لكامل الحالات المتأثرة" : "Download full affected-case CSV"}
                         </Link>
                       </div>
                     </td>
