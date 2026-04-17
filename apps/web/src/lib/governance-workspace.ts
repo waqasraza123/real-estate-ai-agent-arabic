@@ -50,12 +50,30 @@ export type GovernanceOperationalRiskExportScope =
 export interface GovernanceOperationalRiskExportCandidate {
   batchId: string;
   caseCount: number;
+  changedLaterCaseCount: number;
+  comparisonToNext?: GovernanceOperationalRiskExportCandidateComparison;
+  followUpOnlyCaseCount: number;
+  laterBulkResetOnlyCaseCount: number;
+  mixedReasonCaseCount: number;
   priority: "high" | "medium" | "baseline";
   savedAt: string;
   scopedOwnerName: string;
   scope: GovernanceOperationalRiskExportScope;
   score: number;
   stillEscalatedCaseCount: number;
+}
+
+export interface GovernanceOperationalRiskExportCandidateComparison {
+  caseCountDelta: number;
+  reasonAdvantage:
+    | "broader_coverage"
+    | "mixed_reason_focus"
+    | "scope_specificity"
+    | "still_escalated_pressure"
+    | "newer_batch"
+    | "tie";
+  scoreDelta: number;
+  stillEscalatedCaseDelta: number;
 }
 
 export interface GovernanceOperationalRiskBatchDrift {
@@ -296,7 +314,7 @@ export function buildGovernanceOperationalRiskSummary(
 function buildGovernanceOperationalRiskExportCandidates(
   recentBulkBatches: GovernanceOperationalRiskBulkBatch[]
 ): GovernanceOperationalRiskExportCandidate[] {
-  return recentBulkBatches
+  const rankedCandidates = recentBulkBatches
     .flatMap((batch) => {
       const candidates: GovernanceOperationalRiskExportCandidate[] = [
         buildGovernanceOperationalRiskExportCandidate(batch, "full_batch", batch.caseCount)
@@ -338,6 +356,17 @@ function buildGovernanceOperationalRiskExportCandidates(
       return new Date(right.savedAt).getTime() - new Date(left.savedAt).getTime();
     })
     .slice(0, 5);
+
+  return rankedCandidates.map((candidate, index) => {
+    const nextCandidate = rankedCandidates[index + 1];
+
+    return nextCandidate
+      ? {
+          ...candidate,
+          comparisonToNext: buildGovernanceOperationalRiskExportCandidateComparison(candidate, nextCandidate)
+        }
+      : candidate;
+  });
 }
 
 function buildGovernanceOperationalRiskExportCandidate(
@@ -347,16 +376,53 @@ function buildGovernanceOperationalRiskExportCandidate(
 ): GovernanceOperationalRiskExportCandidate {
   const scopeWeight = getGovernanceOperationalRiskExportScopeWeight(scope);
   const score = scopeWeight + caseCount * 10 + batch.stillEscalatedCaseCount * 3;
+  const changedLaterCaseCount = batch.drift?.casesWithLaterChangesCount ?? 0;
+  const followUpOnlyCaseCount = batch.drift?.followUpUpdateOnlyCaseCount ?? 0;
+  const laterBulkResetOnlyCaseCount = batch.drift?.laterBulkResetOnlyCaseCount ?? 0;
+  const mixedReasonCaseCount = batch.drift?.mixedReasonCaseCount ?? 0;
 
   return {
     batchId: batch.batchId,
     caseCount,
+    changedLaterCaseCount,
+    followUpOnlyCaseCount,
+    laterBulkResetOnlyCaseCount,
+    mixedReasonCaseCount,
     priority: score >= 300 ? "high" : score >= 200 ? "medium" : "baseline",
     savedAt: batch.savedAt,
     scopedOwnerName: batch.scopedOwnerName,
     scope,
     score,
     stillEscalatedCaseCount: batch.stillEscalatedCaseCount
+  };
+}
+
+function buildGovernanceOperationalRiskExportCandidateComparison(
+  candidate: GovernanceOperationalRiskExportCandidate,
+  nextCandidate: GovernanceOperationalRiskExportCandidate
+): GovernanceOperationalRiskExportCandidateComparison {
+  const caseCountDelta = candidate.caseCount - nextCandidate.caseCount;
+  const stillEscalatedCaseDelta = candidate.stillEscalatedCaseCount - nextCandidate.stillEscalatedCaseCount;
+  const savedAtDelta = new Date(candidate.savedAt).getTime() - new Date(nextCandidate.savedAt).getTime();
+  let reasonAdvantage: GovernanceOperationalRiskExportCandidateComparison["reasonAdvantage"] = "tie";
+
+  if (candidate.scope === "mixed" && nextCandidate.scope !== "mixed") {
+    reasonAdvantage = "mixed_reason_focus";
+  } else if (candidate.scope !== "full_batch" && nextCandidate.scope === "full_batch") {
+    reasonAdvantage = "scope_specificity";
+  } else if (caseCountDelta > 0) {
+    reasonAdvantage = "broader_coverage";
+  } else if (stillEscalatedCaseDelta > 0) {
+    reasonAdvantage = "still_escalated_pressure";
+  } else if (savedAtDelta > 0) {
+    reasonAdvantage = "newer_batch";
+  }
+
+  return {
+    caseCountDelta,
+    reasonAdvantage,
+    scoreDelta: candidate.score - nextCandidate.score,
+    stillEscalatedCaseDelta
   };
 }
 

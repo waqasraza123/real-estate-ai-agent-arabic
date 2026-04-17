@@ -236,6 +236,10 @@ describe("manager governance summary", () => {
       {
         batchId: "33333333-3333-4333-8333-333333333333",
         caseCount: 3,
+        changedLaterCaseCount: 0,
+        followUpOnlyCaseCount: 0,
+        laterBulkResetOnlyCaseCount: 0,
+        mixedReasonCaseCount: 0,
         priority: "baseline",
         savedAt: "2026-04-13T11:15:00.000Z",
         scopedOwnerName: "Revenue Ops Queue",
@@ -437,6 +441,16 @@ describe("manager governance summary", () => {
       {
         batchId: "33333333-3333-4333-8333-333333333333",
         caseCount: 1,
+        changedLaterCaseCount: 1,
+        comparisonToNext: {
+          caseCountDelta: 0,
+          reasonAdvantage: "mixed_reason_focus",
+          scoreDelta: 50,
+          stillEscalatedCaseDelta: 0
+        },
+        followUpOnlyCaseCount: 0,
+        laterBulkResetOnlyCaseCount: 0,
+        mixedReasonCaseCount: 1,
         priority: "high",
         savedAt: "2026-04-13T11:15:00.000Z",
         scopedOwnerName: "Revenue Ops Queue",
@@ -447,6 +461,16 @@ describe("manager governance summary", () => {
       {
         batchId: "33333333-3333-4333-8333-333333333333",
         caseCount: 1,
+        changedLaterCaseCount: 1,
+        comparisonToNext: {
+          caseCountDelta: -2,
+          reasonAdvantage: "scope_specificity",
+          scoreDelta: 110,
+          stillEscalatedCaseDelta: 0
+        },
+        followUpOnlyCaseCount: 0,
+        laterBulkResetOnlyCaseCount: 0,
+        mixedReasonCaseCount: 1,
         priority: "medium",
         savedAt: "2026-04-13T11:15:00.000Z",
         scopedOwnerName: "Revenue Ops Queue",
@@ -457,6 +481,10 @@ describe("manager governance summary", () => {
       {
         batchId: "33333333-3333-4333-8333-333333333333",
         caseCount: 3,
+        changedLaterCaseCount: 1,
+        followUpOnlyCaseCount: 0,
+        laterBulkResetOnlyCaseCount: 0,
+        mixedReasonCaseCount: 1,
         priority: "baseline",
         savedAt: "2026-04-13T11:15:00.000Z",
         scopedOwnerName: "Revenue Ops Queue",

@@ -403,11 +403,10 @@ export function ManagerGovernanceReport(props: {
                               ? `دفعة ${candidate.scopedOwnerName}`
                               : `${candidate.scopedOwnerName} batch`}
                           </span>
-                          <span>
-                            {props.locale === "ar"
-                              ? `الدرجة ${candidate.score}`
-                              : `Score ${candidate.score}`}
-                          </span>
+                          <span>{getExportCandidateJustification(props.locale, candidate)}</span>
+                          {candidate.comparisonToNext ? (
+                            <span>{getExportCandidateComparisonLabel(props.locale, candidate)}</span>
+                          ) : null}
                         </div>
                       </td>
                       <td data-column-label={props.locale === "ar" ? "الحجم" : "Volume"}>
@@ -1039,6 +1038,76 @@ function getExportCandidateTone(priority: GovernanceOperationalRiskExportCandida
       return "success";
     case "baseline":
       return "neutral";
+  }
+}
+
+function getExportCandidateJustification(locale: SupportedLocale, candidate: GovernanceOperationalRiskExportCandidate) {
+  if (locale === "ar") {
+    switch (candidate.scope) {
+      case "mixed":
+        return `يعزل ${candidate.mixedReasonCaseCount} حالات انجراف مختلط تجمع بين تحديثات المتابعة وإعادات الضبط الجماعية اللاحقة.`;
+      case "changed_later":
+        return `يغطي ${candidate.changedLaterCaseCount} حالات تغيّرت لاحقاً بعد إعادة الضبط الأصلية.`;
+      case "follow_up_only":
+        return `يحصر ${candidate.followUpOnlyCaseCount} حالات انجرفت بسبب تحديثات متابعة فردية فقط.`;
+      case "later_bulk_reset_only":
+        return `يحصر ${candidate.laterBulkResetOnlyCaseCount} حالات انجرفت بسبب دفعات جماعية لاحقة فقط.`;
+      case "full_batch":
+        return `يحافظ على عرض كامل لـ ${candidate.caseCount} حالات متأثرة داخل هذه الدفعة.`;
+    }
+  }
+
+  switch (candidate.scope) {
+    case "mixed":
+      return `Isolates ${candidate.mixedReasonCaseCount} mixed-reason drifted cases touched by both later follow-up saves and later bulk resets.`;
+    case "changed_later":
+      return `Covers ${candidate.changedLaterCaseCount} cases that changed after the original bulk reset.`;
+    case "follow_up_only":
+      return `Narrows the export to ${candidate.followUpOnlyCaseCount} cases drifted only by later individual follow-up saves.`;
+    case "later_bulk_reset_only":
+      return `Narrows the export to ${candidate.laterBulkResetOnlyCaseCount} cases drifted only by later bulk resets.`;
+    case "full_batch":
+      return `Keeps full coverage of all ${candidate.caseCount} affected cases in the batch.`;
+  }
+}
+
+function getExportCandidateComparisonLabel(locale: SupportedLocale, candidate: GovernanceOperationalRiskExportCandidate) {
+  const comparison = candidate.comparisonToNext;
+
+  if (!comparison) {
+    return "";
+  }
+
+  if (locale === "ar") {
+    switch (comparison.reasonAdvantage) {
+      case "mixed_reason_focus":
+        return `يتقدم على التوصية التالية لأنه يرفع الحالات ذات السبب المختلط أولاً قبل النطاقات الأوسع.`;
+      case "scope_specificity":
+        return `يتقدم على التوصية التالية لأنه يقدّم نطاقاً أضيق يركّز على سبب الانجراف بدل كامل الدفعة.`;
+      case "broader_coverage":
+        return `يتقدم على التوصية التالية لأنه يغطي ${comparison.caseCountDelta} حالات إضافية ضمن نفس أولوية المراجعة الحية.`;
+      case "still_escalated_pressure":
+        return `يتقدم على التوصية التالية لأنه يبقي ${comparison.stillEscalatedCaseDelta} حالات متصاعدة إضافية داخل النطاق الموصى به.`;
+      case "newer_batch":
+        return `يتقدم على التوصية التالية لأنه يعود إلى دفعة أحدث ما زالت أقرب إلى ضغط التشغيل الحالي.`;
+      case "tie":
+        return `يتقدم على التوصية التالية بهامش ترتيب بسيط فقط، لذا يمكن مشاركة النطاقين معاً إذا لزم الأمر.`;
+    }
+  }
+
+  switch (comparison.reasonAdvantage) {
+    case "mixed_reason_focus":
+      return "Ranks above the next option because it surfaces mixed-reason drift before broader recovery scopes.";
+    case "scope_specificity":
+      return "Ranks above the next option because it keeps the export focused on one drift cause instead of the full batch.";
+    case "broader_coverage":
+      return `Ranks above the next option because it covers ${comparison.caseCountDelta} more live cases in the same review pass.`;
+    case "still_escalated_pressure":
+      return `Ranks above the next option because it keeps ${comparison.stillEscalatedCaseDelta} more still-escalated cases inside scope.`;
+    case "newer_batch":
+      return "Ranks above the next option because it comes from a newer batch that is closer to current operating pressure.";
+    case "tie":
+      return "Only narrowly outranks the next option, so both scopes may be worth sharing together if needed.";
   }
 }
 
