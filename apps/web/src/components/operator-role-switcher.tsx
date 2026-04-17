@@ -29,6 +29,10 @@ export function OperatorRoleSwitcher(props: {
           ))}
         </select>
       </label>
+      <label className="role-switcher-label">
+        <span>Access key</span>
+        <input autoComplete="off" name="accessKey" required type="password" />
+      </label>
       <RoleSubmitButton label={props.messages.common.applyRole} />
     </form>
   );

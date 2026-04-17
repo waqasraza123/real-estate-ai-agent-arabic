@@ -80,6 +80,7 @@
 - The next persisted Phase 5 operational-risk-batch-reason-mix-reporting boundary is now live locally: governance operational-risk reporting now shows whether each recent drifted bulk batch is dominated by follow-up-only changes, later bulk resets, or mixed case-level reasons before managers drill into the changed-later subset
 - The next persisted Phase 5 operational-risk-reason-specific-routing boundary is now live locally: governance operational-risk reporting now deep-links each recent drifted bulk batch into exact follow-up-only, later-bulk-only, or mixed changed-later case subsets, while revenue views preserve paths back to the broader changed-later and full batch scopes
 - The next persisted Phase 5 operational-risk-reason-specific-export boundary is now live locally: governance operational-risk reporting now exports exact changed-later, follow-up-only, later-bulk-only, mixed, and full affected-case subsets directly from each recent drifted bulk batch row without widening the QA-history report export contract
+- The next persisted Phase 5 operator-session-access-key boundary is now live locally: privileged web mutations now forward only verified signed session cookies to the API, and role switching now requires a per-role access key configured through environment policy before a trusted session cookie is issued
 
 ## Completed Major Slices
 - Bootstrapped durable repo memory and operating instructions
@@ -140,6 +141,7 @@
 - Added the next persisted Phase 5 operational-risk-batch-reason-mix-reporting slice with shared drift-reason-mix derivation from reconstructed batch history, governance operational-risk visibility for follow-up-only vs later-bulk-only vs mixed drifted cases on recent batches, and successful focused-test plus typecheck verification
 - Added the next persisted Phase 5 operational-risk-reason-specific-routing slice with explicit revenue-route reason-filter parsing, reason-specific changed-case derivation from reconstructed batch history, governance-report links into follow-up-only vs later-bulk-only vs mixed subsets, aligned CSV export naming, and successful focused-test plus typecheck verification
 - Added the next persisted Phase 5 operational-risk-reason-specific-export slice with governance-report row actions for exact changed-later and reason-specific live-case CSV exports, aligned reuse of the existing revenue batch export route, and successful typecheck, lint, and build verification
+- Added the next persisted Phase 5 operator-session-access-key slice with per-role access-key parsing and constant-time validation in the web shell, role-switch enforcement before signed session issuance, removal of forged role header fallback in live API calls, focused operator-access test coverage, and successful fast-test, typecheck, and lint verification
 - Strengthened push verification to include lint and API integration tests in addition to typecheck, fast tests, and build
 
 ## Important Decisions
@@ -205,6 +207,7 @@
 - Governance-side drift reason mix also remains derived from that same reconstructed batch-history model in the web layer, so operational-risk reporting does not introduce a second persisted batch-reason summary alongside the existing audit stream
 - Reason-specific drift drill-down also remains a revenue-routing concern in the web layer, so follow-up-only vs later-bulk-only vs mixed subsets are derived on demand from reconstructed batch history rather than via a dedicated persisted reason index
 - Reason-specific governance export also remains a web-layer revenue-export concern, so operational-risk reporting reuses the existing batch export route with narrower query scopes instead of introducing a second governance-owned export endpoint for live case subsets
+- Trusted web-to-API mutations now require a verified signed session cookie from the active request, and local role-switching is gated by per-role access keys defined through `OPERATOR_ROLE_ACCESS_KEYS` rather than accepting unauthenticated role assertions
 - Bulk-result drill-down remains a web-layer revenue-routing concern, so governance reporting links into a batch-id-scoped revenue view instead of extending the API with a dedicated bulk-batch detail endpoint
 - Prepared handover customer updates now carry their own persisted QA gate state, and dispatch-ready promotion is blocked whenever the latest draft review is pending or marked for follow-up
 - Manager governance analytics now derive directly from the existing case-summary QA fields so revenue and handover command centers can show governance pressure without a separate reporting backend

@@ -41,9 +41,7 @@ import type {
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
 import { operatorSessionCookieName, operatorSessionHeaderName } from "@real-estate-ai/contracts";
-import { createOperatorSessionToken, verifyOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
-
-import { defaultOperatorRole } from "@/lib/operator-role";
+import { verifyOperatorSessionToken } from "@real-estate-ai/contracts/operator-session";
 
 const defaultApiBaseUrl = "http://127.0.0.1:4000";
 
@@ -531,18 +529,18 @@ async function requestJson<T>(path: string, options?: ApiRequestOptions) {
 }
 
 async function getOperatorSessionHeaders(operatorRole?: OperatorRole) {
-  if (operatorRole) {
-    return {
-      [operatorSessionHeaderName]: createOperatorSessionToken(operatorRole).token
-    };
-  }
-
   const cookieStore = await cookies();
   const storedSessionToken = cookieStore.get(operatorSessionCookieName)?.value;
 
+  if (operatorRole) {
+    void operatorRole;
+  }
+
+  if (!verifyOperatorSessionToken(storedSessionToken)) {
+    return {};
+  }
+
   return {
-    [operatorSessionHeaderName]: verifyOperatorSessionToken(storedSessionToken)
-      ? (storedSessionToken as string)
-      : createOperatorSessionToken(defaultOperatorRole).token
+    [operatorSessionHeaderName]: storedSessionToken as string
   };
 }
