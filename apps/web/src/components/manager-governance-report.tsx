@@ -26,6 +26,7 @@ import { buildRevenueManagerExportHref, buildRevenueManagerHref, revenueManagerF
 
 export function ManagerGovernanceReport(props: {
   currentOperatorRole: OperatorRole;
+  exportRecipient: ExportRecipient;
   filters: ListGovernanceEventsQuery;
   governanceEvents: PersistedGovernanceEventList | null;
   governanceSummary: PersistedGovernanceSummary | null;
@@ -200,17 +201,23 @@ export function ManagerGovernanceReport(props: {
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, props.filters, "blended"),
+                  href: buildGovernanceReportHref(props.locale, props.filters, "blended", {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "مزدوج" : "Blended",
                   value: "blended"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, props.filters, "qa_history"),
+                  href: buildGovernanceReportHref(props.locale, props.filters, "qa_history", {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "تاريخ الجودة" : "QA history",
                   value: "qa_history"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, props.filters, "operational_risk"),
+                  href: buildGovernanceReportHref(props.locale, props.filters, "operational_risk", {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "مخاطر التشغيل" : "Operational risk",
                   value: "operational_risk"
                 }
@@ -223,17 +230,23 @@ export function ManagerGovernanceReport(props: {
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 7 }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 7 }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "7 أيام" : "7 days",
                   value: "7"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 30 }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 30 }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "30 يوماً" : "30 days",
                   value: "30"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 60 }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, windowDays: 60 }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "60 يوماً" : "60 days",
                   value: "60"
                 }
@@ -247,17 +260,26 @@ export function ManagerGovernanceReport(props: {
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: undefined }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: undefined }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "الكل" : "All",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "case_message" }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "case_message" }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "إيرادات" : "Revenue",
                   value: "case_message"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, kind: "handover_customer_update" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, kind: "handover_customer_update" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "تسليم" : "Handover",
                   value: "handover_customer_update"
                 }
@@ -272,22 +294,36 @@ export function ManagerGovernanceReport(props: {
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: undefined }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: undefined }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "كل الحالات" : "All statuses",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "pending_review" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, status: "pending_review" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "قيد الانتظار" : "Pending",
                   value: "pending_review"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "approved" }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "approved" }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "معتمد" : "Approved",
                   value: "approved"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, status: "follow_up_required" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, status: "follow_up_required" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "تحتاج متابعة" : "Follow-up",
                   value: "follow_up_required"
                 }
@@ -302,27 +338,49 @@ export function ManagerGovernanceReport(props: {
               locale={props.locale}
               options={[
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: undefined }, props.view),
+                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: undefined }, props.view, {
+                    exportRecipient: props.exportRecipient
+                  }),
                   label: props.locale === "ar" ? "كل الموضوعات" : "All subjects",
                   value: "all"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "case_message" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, subjectType: "case_message" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "رسالة محادثة" : "Conversation message",
                   value: "case_message"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "prepared_reply_draft" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, subjectType: "prepared_reply_draft" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "مسودة رد" : "Reply draft",
                   value: "prepared_reply_draft"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "scheduling_invite" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, subjectType: "scheduling_invite" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "دعوة جدولة" : "Scheduling invite",
                   value: "scheduling_invite"
                 },
                 {
-                  href: buildGovernanceReportHref(props.locale, { ...props.filters, subjectType: "appointment_confirmation" }, props.view),
+                  href: buildGovernanceReportHref(
+                    props.locale,
+                    { ...props.filters, subjectType: "appointment_confirmation" },
+                    props.view,
+                    { exportRecipient: props.exportRecipient }
+                  ),
                   label: props.locale === "ar" ? "تأكيد موعد" : "Appointment confirmation",
                   value: "appointment_confirmation"
                 }
@@ -360,10 +418,32 @@ export function ManagerGovernanceReport(props: {
               ) : null}
               {showQaHistory ? (
                 <StatusBadge tone="success">
-                  {props.locale === "ar" ? "صيَغ مستلمين متعددة" : "Multiple recipient variants"}
+                  {getExportRecipientBadgeLabel(props.locale, props.exportRecipient)}
                 </StatusBadge>
               ) : null}
             </div>
+            <FilterTabs
+              activeValue={props.exportRecipient}
+              locale={props.locale}
+              options={[
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, props.view, { exportRecipient: "manager" }),
+                  label: props.locale === "ar" ? "إدارة" : "Manager",
+                  value: "manager"
+                },
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, props.view, { exportRecipient: "operations" }),
+                  label: props.locale === "ar" ? "تشغيل" : "Operations",
+                  value: "operations"
+                },
+                {
+                  href: buildGovernanceReportHref(props.locale, props.filters, props.view, { exportRecipient: "qa" }),
+                  label: props.locale === "ar" ? "جودة" : "QA",
+                  value: "qa"
+                }
+              ]}
+              title={props.locale === "ar" ? "المستلم الافتراضي للتصدير" : "Default export recipient"}
+            />
             {showQaHistory ? (
               <div className="page-stack">
                 {exportOptions.map((option) => (
@@ -443,9 +523,15 @@ export function ManagerGovernanceReport(props: {
                       </td>
                       <td data-column-label={props.locale === "ar" ? "الإجراء" : "Action"}>
                         <div className="stack-tight">
-                          <Link className="inline-link" href={buildOperationalRiskExportHref(props.locale, candidate)}>
-                            {props.locale === "ar" ? "تنزيل CSV المقترح" : "Download recommended CSV"}
-                          </Link>
+                          {(["manager", "operations", "qa"] as const).map((recipient) => (
+                            <Link
+                              key={`${candidate.batchId}:${candidate.scope}:${recipient}`}
+                              className="inline-link"
+                              href={buildOperationalRiskExportHref(props.locale, candidate, recipient)}
+                            >
+                              {getOperationalRiskExportLinkLabel(props.locale, recipient)}
+                            </Link>
+                          ))}
                           <Link
                             className="inline-link"
                             href={buildOperationalRiskDrillDownHref(props.locale, candidate)}
@@ -676,7 +762,7 @@ export function ManagerGovernanceReport(props: {
                             href={buildRevenueManagerExportHref(props.locale, {
                               batchDrift: "changed_later",
                               bulkBatchId: batch.batchId
-                            })}
+                            }, { recipient: props.exportRecipient })}
                           >
                             {props.locale === "ar" ? "تنزيل CSV للحالات التي تغيّرت لاحقاً" : "Download changed-later CSV"}
                           </Link>
@@ -704,7 +790,7 @@ export function ManagerGovernanceReport(props: {
                               batchDrift: "changed_later",
                               batchDriftReason: "follow_up_only",
                               bulkBatchId: batch.batchId
-                            })}
+                            }, { recipient: props.exportRecipient })}
                           >
                             {props.locale === "ar" ? "تنزيل CSV للمتابعة فقط" : "Download follow-up-only CSV"}
                           </Link>
@@ -732,7 +818,7 @@ export function ManagerGovernanceReport(props: {
                               batchDrift: "changed_later",
                               batchDriftReason: "later_bulk_reset_only",
                               bulkBatchId: batch.batchId
-                            })}
+                            }, { recipient: props.exportRecipient })}
                           >
                             {props.locale === "ar" ? "تنزيل CSV للدفعات فقط" : "Download bulk-reset-only CSV"}
                           </Link>
@@ -760,7 +846,7 @@ export function ManagerGovernanceReport(props: {
                               batchDrift: "changed_later",
                               batchDriftReason: "mixed",
                               bulkBatchId: batch.batchId
-                            })}
+                            }, { recipient: props.exportRecipient })}
                           >
                             {props.locale === "ar" ? "تنزيل CSV للحالات المختلطة" : "Download mixed-reason CSV"}
                           </Link>
@@ -781,7 +867,7 @@ export function ManagerGovernanceReport(props: {
                           className="inline-link"
                           href={buildRevenueManagerExportHref(props.locale, {
                             bulkBatchId: batch.batchId
-                          })}
+                          }, { recipient: props.exportRecipient })}
                         >
                           {props.locale === "ar" ? "تنزيل CSV لكامل الحالات المتأثرة" : "Download full affected-case CSV"}
                         </Link>
@@ -982,7 +1068,11 @@ function buildOperationalRiskDrillDownHref(locale: SupportedLocale, candidate: G
   return buildRevenueManagerHref(locale, filters, { hash: revenueManagerFocusedQueueId });
 }
 
-function buildOperationalRiskExportHref(locale: SupportedLocale, candidate: GovernanceOperationalRiskExportCandidate) {
+function buildOperationalRiskExportHref(
+  locale: SupportedLocale,
+  candidate: GovernanceOperationalRiskExportCandidate,
+  recipient: ExportRecipient
+) {
   const filters =
     candidate.scope === "full_batch"
       ? {
@@ -1000,7 +1090,7 @@ function buildOperationalRiskExportHref(locale: SupportedLocale, candidate: Gove
           bulkBatchId: candidate.batchId
         };
 
-  return buildRevenueManagerExportHref(locale, filters, { recipient: "operations" });
+  return buildRevenueManagerExportHref(locale, filters, { recipient });
 }
 
 function getGovernanceExportOptionLabel(locale: SupportedLocale, recipient: ExportRecipient) {
@@ -1044,6 +1134,50 @@ function getGovernanceExportOptionSummary(locale: SupportedLocale, recipient: Ex
       return "Packages the same history for daily operational follow-up and action-ready review.";
     case "qa":
       return "Frames the same history for QA and policy audit when it leaves the product.";
+  }
+}
+
+function getExportRecipientBadgeLabel(locale: SupportedLocale, recipient: ExportRecipient) {
+  if (locale === "ar") {
+    switch (recipient) {
+      case "manager":
+        return "المستلم الحالي: الإدارة";
+      case "operations":
+        return "المستلم الحالي: التشغيل";
+      case "qa":
+        return "المستلم الحالي: الجودة";
+    }
+  }
+
+  switch (recipient) {
+    case "manager":
+      return "Recipient: manager";
+    case "operations":
+      return "Recipient: operations";
+    case "qa":
+      return "Recipient: QA";
+  }
+}
+
+function getOperationalRiskExportLinkLabel(locale: SupportedLocale, recipient: ExportRecipient) {
+  if (locale === "ar") {
+    switch (recipient) {
+      case "manager":
+        return "CSV إداري";
+      case "operations":
+        return "CSV تشغيلي";
+      case "qa":
+        return "CSV جودة";
+    }
+  }
+
+  switch (recipient) {
+    case "manager":
+      return "Manager CSV";
+    case "operations":
+      return "Operations CSV";
+    case "qa":
+      return "QA CSV";
   }
 }
 

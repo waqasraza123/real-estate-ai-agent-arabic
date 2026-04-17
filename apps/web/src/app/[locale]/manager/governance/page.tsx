@@ -4,7 +4,11 @@ import { Panel } from "@real-estate-ai/ui";
 import { ManagerGovernanceReport } from "@/components/manager-governance-report";
 import { ScreenIntro } from "@/components/screen-intro";
 import { buildGovernanceOperationalRiskSummary } from "@/lib/governance-workspace";
-import { parseGovernanceReportSearchParams, parseGovernanceReportView } from "@/lib/governance-report";
+import {
+  parseGovernanceReportExportRecipient,
+  parseGovernanceReportSearchParams,
+  parseGovernanceReportView
+} from "@/lib/governance-report";
 import {
   tryGetPersistedCaseDetail,
   tryGetPersistedGovernanceEvents,
@@ -54,6 +58,7 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
   }
 
   const filters = parseGovernanceReportSearchParams(rawSearchParams);
+  const exportRecipient = parseGovernanceReportExportRecipient(rawSearchParams);
   const view = parseGovernanceReportView(rawSearchParams);
   const [governanceSummary, governanceEvents, persistedCases] = await Promise.all([
     tryGetPersistedGovernanceSummary(),
@@ -110,6 +115,7 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
       governanceSummary={governanceSummary}
       locale={locale}
       operationalRiskSummary={operationalRiskSummary}
+      exportRecipient={exportRecipient}
       view={view}
     />
   );

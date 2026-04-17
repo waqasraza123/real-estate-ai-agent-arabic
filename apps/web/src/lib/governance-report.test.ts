@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildGovernanceReportHref,
   buildGovernanceReportSearchParams,
+  parseGovernanceReportExportRecipient,
   parseGovernanceReportSearchParams,
   parseGovernanceReportView
 } from "./governance-report";
@@ -14,6 +15,7 @@ describe("governance report filters", () => {
       windowDays: 30
     });
     expect(parseGovernanceReportView(undefined)).toBe("blended");
+    expect(parseGovernanceReportExportRecipient(undefined)).toBe("manager");
   });
 
   it("keeps the first value when repeated params are present", () => {
@@ -58,5 +60,17 @@ describe("governance report filters", () => {
         "operational_risk"
       )
     ).toBe("/en/manager/governance?kind=case_message&windowDays=30&view=operational_risk");
+
+    expect(
+      buildGovernanceReportHref(
+        "en",
+        {
+          kind: "case_message",
+          windowDays: 30
+        },
+        "operational_risk",
+        { exportRecipient: "qa" }
+      )
+    ).toBe("/en/manager/governance?kind=case_message&windowDays=30&view=operational_risk&recipient=qa");
   });
 });

@@ -1,4 +1,6 @@
 import { listGovernanceEventsQuerySchema, type ListGovernanceEventsQuery, type SupportedLocale } from "@real-estate-ai/contracts";
+import { parseExportRecipient } from "./export-summary";
+import type { ExportRecipient } from "./export-summary";
 
 type SearchParamsInput =
   | Record<string, string | string[] | undefined>
@@ -24,6 +26,13 @@ export function parseGovernanceReportView(searchParams: SearchParamsInput): Gove
   }
 
   return "blended";
+}
+
+export function parseGovernanceReportExportRecipient(searchParams: SearchParamsInput): ExportRecipient {
+  const rawSearchParams =
+    searchParams instanceof URLSearchParams ? Object.fromEntries(searchParams.entries()) : normalizeSearchParamRecord(searchParams);
+
+  return parseExportRecipient(rawSearchParams.recipient);
 }
 
 export function buildGovernanceReportSearchParams(query: Partial<ListGovernanceEventsQuery>) {
@@ -63,12 +72,17 @@ export function buildGovernanceReportSearchParams(query: Partial<ListGovernanceE
 export function buildGovernanceReportHref(
   locale: SupportedLocale,
   query: Partial<ListGovernanceEventsQuery>,
-  view: GovernanceReportView = "blended"
+  view: GovernanceReportView = "blended",
+  options: { exportRecipient?: ExportRecipient } = {}
 ) {
   const searchParams = buildGovernanceReportSearchParams(query);
 
   if (view !== "blended") {
     searchParams.set("view", view);
+  }
+
+  if (options.exportRecipient && options.exportRecipient !== "manager") {
+    searchParams.set("recipient", options.exportRecipient);
   }
 
   const serialized = searchParams.toString();
