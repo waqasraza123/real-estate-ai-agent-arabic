@@ -308,6 +308,63 @@ export function DetailListItem(props: {
   );
 }
 
+export function WorkflowPanelBody(props: {
+  children?: ReactNode;
+  className?: string;
+  note?: ReactNode;
+  summary?: ReactNode;
+}) {
+  return (
+    <div className={cx(pageStackClassName, props.className)}>
+      {props.summary ? <div className={panelSummaryClassName}>{props.summary}</div> : null}
+      {props.note ? <div className={fieldNoteClassName}>{props.note}</div> : null}
+      {props.children}
+    </div>
+  );
+}
+
+export function workflowCardClassName(tone: "neutral" | "warning" | "critical" | "success" = "neutral") {
+  if (tone === "critical") {
+    return criticalAlertCardClassName;
+  }
+
+  if (tone === "warning") {
+    return alertCardClassName;
+  }
+
+  if (tone === "success") {
+    return successCardClassName;
+  }
+
+  return interventionCardClassName;
+}
+
+export function WorkflowCard(props: {
+  actions?: ReactNode;
+  badges?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  meta?: ReactNode;
+  summary?: ReactNode;
+  title: ReactNode;
+  tone?: "neutral" | "warning" | "critical" | "success";
+}) {
+  return (
+    <article className={cx(workflowCardClassName(props.tone), props.className)}>
+      <div className={rowBetweenClassName}>
+        <div className={stackTightClassName}>
+          <h3>{props.title}</h3>
+          {props.meta}
+        </div>
+        {props.badges ? <div className={statusRowWrapClassName}>{props.badges}</div> : null}
+      </div>
+      {props.summary ? <div>{props.summary}</div> : null}
+      {props.children}
+      {props.actions ? <div className={statusRowWrapClassName}>{props.actions}</div> : null}
+    </article>
+  );
+}
+
 export function StatusBadge(props: {
   children: ReactNode;
   tone?: "neutral" | "success" | "warning" | "critical";

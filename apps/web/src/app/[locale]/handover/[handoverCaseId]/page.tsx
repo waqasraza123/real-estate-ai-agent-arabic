@@ -17,6 +17,7 @@ import {
   StatusBadge,
   statusRowWrapClassName,
   twoColumnGridClassName,
+  WorkflowPanelBody,
 } from "@real-estate-ai/ui";
 
 import { HandoverAppointmentConfirmationForm } from "@/components/handover-appointment-confirmation-form";
@@ -215,13 +216,14 @@ export default async function HandoverPage(props: PageProps) {
 
         <div className={twoColumnGridClassName}>
           <Panel title={locale === "ar" ? "تنفيذ يوم التسليم" : "Handover-day execution"}>
-            <div className={pageStackClassName}>
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
+            <WorkflowPanelBody
+              note={executionGuardNote}
+              summary={
+                locale === "ar"
                   ? "ابدأ حالة التنفيذ الحي بعد اكتمال الجدولة الداخلية وتصفية العوائق المفتوحة، من دون تشغيل أي تكامل خارجي."
-                  : "Start the live execution state after internal scheduling is complete and open blockers are cleared, without triggering any external integration."}
-              </p>
-              <p className={fieldNoteClassName}>{executionGuardNote}</p>
+                  : "Start the live execution state after internal scheduling is complete and open blockers are cleared, without triggering any external integration."
+              }
+            >
               <DetailGrid className="xl:grid-cols-2">
                 <DetailItem
                   label={locale === "ar" ? "بدأ التنفيذ" : "Execution started"}
@@ -243,17 +245,18 @@ export default async function HandoverPage(props: PageProps) {
                 returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
                 status={persistedHandoverCase.status}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={locale === "ar" ? "الإتمام المضبوط" : "Controlled completion"}>
-            <div className={pageStackClassName}>
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
+            <WorkflowPanelBody
+              note={executionGuardNote}
+              summary={
+                locale === "ar"
                   ? "أغلق يوم التسليم بملخص إتمام واضح بعد انتهاء التنفيذ ومعالجة العوائق المفتوحة."
-                  : "Close the handover day with a clear completion summary after execution finishes and open blockers are resolved."}
-              </p>
-              <p className={fieldNoteClassName}>{executionGuardNote}</p>
+                  : "Close the handover day with a clear completion summary after execution finishes and open blockers are resolved."
+              }
+            >
               <DetailGrid className="xl:grid-cols-2">
                 <DetailItem
                   label={locale === "ar" ? "اكتمل في" : "Completed at"}
@@ -282,7 +285,7 @@ export default async function HandoverPage(props: PageProps) {
                 returnPath={`/${locale}/handover/${persistedHandoverCase.handoverCaseId}`}
                 status={persistedHandoverCase.status}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
         </div>
 
@@ -372,12 +375,13 @@ export default async function HandoverPage(props: PageProps) {
 
         <div className={twoColumnGridClassName}>
           <Panel title={locale === "ar" ? "مراجعة الإغلاق الإداري" : "Administrative closure review"}>
-            <div className={pageStackClassName}>
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
+            <WorkflowPanelBody
+              summary={
+                locale === "ar"
                   ? "بعد اكتمال السجل وإغلاق أي متابعة مطلوبة، احفظ قرار الإغلاق الإداري لتحديد ما إذا كان السجل جاهزاً للأرشفة أو يحتاج إلى تعليق يدوي."
-                  : "Once the handover is complete and any required aftercare is resolved, save the administrative closure decision to mark whether the record is ready to archive or should remain on hold."}
-              </p>
+                  : "Once the handover is complete and any required aftercare is resolved, save the administrative closure decision to mark whether the record is ready to archive or should remain on hold."
+              }
+            >
               {archiveReviewItem ? (
                 <DetailGrid className="xl:grid-cols-2">
                   <DetailItem label={locale === "ar" ? "النتيجة الحالية" : "Current outcome"} value={archiveReviewItem.outcomeLabel} />
@@ -399,16 +403,17 @@ export default async function HandoverPage(props: PageProps) {
                     : "The archive review opens after completion, a saved manager review, and any required post-handover follow-up resolution."}
                 </p>
               )}
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={locale === "ar" ? "حالة الأرشفة الإدارية" : "Administrative archive status"}>
-            <div className={pageStackClassName}>
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
+            <WorkflowPanelBody
+              summary={
+                locale === "ar"
                   ? "هذه الحدود لا تشغل أي نظام أرشفة خارجي، لكنها تجعل قرار الإغلاق الإداري مرئياً: تعليق، جاهز للأرشفة، ثم مؤرشف."
-                  : "This boundary does not trigger any external archiving system. It simply makes administrative closure visible as held, ready to archive, and then archived."}
-              </p>
+                  : "This boundary does not trigger any external archiving system. It simply makes administrative closure visible as held, ready to archive, and then archived."
+              }
+            >
               {archiveStatusItem ? (
                 <DetailGrid>
                   <DetailItem
@@ -435,7 +440,7 @@ export default async function HandoverPage(props: PageProps) {
                     : "Archive status becomes available after the administrative closure review is saved on the completed record."}
                 </p>
               )}
-            </div>
+            </WorkflowPanelBody>
           </Panel>
         </div>
 

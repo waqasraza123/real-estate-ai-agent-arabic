@@ -18,8 +18,6 @@ import {
   criticalAlertCardClassName,
   fieldNoteClassName,
   inlineLinkClassName,
-  interventionCardClassName,
-  interventionOpenCardClassName,
   metricDetailClassName,
   metricGridClassName,
   metricLabelClassName,
@@ -32,7 +30,9 @@ import {
   stackTightClassName,
   StatusBadge,
   statusRowWrapClassName,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowCard,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
@@ -989,12 +989,13 @@ export function RevenueManagerCommandCenter(props: {
       <ScreenIntro badge={workspaceCopy.title} summary={workspaceCopy.summary} title={workspaceCopy.title} />
 
       <Panel title={props.locale === "ar" ? "سجل الدور المحلي الحالي" : "Current local role mode"}>
-        <div className={pageStackClassName}>
-          <p className={panelSummaryClassName}>
-            {props.locale === "ar"
+        <WorkflowPanelBody
+          summary={
+            props.locale === "ar"
               ? `يعمل هذا المركز الآن بدور ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. تمت إزالة طوابير التسليم من هذا المسار حتى تبقى متابعة الإيرادات واضحة وقابلة للتنفيذ.`
-              : `This command center is currently running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. Handover queues have moved off this route so revenue follow-up can stay focused and actionable.`}
-          </p>
+              : `This command center is currently running as ${getOperatorRoleLabel(props.locale, props.currentOperatorRole)}. Handover queues have moved off this route so revenue follow-up can stay focused and actionable.`
+          }
+        >
           <div className={statusRowWrapClassName}>
             <StatusBadge>{getOperatorRoleLabel(props.locale, props.currentOperatorRole)}</StatusBadge>
             {managerCapabilities.canManageFollowUp ? (
@@ -1009,14 +1010,14 @@ export function RevenueManagerCommandCenter(props: {
           <Link className={inlineLinkClassName} href={`/${props.locale}/manager/governance`}>
             {props.locale === "ar" ? "فتح تقرير الحوكمة" : "Open governance report"}
           </Link>
-        </div>
+        </WorkflowPanelBody>
       </Panel>
 
       {hasScopedView ? (
         <Panel title={props.locale === "ar" ? "نطاق الطابور الحالي" : "Current queue scope"}>
-          <div className={pageStackClassName} id={revenueManagerFocusedQueueId}>
-            <p className={panelSummaryClassName}>
-              {hasScopedBatchView && revenueScope.batchScope
+          <WorkflowPanelBody
+            summary={
+              hasScopedBatchView && revenueScope.batchScope
                 ? props.locale === "ar"
                   ? hasChangedLaterReasonScopedView && batchDriftReasonScopeLabel
                     ? `يعرض هذا النطاق فقط الحالات المتأثرة من الدفعة الجماعية المحفوظة ${batchScopeSavedAt} التي تغيّرت لاحقاً بسبب ${batchDriftReasonScopeLabel} بعد إعادة الضبط الأصلية من نطاق ${revenueScope.batchScope.scopedOwnerName}.`
@@ -1038,8 +1039,10 @@ export function RevenueManagerCommandCenter(props: {
                     : "This scope is narrowed to escalated post-reply handoffs across the active owner set."
                 : props.locale === "ar"
                   ? "يعمل هذا العرض داخل نطاق مخصص لقرار تشغيلي أكثر تركيزاً."
-                  : "This view is running inside a narrower operational scope."}
-            </p>
+                  : "This view is running inside a narrower operational scope."
+            }
+          >
+            <div id={revenueManagerFocusedQueueId} />
             <div className={statusRowWrapClassName}>
               <StatusBadge>
                 {hasScopedBatchView
@@ -1582,7 +1585,7 @@ export function RevenueManagerCommandCenter(props: {
                 );
               }}
             />
-          </div>
+          </WorkflowPanelBody>
         </Panel>
       ) : null}
 
@@ -1690,13 +1693,11 @@ export function RevenueManagerCommandCenter(props: {
               );
 
               return (
-                <article key={caseItem.caseId} className={criticalAlertCardClassName}>
-                  <div className={rowBetweenClassName}>
-                    <div className={stackTightClassName}>
-                      <h3>{caseItem.customerName}</h3>
-                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
-                    </div>
-                    <div className={statusRowWrapClassName}>
+                <WorkflowCard
+                  key={caseItem.caseId}
+                  tone="critical"
+                  badges={
+                    <>
                       <StatusBadge tone={caseItem.followUpStatus === "attention" ? "critical" : "warning"}>
                         {getPersistedFollowUpLabel(props.locale, caseItem)}
                       </StatusBadge>
@@ -1705,9 +1706,24 @@ export function RevenueManagerCommandCenter(props: {
                       ) : null}
                       {qaReviewDisplay ? <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge> : null}
                       {handoverDisplay ? <StatusBadge tone={handoverDisplay.statusTone}>{handoverDisplay.statusLabel}</StatusBadge> : null}
-                    </div>
-                  </div>
-                  <p>{caseItem.nextAction}</p>
+                    </>
+                  }
+                  meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>}
+                  summary={caseItem.nextAction}
+                  title={caseItem.customerName}
+                  actions={
+                    <>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                        {props.locale === "ar" ? "فتح الحالة" : "Open case"}
+                      </Link>
+                      {handoverDisplay && canAccessHandoverWorkspace ? (
+                        <Link className={inlineLinkClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
+                          {props.locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
+                        </Link>
+                      ) : null}
+                    </>
+                  }
+                >
                   {caseItem.latestHumanReply ? (
                     <div className={stackTightClassName}>
                       <p className={caseMetaClassName}>
@@ -1739,17 +1755,7 @@ export function RevenueManagerCommandCenter(props: {
                     {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
                     <StatusBadge>{getPersistedCaseStageLabel(props.locale, caseItem.stage)}</StatusBadge>
                   </div>
-                  <div className={statusRowWrapClassName}>
-                    <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
-                      {props.locale === "ar" ? "فتح الحالة" : "Open case"}
-                    </Link>
-                    {handoverDisplay && canAccessHandoverWorkspace ? (
-                      <Link className={inlineLinkClassName} href={`/${props.locale}/handover/${handoverDisplay.handoverCaseId}`}>
-                        {props.locale === "ar" ? "فتح سجل التسليم" : "Open handover"}
-                      </Link>
-                    ) : null}
-                  </div>
-                </article>
+                </WorkflowCard>
               );
             }}
           />
@@ -1860,20 +1866,26 @@ export function RevenueManagerCommandCenter(props: {
             );
 
             return (
-              <article key={caseItem.caseId} className={criticalAlertCardClassName}>
-                <div className={rowBetweenClassName}>
-                  <div className={stackTightClassName}>
-                    <h3>{caseItem.customerName}</h3>
-                    <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
-                  </div>
-                  <div className={statusRowWrapClassName}>
+              <WorkflowCard
+                key={caseItem.caseId}
+                tone="critical"
+                badges={
+                  <>
                     <StatusBadge tone="warning">{getPersistedFollowUpLabel(props.locale, caseItem)}</StatusBadge>
                     {caseItem.openInterventionsCount > 0 ? (
                       <StatusBadge tone="warning">{getInterventionCountLabel(props.locale, caseItem.openInterventionsCount)}</StatusBadge>
                     ) : null}
-                  </div>
-                </div>
-                <p>{caseItem.nextAction}</p>
+                  </>
+                }
+                meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>}
+                summary={caseItem.nextAction}
+                title={caseItem.customerName}
+                actions={
+                  <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                    {props.locale === "ar" ? "فتح الحالة" : "Open case"}
+                  </Link>
+                }
+              >
                 <div className={stackTightClassName}>
                   <p className={caseMetaClassName}>
                     {caseItem.latestHumanReply?.sentByName}
@@ -1883,12 +1895,7 @@ export function RevenueManagerCommandCenter(props: {
                   {latestHumanReplyOwnershipLabel ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipLabel}</p> : null}
                   {latestHumanReplyEscalationLabel ? <p className={caseMetaClassName}>{latestHumanReplyEscalationLabel}</p> : null}
                 </div>
-                <div className={statusRowWrapClassName}>
-                  <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
-                    {props.locale === "ar" ? "فتح الحالة" : "Open case"}
-                  </Link>
-                </div>
-              </article>
+              </WorkflowCard>
             );
           }}
         />
@@ -1913,37 +1920,40 @@ export function RevenueManagerCommandCenter(props: {
               }
 
               return (
-                <article key={caseItem.caseId} className={criticalAlertCardClassName}>
-                  <div className={rowBetweenClassName}>
-                    <div className={stackTightClassName}>
-                      <h3>{caseItem.customerName}</h3>
-                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
-                    </div>
-                    <div className={statusRowWrapClassName}>
+                <WorkflowCard
+                  key={caseItem.caseId}
+                  tone="critical"
+                  badges={
+                    <>
                       <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
                       <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
                       <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                    </div>
-                  </div>
+                    </>
+                  }
+                  meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>}
+                  summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
+                  title={caseItem.customerName}
+                  actions={
+                    <>
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
+                        {props.locale === "ar" ? "فتح الحالة" : "Open case"}
+                      </Link>
+                      {canAccessQaWorkspace ? (
+                        <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
+                          {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                        </Link>
+                      ) : null}
+                    </>
+                  }
+                >
                   {qaReviewDisplay.draftMessage ? <p>{qaReviewDisplay.draftMessage}</p> : null}
-                  <p>{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}</p>
                   <p className={caseMetaClassName}>{qaReviewDisplay.updatedAt}</p>
                   <div className={statusRowWrapClassName}>
                     {qaReviewDisplay.policySignalLabels.map((label) => (
                       <StatusBadge key={`${caseItem.caseId}-${label}`}>{label}</StatusBadge>
                     ))}
                   </div>
-                  <div className={statusRowWrapClassName}>
-                    <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
-                      {props.locale === "ar" ? "فتح الحالة" : "Open case"}
-                    </Link>
-                    {canAccessQaWorkspace ? (
-                      <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
-                        {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
-                      </Link>
-                    ) : null}
-                  </div>
-                </article>
+                </WorkflowCard>
               );
             }}
           />
@@ -2006,24 +2016,21 @@ function GovernanceHotspotsPanel(props: {
       emptyTitle={props.emptyTitle}
       items={props.topPolicySignals}
       renderItem={(signalCount) => (
-        <article
+        <WorkflowCard
           key={`${signalCount.kind}-${signalCount.signal}`}
-          className={signalCount.kind === "handover_customer_update" ? interventionOpenCardClassName : interventionCardClassName}
-        >
-          <div className={rowBetweenClassName}>
-            <h3>{getGovernanceSignalLabel(props.locale, signalCount)}</h3>
-            <StatusBadge tone={signalCount.count > 1 ? "critical" : "warning"}>{signalCount.count}</StatusBadge>
-          </div>
-          <p>
-            {signalCount.kind === "handover_customer_update"
+          tone={signalCount.kind === "handover_customer_update" ? "warning" : "neutral"}
+          badges={<StatusBadge tone={signalCount.count > 1 ? "critical" : "warning"}>{signalCount.count}</StatusBadge>}
+          summary={
+            signalCount.kind === "handover_customer_update"
               ? props.locale === "ar"
                 ? "إشارة متكررة داخل مسودات تحديث العميل في مسار التسليم."
                 : "Recurring risk signal inside prepared customer-update drafts."
               : props.locale === "ar"
                 ? "إشارة متكررة داخل مراجعات رسائل العملاء في مسار الإيرادات."
-                : "Recurring risk signal inside customer-message QA reviews."}
-          </p>
-        </article>
+                : "Recurring risk signal inside customer-message QA reviews."
+          }
+          title={getGovernanceSignalLabel(props.locale, signalCount)}
+        />
       )}
     />
   );
@@ -2049,28 +2056,29 @@ function GovernanceActivityPanel(props: {
       emptyTitle={props.emptyTitle}
       items={props.items}
       renderItem={(item) => (
-        <article key={item.date} className={interventionCardClassName}>
-          <div className={rowBetweenClassName}>
-            <h3>{formatShortDate(`${item.date}T00:00:00.000Z`, props.locale)}</h3>
-            <div className={statusRowWrapClassName}>
+        <WorkflowCard
+          key={item.date}
+          badges={
+            <>
               <StatusBadge tone={item.openedCount > item.resolvedCount ? "warning" : "success"}>
                 {props.locale === "ar" ? `${item.openedCount} فتحت` : `${item.openedCount} opened`}
               </StatusBadge>
               <StatusBadge tone={item.resolvedCount > 0 ? "success" : "warning"}>
                 {props.locale === "ar" ? `${item.resolvedCount} حسمت` : `${item.resolvedCount} resolved`}
               </StatusBadge>
-            </div>
-          </div>
-          <p>
-            {props.locale === "ar"
+            </>
+          }
+          summary={
+            props.locale === "ar"
               ? item.openedCount > item.resolvedCount
                 ? "ضغط الحوكمة ازداد في هذا اليوم أكثر مما حُسم."
                 : "تم حسم النشاطات اليومية بقدر يوازي أو يفوق الفتحات الجديدة."
               : item.openedCount > item.resolvedCount
                 ? "Governance pressure increased on this day faster than reviews were closed."
-                : "Daily governance work was resolved at the same pace as, or faster than, new openings."}
-          </p>
-        </article>
+                : "Daily governance work was resolved at the same pace as, or faster than, new openings."
+          }
+          title={formatShortDate(`${item.date}T00:00:00.000Z`, props.locale)}
+        />
       )}
     />
   );
@@ -2099,13 +2107,10 @@ function GovernanceRecentEventsPanel(props: {
           event.status === "approved" ? "success" : event.status === "follow_up_required" ? "warning" : ("critical" as const);
 
         return (
-          <article key={`${event.caseId}-${event.createdAt}-${event.kind}-${event.action}`} className={interventionCardClassName}>
-            <div className={rowBetweenClassName}>
-              <div className={stackTightClassName}>
-                <h3>{event.customerName}</h3>
-                <p className={caseMetaClassName}>{formatDateTime(event.createdAt, props.locale)}</p>
-              </div>
-              <div className={statusRowWrapClassName}>
+          <WorkflowCard
+            key={`${event.caseId}-${event.createdAt}-${event.kind}-${event.action}`}
+            badges={
+              <>
                 <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
                 {event.subjectType && event.kind === "handover_customer_update" ? (
                   <StatusBadge>
@@ -2115,9 +2120,12 @@ function GovernanceRecentEventsPanel(props: {
                     )}
                   </StatusBadge>
                 ) : null}
-              </div>
-            </div>
-            <p>{getGovernanceRecentEventSummary(props.locale, event)}</p>
+              </>
+            }
+            meta={<p className={caseMetaClassName}>{formatDateTime(event.createdAt, props.locale)}</p>}
+            summary={getGovernanceRecentEventSummary(props.locale, event)}
+            title={event.customerName}
+          >
             <div className={statusRowWrapClassName}>
               {event.policySignals.map((signal) => (
                 <StatusBadge key={`${event.caseId}-${event.createdAt}-${signal}`}>
@@ -2129,7 +2137,7 @@ function GovernanceRecentEventsPanel(props: {
                 </StatusBadge>
               ))}
             </div>
-          </article>
+          </WorkflowCard>
         );
       }}
     />
