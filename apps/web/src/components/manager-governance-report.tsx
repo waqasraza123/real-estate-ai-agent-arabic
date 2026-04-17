@@ -17,9 +17,9 @@ import {
   EmptyState,
   fieldNoteClassName,
   inlineLinkClassName,
+  MetricInsightTile,
   MetricTile,
   pageStackClassName,
-  panelSummaryClassName,
   Panel,
   stackTightClassName,
   StatusBadge,
@@ -27,7 +27,8 @@ import {
   tableLinkClassName,
   tableLinkMetaClassName,
   tableLinkTitleClassName,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { SegmentedLinkTabs } from "@/components/segmented-link-tabs";
@@ -82,12 +83,13 @@ export function ManagerGovernanceReport(props: {
       />
 
       <Panel title={props.locale === "ar" ? "نطاق التقرير الحالي" : "Current report scope"}>
-        <div className={pageStackClassName}>
-          <p className={panelSummaryClassName}>
-            {props.locale === "ar"
+        <WorkflowPanelBody
+          summary={
+            props.locale === "ar"
               ? `يعمل التقرير بدور ${activeRoleLabel} مع نافذة ${props.filters.windowDays} يوماً وحد أقصى ${props.filters.limit} حدثاً مفصلاً.`
-              : `The report is running as ${activeRoleLabel}, scoped to the last ${props.filters.windowDays} days with up to ${props.filters.limit} detailed events.`}
-          </p>
+              : `The report is running as ${activeRoleLabel}, scoped to the last ${props.filters.windowDays} days with up to ${props.filters.limit} detailed events.`
+          }
+        >
           <div className={statusRowWrapClassName}>
             <StatusBadge>{activeRoleLabel}</StatusBadge>
             <StatusBadge>{props.locale === "ar" ? `${props.filters.windowDays} أيام` : `${props.filters.windowDays} days`}</StatusBadge>
@@ -97,7 +99,7 @@ export function ManagerGovernanceReport(props: {
             {props.filters.status ? <StatusBadge tone={getStatusTone(props.filters.status)}>{getStatusLabel(props.locale, props.filters.status)}</StatusBadge> : null}
             {props.filters.subjectType ? <StatusBadge>{getSubjectLabel(props.locale, props.filters.subjectType)}</StatusBadge> : null}
           </div>
-        </div>
+        </WorkflowPanelBody>
       </Panel>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -186,52 +188,47 @@ export function ManagerGovernanceReport(props: {
           />
         ) : null}
         {showOperationalRisk ? (
-          <div className="flex min-h-44 flex-col justify-between rounded-4xl border border-brand-100/90 bg-gradient-to-b from-brand-50 to-white p-5 shadow-panel transition duration-300 hover:-translate-y-0.5 hover:shadow-panel-lg">
-            <div className={pageStackClassName}>
-              <div>
-                <p className="text-xs font-semibold tracking-[0.18em] text-ink-soft">
-                  {props.locale === "ar" ? "مزيج أسباب الانجراف" : "Drift reason mix"}
-                </p>
-                <p className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-ink">
-                  {props.operationalRiskSummary.mixedReasonDriftCaseCount}
-                </p>
-              </div>
-              <p className="text-sm leading-7 text-ink-soft">
-                {props.locale === "ar"
-                  ? "حالات انجرفت بسبب تحديث متابعة فردي وإعادة ضبط جماعية لاحقة معاً داخل الدفعات الحديثة المرئية."
-                  : "Drifted cases in the recent visible batches that were changed by both later individual follow-up saves and later bulk resets."}
-              </p>
-            </div>
-            <div className={statusRowWrapClassName}>
-              {props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount > 0 ? (
-                <StatusBadge>
-                  {props.locale === "ar"
-                    ? `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} متابعة فقط`
-                    : `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} follow-up only`}
-                </StatusBadge>
-              ) : null}
-              {props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount > 0 ? (
-                <StatusBadge>
-                  {props.locale === "ar"
-                    ? `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} دفعة فقط`
-                    : `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} bulk reset only`}
-                </StatusBadge>
-              ) : null}
-              {props.operationalRiskSummary.mixedReasonDriftCaseCount > 0 ? (
-                <StatusBadge tone="warning">
-                  {props.locale === "ar"
-                    ? `${props.operationalRiskSummary.mixedReasonDriftCaseCount} مختلطة`
-                    : `${props.operationalRiskSummary.mixedReasonDriftCaseCount} mixed`}
-                </StatusBadge>
-              ) : null}
-            </div>
-          </div>
+          <MetricInsightTile
+            detail={
+              props.locale === "ar"
+                ? "حالات انجرفت بسبب تحديث متابعة فردي وإعادة ضبط جماعية لاحقة معاً داخل الدفعات الحديثة المرئية."
+                : "Drifted cases in the recent visible batches that were changed by both later individual follow-up saves and later bulk resets."
+            }
+            footer={
+              <>
+                {props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount > 0 ? (
+                  <StatusBadge>
+                    {props.locale === "ar"
+                      ? `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} متابعة فقط`
+                      : `${props.operationalRiskSummary.followUpUpdateOnlyDriftCaseCount} follow-up only`}
+                  </StatusBadge>
+                ) : null}
+                {props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount > 0 ? (
+                  <StatusBadge>
+                    {props.locale === "ar"
+                      ? `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} دفعة فقط`
+                      : `${props.operationalRiskSummary.laterBulkResetOnlyDriftCaseCount} bulk reset only`}
+                  </StatusBadge>
+                ) : null}
+                {props.operationalRiskSummary.mixedReasonDriftCaseCount > 0 ? (
+                  <StatusBadge tone="warning">
+                    {props.locale === "ar"
+                      ? `${props.operationalRiskSummary.mixedReasonDriftCaseCount} مختلطة`
+                      : `${props.operationalRiskSummary.mixedReasonDriftCaseCount} mixed`}
+                  </StatusBadge>
+                ) : null}
+              </>
+            }
+            label={props.locale === "ar" ? "مزيج أسباب الانجراف" : "Drift reason mix"}
+            tone="mint"
+            value={props.operationalRiskSummary.mixedReasonDriftCaseCount}
+          />
         ) : null}
       </div>
 
       <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "فلاتر سريعة" : "Quick filters"}>
-          <div className={pageStackClassName}>
+          <WorkflowPanelBody>
             <SegmentedLinkTabs
               activeValue={props.view}
               items={[
@@ -419,20 +416,21 @@ export function ManagerGovernanceReport(props: {
               title={props.locale === "ar" ? "موضوع المراجعة" : "Review subject"}
             />
             ) : null}
-          </div>
+          </WorkflowPanelBody>
         </Panel>
 
         <Panel title={props.locale === "ar" ? "التصدير والاستخدام" : "Export and usage"}>
-          <div className={pageStackClassName}>
-            <p className={panelSummaryClassName}>
-              {props.view === "operational_risk"
+          <WorkflowPanelBody
+            summary={
+              props.view === "operational_risk"
                 ? props.locale === "ar"
                   ? "وضع مخاطر التشغيل يعرض ضغط التسليمات الحية فقط. تصدير CSV على مستوى التقرير يبقى مخصصاً لسجل أحداث الجودة التاريخي، بينما توفّر صفوف الدفعات أدناه تصدير الحالات الحية الدقيقة لكل نطاق دفعة."
                   : "Operational risk mode focuses on live handoff pressure only. Report-level CSV export remains reserved for historical QA-event reporting, while the bulk rows below can export exact live-case scopes per batch."
                 : props.locale === "ar"
                   ? "نزّل نفس النطاق الحالي كملف CSV لمشاركته مع التشغيل أو المراجعة اليومية دون فقدان سياق الإشارات أو الأدلة."
-                  : "Download the current filtered scope as CSV for operations review without losing policy signals, evidence, or reviewer context."}
-            </p>
+                  : "Download the current filtered scope as CSV for operations review without losing policy signals, evidence, or reviewer context."
+            }
+          >
             <div className={statusRowWrapClassName}>
               <StatusBadge>{props.view === "operational_risk" ? (props.locale === "ar" ? "عرض حي" : "Live view") : props.locale === "ar" ? "CSV جاهز" : "CSV export ready"}</StatusBadge>
               <StatusBadge>
@@ -489,19 +487,20 @@ export function ManagerGovernanceReport(props: {
             <Link className={inlineLinkClassName} href={`/${props.locale}/manager`}>
               {props.locale === "ar" ? "العودة إلى بوابة الإدارة" : "Return to the manager gateway"}
             </Link>
-          </div>
+          </WorkflowPanelBody>
         </Panel>
       </div>
 
       {showOperationalRisk ? (
       <Panel title={props.locale === "ar" ? "أولويات التصدير المقترحة" : "Recommended export priorities"}>
         {props.operationalRiskSummary.exportCandidates.length > 0 ? (
-          <div className={pageStackClassName}>
-            <p className={panelSummaryClassName}>
-              {props.locale === "ar"
+          <WorkflowPanelBody
+            summary={
+              props.locale === "ar"
                 ? "يعرض هذا الملخص أي نطاقات CSV الحية تستحق السحب أولاً قبل فتح صفوف الدفعات، اعتماداً على حجم الانجراف وتعقيد سببه والحالات التي ما زالت متصاعدة."
-                : "This summary ranks which live CSV scopes are worth pulling first before opening batch rows, based on visible drift volume, drift complexity, and cases that are still escalated."}
-            </p>
+                : "This summary ranks which live CSV scopes are worth pulling first before opening batch rows, based on visible drift volume, drift complexity, and cases that are still escalated."
+            }
+          >
             <div className={dataTableWrapperClassName}>
               <table className={dataTableClassName}>
                 <thead>
@@ -575,7 +574,7 @@ export function ManagerGovernanceReport(props: {
                 </tbody>
               </table>
             </div>
-          </div>
+          </WorkflowPanelBody>
         ) : (
           <EmptyState
             summary={

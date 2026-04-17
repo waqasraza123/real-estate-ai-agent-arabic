@@ -420,6 +420,27 @@ export function MetricTile(props: {
   );
 }
 
+export function MetricInsightTile(props: {
+  detail: ReactNode;
+  footer?: ReactNode;
+  label: ReactNode;
+  tone: "ocean" | "sand" | "mint" | "rose";
+  value: ReactNode;
+}) {
+  return (
+    <div className={metricTileClassName(props.tone)}>
+      <div className={pageStackClassName}>
+        <div>
+          <p className={metricLabelClassName}>{props.label}</p>
+          <div className={cx(metricValueClassName, "mt-3")}>{props.value}</div>
+        </div>
+        <div className={metricDetailClassName}>{props.detail}</div>
+      </div>
+      {props.footer ? <div className={statusRowWrapClassName}>{props.footer}</div> : null}
+    </div>
+  );
+}
+
 function EmptyIllustration() {
   return (
     <div className="relative flex h-28 w-28 items-center justify-center">
