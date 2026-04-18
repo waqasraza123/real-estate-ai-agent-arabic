@@ -6,16 +6,15 @@ import { getDemoCaseById, getLocalizedText, type SupportedLocale } from "@real-e
 import { getMessages } from "@real-estate-ai/i18n";
 import {
   caseMetaClassName,
-  caseStackCardClassName,
-  documentRowActionsClassName,
-  documentRowClassName,
+  HighlightNotice,
   inlineLinkClassName,
   pageStackClassName,
   Panel,
-  panelSummaryClassName,
   StatusBadge,
-  stackListClassName,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowCard,
+  WorkflowListItem,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { CaseRouteTabs } from "@/components/case-route-tabs";
@@ -84,20 +83,19 @@ export default async function DocumentsPage(props: PageProps) {
 
         <div className={twoColumnGridClassName}>
           <Panel title={messages.common.documents}>
-            <div className="mt-4">
+            <WorkflowPanelBody className="mt-4">
               <StatefulStack
                 emptySummary={messages.states.emptyDocumentsSummary}
                 emptyTitle={messages.states.emptyDocumentsTitle}
                 items={documentItems}
                 renderItem={(documentItem) => (
-                  <article key={documentItem.documentRequestId} className={documentRowClassName}>
-                    <div className="space-y-1.5">
-                      <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{documentItem.label}</h3>
-                      <p className="text-sm leading-7 text-ink-soft">{documentItem.detail}</p>
-                      <p className={caseMetaClassName}>{documentItem.updatedAt}</p>
-                    </div>
-                    <div className={documentRowActionsClassName}>
-                      <StatusBadge tone={documentItem.statusTone}>{documentItem.statusLabel}</StatusBadge>
+                  <WorkflowListItem
+                    key={documentItem.documentRequestId}
+                    badges={<StatusBadge tone={documentItem.statusTone}>{documentItem.statusLabel}</StatusBadge>}
+                    meta={<p className={caseMetaClassName}>{documentItem.updatedAt}</p>}
+                    summary={documentItem.detail}
+                    title={documentItem.label}
+                    actions={
                       <DocumentStatusForm
                         caseId={persistedCase.caseId}
                         documentRequestId={documentItem.documentRequestId}
@@ -105,36 +103,33 @@ export default async function DocumentsPage(props: PageProps) {
                         returnPath={`/${locale}/leads/${persistedCase.caseId}/documents`}
                         status={documentItem.value}
                       />
-                    </div>
-                  </article>
+                    }
+                  />
                 )}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={handoverIntakeCopy.title}>
             {persistedCase.handoverCase ? (
-              <div className={stackListClassName}>
-                <div className={caseStackCardClassName}>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">
-                      {locale === "ar" ? "سجل التسليم مرتبط" : "Linked handover record"}
-                    </h3>
-                    <StatusBadge tone="success">{getPersistedHandoverStatusLabel(locale, persistedCase.handoverCase)}</StatusBadge>
-                  </div>
-                  <p className="text-sm leading-7 text-ink-soft">{handoverIntakeCopy.helperReady}</p>
-                  <p className={caseMetaClassName}>{persistedCase.handoverCase.ownerName}</p>
-                  {canAccessHandoverWorkspace ? (
-                    <Link className={inlineLinkClassName} href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
-                      {locale === "ar" ? "فتح سجل التسليم" : "Open handover record"}
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  actions={
+                    canAccessHandoverWorkspace ? (
+                      <Link className={inlineLinkClassName} href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
+                        {locale === "ar" ? "فتح سجل التسليم" : "Open handover record"}
+                      </Link>
+                    ) : null
+                  }
+                  badges={<StatusBadge tone="success">{getPersistedHandoverStatusLabel(locale, persistedCase.handoverCase)}</StatusBadge>}
+                  meta={<p className={caseMetaClassName}>{persistedCase.handoverCase.ownerName}</p>}
+                  summary={handoverIntakeCopy.helperReady}
+                  title={locale === "ar" ? "سجل التسليم مرتبط" : "Linked handover record"}
+                  tone="success"
+                />
+              </WorkflowPanelBody>
             ) : documentsAccepted ? (
-              <div className="mt-4 space-y-4">
-                <p className={panelSummaryClassName}>{handoverIntakeCopy.helperReady}</p>
-                <p className="text-sm leading-7 text-ink-soft">{handoverIntakeGuardNote}</p>
+              <WorkflowPanelBody className="mt-4" note={handoverIntakeGuardNote} summary={handoverIntakeCopy.helperReady}>
                 <HandoverIntakeForm
                   canManage={canManageHandoverIntake}
                   caseId={persistedCase.caseId}
@@ -143,16 +138,21 @@ export default async function DocumentsPage(props: PageProps) {
                   locale={locale}
                   returnPath={`/${locale}/leads/${persistedCase.caseId}/documents`}
                 />
-              </div>
+              </WorkflowPanelBody>
             ) : (
-              <div className={stackListClassName}>
-                <div className={caseStackCardClassName}>
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">
-                    {locale === "ar" ? "اعتماد التسليم ما زال مقفلاً" : "Handover approval is still locked"}
-                  </h3>
-                  <p className="text-sm leading-7 text-ink-soft">{handoverIntakeCopy.helperLocked}</p>
-                </div>
-              </div>
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  summary={handoverIntakeCopy.helperLocked}
+                  title={locale === "ar" ? "اعتماد التسليم ما زال مقفلاً" : "Handover approval is still locked"}
+                  tone="warning"
+                >
+                  <HighlightNotice tone="warning">
+                    {locale === "ar"
+                      ? "يبقى هذا المسار مقفلاً حتى تصل كل المستندات المطلوبة إلى حالة مقبولة."
+                      : "This route stays locked until every required document reaches an accepted state."}
+                  </HighlightNotice>
+                </WorkflowCard>
+              </WorkflowPanelBody>
             )}
           </Panel>
         </div>
@@ -172,26 +172,25 @@ export default async function DocumentsPage(props: PageProps) {
       <CaseRouteTabs caseId={caseItem.id} handoverCaseId={caseItem.handoverCaseId} locale={locale} />
 
       <Panel title={messages.common.documents}>
-        <div className="mt-4">
+        <WorkflowPanelBody className="mt-4">
           <StatefulStack
             emptySummary={messages.states.emptyDocumentsSummary}
             emptyTitle={messages.states.emptyDocumentsTitle}
             items={caseItem.documents}
             renderItem={(documentItem) => (
-              <article key={documentItem.id} className={documentRowClassName}>
-                <div className="space-y-1.5">
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{getLocalizedText(documentItem.name, locale)}</h3>
-                  <p className="text-sm leading-7 text-ink-soft">{getLocalizedText(documentItem.detail, locale)}</p>
-                </div>
-                <div className={documentRowActionsClassName}>
+              <WorkflowListItem
+                key={documentItem.id}
+                badges={
                   <StatusBadge tone={documentItem.status === "missing" ? "critical" : documentItem.status === "review" ? "warning" : "success"}>
                     {documentItem.status}
                   </StatusBadge>
-                </div>
-              </article>
+                }
+                summary={getLocalizedText(documentItem.detail, locale)}
+                title={getLocalizedText(documentItem.name, locale)}
+              />
             )}
           />
-        </div>
+        </WorkflowPanelBody>
       </Panel>
 
       <PlaceholderNotice locale={locale} />

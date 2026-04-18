@@ -21,6 +21,17 @@ export const caseMetaClassName = "text-sm text-ink-muted [unicode-bidi:plaintext
 export const panelSummaryClassName = "text-sm leading-7 text-ink-soft sm:text-[0.96rem]";
 export const placeholderNoticeClassName =
   "rounded-3xl border border-dashed border-canvas-line/80 bg-canvas-raised/85 px-5 py-4 text-sm leading-7 text-ink-soft";
+export function highlightNoticeClassName(tone: "brand" | "ai" | "warning" = "brand") {
+  if (tone === "ai") {
+    return "rounded-4xl border border-ai-100/80 bg-ai-50/70 p-4 text-sm leading-7 text-ink-soft";
+  }
+
+  if (tone === "warning") {
+    return "rounded-4xl border border-warning-200/80 bg-warning-50/70 p-4 text-sm leading-7 text-ink-soft";
+  }
+
+  return "rounded-4xl border border-brand-100/80 bg-brand-50/70 p-4 text-sm leading-7 text-ink-soft";
+}
 export const inlineLinkClassName =
   "inline-flex items-center gap-2 text-sm font-semibold text-brand-700 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-raised";
 
@@ -321,6 +332,14 @@ export function WorkflowPanelBody(props: {
       {props.children}
     </div>
   );
+}
+
+export function HighlightNotice(props: {
+  children: ReactNode;
+  className?: string;
+  tone?: "brand" | "ai" | "warning";
+}) {
+  return <div className={cx(highlightNoticeClassName(props.tone), props.className)}>{props.children}</div>;
 }
 
 export function workflowCardClassName(tone: "neutral" | "warning" | "critical" | "success" = "neutral") {

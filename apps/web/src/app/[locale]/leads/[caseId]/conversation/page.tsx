@@ -10,11 +10,10 @@ import {
   inlineLinkClassName,
   pageStackClassName,
   Panel,
-  panelSummaryClassName,
-  rowBetweenClassName,
   StatusBadge,
-  statusRowWrapClassName,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowCard,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { CaseRouteTabs } from "@/components/case-route-tabs";
@@ -113,26 +112,30 @@ export default async function ConversationPage(props: PageProps) {
 
         {qaReviewDisplay ? (
           <Panel title={locale === "ar" ? "حالة التحكم البشري" : "Human takeover state"}>
-            <div className="mt-4 space-y-4">
-              <div className={statusRowWrapClassName}>
-                <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
-                <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
-                <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                {qaReviewDisplay.policySignalLabels.map((label) => (
-                  <StatusBadge key={label}>{label}</StatusBadge>
-                ))}
-              </div>
-              <p className="text-sm leading-7 text-ink-soft">{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}</p>
-              {qaReviewDisplay.draftMessage ? <p className={caseMetaClassName}>{qaReviewDisplay.draftMessage}</p> : null}
-            </div>
+            <WorkflowPanelBody className="mt-4">
+              <WorkflowCard
+                badges={
+                  <>
+                    <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
+                    <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
+                    <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
+                    {qaReviewDisplay.policySignalLabels.map((label) => (
+                      <StatusBadge key={label}>{label}</StatusBadge>
+                    ))}
+                  </>
+                }
+                meta={qaReviewDisplay.draftMessage ? <p className={caseMetaClassName}>{qaReviewDisplay.draftMessage}</p> : null}
+                summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
+                title={locale === "ar" ? "بوابة التحكم الحالية" : "Current takeover gate"}
+                tone="warning"
+              />
+            </WorkflowPanelBody>
           </Panel>
         ) : null}
 
         <div className={twoColumnGridClassName}>
           <Panel title={manualReplyCopy.title}>
-            <div className="mt-4 space-y-4">
-              <p className={panelSummaryClassName}>{manualReplyCopy.summary}</p>
-              {!canSendReplies ? <p className="text-sm leading-7 text-ink-soft">{sendReplyGuardNote}</p> : null}
+            <WorkflowPanelBody className="mt-4" note={!canSendReplies ? sendReplyGuardNote : undefined} summary={manualReplyCopy.summary}>
               <CaseManualReplyForm
                 canSend={canSendHumanReply}
                 caseId={persistedCase.caseId}
@@ -145,13 +148,11 @@ export default async function ConversationPage(props: PageProps) {
                 returnPath={`/${locale}/leads/${persistedCase.caseId}/conversation`}
                 showApprovedDraftNote={hasApprovedReplyDraft}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={replyDraftCopy.title}>
-            <div className="mt-4 space-y-4">
-              <p className={panelSummaryClassName}>{replyDraftCopy.summary}</p>
-              <p className="text-sm leading-7 text-ink-soft">{qaSamplingGuardNote}</p>
+            <WorkflowPanelBody className="mt-4" note={qaSamplingGuardNote} summary={replyDraftCopy.summary}>
               <CaseReplyDraftQaRequestForm
                 canManage={canManageQaSampling && qaReviewDisplay?.status !== "pending_review"}
                 caseId={persistedCase.caseId}
@@ -161,38 +162,45 @@ export default async function ConversationPage(props: PageProps) {
                 locale={locale}
                 returnPath={`/${locale}/leads/${persistedCase.caseId}/conversation`}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={locale === "ar" ? "حالة مسودة الرد" : "Reply-draft state"}>
             {currentReplyDraft ? (
-              <div className="mt-4 space-y-4">
-                <div className={rowBetweenClassName}>
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{currentReplyDraft.subjectTypeLabel}</h3>
-                  <StatusBadge tone={currentReplyDraft.statusTone}>{currentReplyDraft.statusLabel}</StatusBadge>
-                </div>
-                <div className={statusRowWrapClassName}>
-                  <StatusBadge>{currentReplyDraft.triggerSourceLabel}</StatusBadge>
-                  {qaReviewDisplay?.policySignalLabels.map((label) => (
-                    <StatusBadge key={label}>{label}</StatusBadge>
-                  ))}
-                </div>
-                <p className="text-sm leading-7 text-ink-soft">{currentReplyDraft.draftMessage}</p>
-                <p className="text-sm leading-7 text-ink-soft">{currentReplyDraft.reviewSummary ?? currentReplyDraft.sampleSummary}</p>
-                {currentReplyDraft.triggerEvidence.length > 0 ? <p className={caseMetaClassName}>{currentReplyDraft.triggerEvidence.join(", ")}</p> : null}
-                <p className={caseMetaClassName}>{currentReplyDraft.updatedAt}</p>
-                {canAccessQaWorkspace ? (
-                  <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
-                    {locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
-                  </Link>
-                ) : null}
-              </div>
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  actions={
+                    canAccessQaWorkspace ? (
+                      <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
+                        {locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                      </Link>
+                    ) : null
+                  }
+                  badges={
+                    <>
+                      <StatusBadge tone={currentReplyDraft.statusTone}>{currentReplyDraft.statusLabel}</StatusBadge>
+                      <StatusBadge>{currentReplyDraft.triggerSourceLabel}</StatusBadge>
+                      {qaReviewDisplay?.policySignalLabels.map((label) => (
+                        <StatusBadge key={label}>{label}</StatusBadge>
+                      ))}
+                    </>
+                  }
+                  meta={<p className={caseMetaClassName}>{currentReplyDraft.updatedAt}</p>}
+                  summary={currentReplyDraft.reviewSummary ?? currentReplyDraft.sampleSummary}
+                  title={currentReplyDraft.subjectTypeLabel}
+                >
+                  <p className="text-sm leading-7 text-ink-soft">{currentReplyDraft.draftMessage}</p>
+                  {currentReplyDraft.triggerEvidence.length > 0 ? <p className={caseMetaClassName}>{currentReplyDraft.triggerEvidence.join(", ")}</p> : null}
+                </WorkflowCard>
+              </WorkflowPanelBody>
             ) : (
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
-                  ? "لا توجد حالياً مسودة رد محفوظة داخل حدود اعتماد الجودة."
-                  : "No prepared reply draft is currently sitting inside the QA approval boundary."}
-              </p>
+              <WorkflowPanelBody
+                summary={
+                  locale === "ar"
+                    ? "لا توجد حالياً مسودة رد محفوظة داخل حدود اعتماد الجودة."
+                    : "No prepared reply draft is currently sitting inside the QA approval boundary."
+                }
+              />
             )}
           </Panel>
         </div>

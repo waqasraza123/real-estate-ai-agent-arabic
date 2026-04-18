@@ -4,15 +4,16 @@ import { canOperatorRoleAccessWorkspace } from "@real-estate-ai/contracts";
 import { getDemoCaseById, type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import {
-  caseStackCardClassName,
   detailLabelClassName,
+  HighlightNotice,
   pageStackClassName,
   Panel,
-  panelSummaryClassName,
   slotCardClassName,
   slotGridClassName,
   StatusBadge,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowCard,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { CaseRouteTabs } from "@/components/case-route-tabs";
@@ -69,30 +70,32 @@ export default async function SchedulePage(props: PageProps) {
         <div className={twoColumnGridClassName}>
           <Panel title={messages.common.visitReadiness}>
             {persistedCase.currentVisit ? (
-              <div className="mt-4">
-                <div className={caseStackCardClassName}>
-                  <p className={detailLabelClassName}>{formatDateTime(persistedCase.currentVisit.scheduledAt, locale)}</p>
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{persistedCase.currentVisit.location}</h3>
-                  <p className="text-sm leading-7 text-ink-soft">
-                    {locale === "ar"
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  meta={<p className={detailLabelClassName}>{formatDateTime(persistedCase.currentVisit.scheduledAt, locale)}</p>}
+                  summary={
+                    locale === "ar"
                       ? "تم ربط الحالة بزيارة محفوظة داخل المسار الحي ويمكن للإدارة متابعتها من شاشة الحالة."
-                      : "The case now has a persisted visit that managers can inspect directly from the live alpha workflow."}
-                  </p>
-                </div>
-              </div>
+                      : "The case now has a persisted visit that managers can inspect directly from the live alpha workflow."
+                  }
+                  title={persistedCase.currentVisit.location}
+                />
+              </WorkflowPanelBody>
             ) : (
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
-                  ? "لا توجد زيارة محفوظة بعد. استخدم النموذج المجاور لتحديد أول موعد فعلي."
-                  : "No visit has been scheduled yet. Use the adjacent form to save the first live appointment."}
-              </p>
+              <WorkflowPanelBody
+                summary={
+                  locale === "ar"
+                    ? "لا توجد زيارة محفوظة بعد. استخدم النموذج المجاور لتحديد أول موعد فعلي."
+                    : "No visit has been scheduled yet. Use the adjacent form to save the first live appointment."
+                }
+              />
             )}
           </Panel>
 
           <Panel title={messages.schedule.title}>
-            <div className="mt-4">
+            <WorkflowPanelBody className="mt-4">
               <VisitSchedulingForm caseId={persistedCase.caseId} locale={locale} returnPath={`/${locale}/leads/${persistedCase.caseId}/schedule`} />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
         </div>
       </div>
@@ -112,12 +115,15 @@ export default async function SchedulePage(props: PageProps) {
 
       <div className={twoColumnGridClassName}>
         <Panel title={messages.common.visitReadiness}>
-          <div className="mt-4 space-y-3">
-            <p className={detailLabelClassName}>{caseItem.visitPlan.scheduledAt}</p>
-            <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{caseItem.customerName}</h3>
-            <p className="text-sm leading-7 text-ink-soft">{caseItem.visitPlan.location[locale]}</p>
-            <p className="text-sm leading-7 text-ink-soft">{caseItem.visitPlan.readinessNote[locale]}</p>
-          </div>
+          <WorkflowPanelBody className="mt-4">
+            <WorkflowCard
+              meta={<p className={detailLabelClassName}>{caseItem.visitPlan.scheduledAt}</p>}
+              summary={caseItem.visitPlan.location[locale]}
+              title={caseItem.customerName}
+            >
+              <HighlightNotice>{caseItem.visitPlan.readinessNote[locale]}</HighlightNotice>
+            </WorkflowCard>
+          </WorkflowPanelBody>
         </Panel>
 
         <Panel title={messages.schedule.title}>

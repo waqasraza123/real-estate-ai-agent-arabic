@@ -6,24 +6,20 @@ import { getDemoCaseById, getLocalizedText } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import {
   caseMetaClassName,
-  caseStackCardClassName,
-  criticalAlertCardClassName,
-  detailGridClassName,
   detailLabelClassName,
   DetailGrid,
   DetailItem,
   DetailListItem,
   detailListClassName,
+  HighlightNotice,
   inlineLinkClassName,
   pageStackClassName,
   Panel,
-  panelSummaryClassName,
-  rowBetweenClassName,
-  stackTightClassName,
   StatusBadge,
   statusRowWrapClassName,
-  successCardClassName,
-  twoColumnGridClassName
+  twoColumnGridClassName,
+  WorkflowCard,
+  WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
 import { AutomationStatusForm } from "@/components/automation-status-form";
@@ -151,74 +147,77 @@ export default async function LeadProfilePage(props: PageProps) {
 
         <div className={twoColumnGridClassName}>
           <Panel title={persistedCase.customerName}>
-            <DetailGrid>
-              <DetailItem label={messages.common.stage} value={<StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>} />
-              <DetailItem label={messages.common.currentOwner} value={persistedCase.ownerName} />
-              <DetailItem label={messages.common.nextAction} value={persistedCase.nextAction} />
-              <DetailItem label={locale === "ar" ? "موعد المتابعة" : "Follow-up due"} value={formatDueAt(persistedCase, locale)} />
-              <DetailItem label={messages.common.lastChange} value={formatCaseLastChange(persistedCase, locale)} />
-              <DetailItem label={locale === "ar" ? "مصدر الحالة" : "Lead source"} value={getPersistedSourceLabel(locale)} />
-            </DetailGrid>
-            <div className={`mt-5 ${statusRowWrapClassName}`}>
-              <StatusBadge tone={persistedCase.followUpStatus === "attention" ? "critical" : "success"}>
-                {getPersistedFollowUpLabel(locale, persistedCase)}
-              </StatusBadge>
-              <StatusBadge>{getPersistedAutomationLabel(locale, persistedCase.automationStatus)}</StatusBadge>
-              {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
-              {persistedCase.openInterventionsCount > 0 ? (
-                <StatusBadge tone="warning">{getInterventionCountLabel(locale, persistedCase.openInterventionsCount)}</StatusBadge>
-              ) : null}
-            </div>
-            <div className="mt-5 rounded-4xl border border-brand-100/80 bg-brand-50/70 p-4 text-sm leading-7 text-ink-soft">
-              <p>{persistedCase.budget ?? persistedCase.projectInterest}</p>
-              <p>{persistedCase.projectInterest}</p>
-            </div>
+            <WorkflowPanelBody className="mt-4">
+              <DetailGrid>
+                <DetailItem label={messages.common.stage} value={<StatusBadge>{getPersistedCaseStageLabel(locale, persistedCase.stage)}</StatusBadge>} />
+                <DetailItem label={messages.common.currentOwner} value={persistedCase.ownerName} />
+                <DetailItem label={messages.common.nextAction} value={persistedCase.nextAction} />
+                <DetailItem label={locale === "ar" ? "موعد المتابعة" : "Follow-up due"} value={formatDueAt(persistedCase, locale)} />
+                <DetailItem label={messages.common.lastChange} value={formatCaseLastChange(persistedCase, locale)} />
+                <DetailItem label={locale === "ar" ? "مصدر الحالة" : "Lead source"} value={getPersistedSourceLabel(locale)} />
+              </DetailGrid>
+              <div className={statusRowWrapClassName}>
+                <StatusBadge tone={persistedCase.followUpStatus === "attention" ? "critical" : "success"}>
+                  {getPersistedFollowUpLabel(locale, persistedCase)}
+                </StatusBadge>
+                <StatusBadge>{getPersistedAutomationLabel(locale, persistedCase.automationStatus)}</StatusBadge>
+                {automationHoldReasonLabel ? <StatusBadge tone="warning">{automationHoldReasonLabel}</StatusBadge> : null}
+                {persistedCase.openInterventionsCount > 0 ? (
+                  <StatusBadge tone="warning">{getInterventionCountLabel(locale, persistedCase.openInterventionsCount)}</StatusBadge>
+                ) : null}
+              </div>
+              <HighlightNotice>
+                <p>{persistedCase.budget ?? persistedCase.projectInterest}</p>
+                <p>{persistedCase.projectInterest}</p>
+              </HighlightNotice>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={locale === "ar" ? "التفاصيل الأساسية" : "Core intake details"}>
-            <dl className={detailListClassName}>
-              <DetailListItem label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={persistedCase.email} />
-              <DetailListItem label={locale === "ar" ? "الهاتف" : "Phone"} value={persistedCase.phone ?? "—"} />
-              <DetailListItem label={locale === "ar" ? "المشروع المطلوب" : "Project interest"} value={persistedCase.projectInterest} />
-              <DetailListItem label={locale === "ar" ? "لغة العميل" : "Customer language"} value={persistedCase.preferredLocale === "ar" ? "العربية" : "English"} />
-            </dl>
+            <WorkflowPanelBody className="mt-4">
+              <dl className={detailListClassName}>
+                <DetailListItem label={locale === "ar" ? "البريد الإلكتروني" : "Email"} value={persistedCase.email} />
+                <DetailListItem label={locale === "ar" ? "الهاتف" : "Phone"} value={persistedCase.phone ?? "—"} />
+                <DetailListItem label={locale === "ar" ? "المشروع المطلوب" : "Project interest"} value={persistedCase.projectInterest} />
+                <DetailListItem label={locale === "ar" ? "لغة العميل" : "Customer language"} value={persistedCase.preferredLocale === "ar" ? "العربية" : "English"} />
+              </dl>
+            </WorkflowPanelBody>
           </Panel>
         </div>
 
         <div className={twoColumnGridClassName}>
           <Panel title={followUpManagerCopy.title}>
-            <div className="mt-4 space-y-4">
-              <p className={panelSummaryClassName}>{followUpManagerCopy.summary}</p>
-              <p className="text-sm leading-7 text-ink-soft">{followUpGuardNote}</p>
-            {persistedCase.latestManagerFollowUp && latestManagerFollowUpLabel && latestManagerFollowUpSavedAt ? (
-              <div className="space-y-3">
-                <StatusBadge>{latestManagerFollowUpLabel}</StatusBadge>
-                <p className="text-sm leading-7 text-ink-soft">
-                  {persistedCase.latestManagerFollowUp.ownerName}
-                  {" · "}
-                  {latestManagerFollowUpSavedAt}
-                </p>
-                {latestManagerFollowUpNote ? <p className="text-sm leading-7 text-ink-soft">{latestManagerFollowUpNote}</p> : null}
-              </div>
-            ) : null}
-            <ManagerFollowUpForm
-              canManage={canManageFollowUp}
-              caseId={persistedCase.caseId}
-              disabledLabel={locale === "ar" ? "يتطلب دوراً إدارياً" : "Manager role required"}
-              locale={locale}
-              nextAction={persistedCase.nextAction}
-              nextActionDueAt={persistedCase.nextActionDueAt}
-              ownerName={persistedCase.ownerName}
-              returnPath={`/${locale}/leads/${persistedCase.caseId}`}
-            />
-            </div>
+            <WorkflowPanelBody className="mt-4" note={followUpGuardNote} summary={followUpManagerCopy.summary}>
+              {persistedCase.latestManagerFollowUp && latestManagerFollowUpLabel && latestManagerFollowUpSavedAt ? (
+                <WorkflowCard
+                  badges={<StatusBadge>{latestManagerFollowUpLabel}</StatusBadge>}
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {persistedCase.latestManagerFollowUp.ownerName}
+                      {" · "}
+                      {latestManagerFollowUpSavedAt}
+                    </p>
+                  }
+                  summary={latestManagerFollowUpNote}
+                  title={locale === "ar" ? "آخر تحديث إداري" : "Latest manager follow-up"}
+                />
+              ) : null}
+              <ManagerFollowUpForm
+                canManage={canManageFollowUp}
+                caseId={persistedCase.caseId}
+                disabledLabel={locale === "ar" ? "يتطلب دوراً إدارياً" : "Manager role required"}
+                locale={locale}
+                nextAction={persistedCase.nextAction}
+                nextActionDueAt={persistedCase.nextActionDueAt}
+                ownerName={persistedCase.ownerName}
+                returnPath={`/${locale}/leads/${persistedCase.caseId}`}
+              />
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={automationCopy.title}>
-            <div className="mt-4 space-y-4">
-              <p className={panelSummaryClassName}>{automationCopy.summary}</p>
-              <p className="text-sm leading-7 text-ink-soft">{automationGuardNote}</p>
-              {automationHoldReasonNote ? <p className="text-sm leading-7 text-ink-soft">{automationHoldReasonNote}</p> : null}
+            <WorkflowPanelBody className="mt-4" note={automationGuardNote} summary={automationCopy.summary}>
+              {automationHoldReasonNote ? <HighlightNotice tone="warning">{automationHoldReasonNote}</HighlightNotice> : null}
               <AutomationStatusForm
                 canManage={canManageAutomation}
                 caseId={persistedCase.caseId}
@@ -227,52 +226,51 @@ export default async function LeadProfilePage(props: PageProps) {
                 returnPath={`/${locale}/leads/${persistedCase.caseId}`}
                 status={persistedCase.automationStatus}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
         </div>
 
         <div className={twoColumnGridClassName}>
           <Panel title={locale === "ar" ? "آخر رد بشري" : "Latest human reply"}>
             {persistedCase.latestHumanReply ? (
-              <div className="mt-4 space-y-4">
-                <div className={rowBetweenClassName}>
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{persistedCase.latestHumanReply.sentByName}</h3>
-                  {latestHumanReplyLabel ? <StatusBadge tone="success">{latestHumanReplyLabel}</StatusBadge> : null}
-                </div>
-                {latestHumanReplyOwnershipLabel ? <StatusBadge>{latestHumanReplyOwnershipLabel}</StatusBadge> : null}
-                {latestHumanReplyEscalationLabel ? <StatusBadge tone="warning">{latestHumanReplyEscalationLabel}</StatusBadge> : null}
-                <p className="text-sm leading-7 text-ink-soft">{persistedCase.latestHumanReply.message}</p>
-                <dl className={detailListClassName}>
-                  <div>
-                    <dt className={detailLabelClassName}>{locale === "ar" ? "وقت الإرسال" : "Sent at"}</dt>
-                    <dd className="mt-1 text-sm leading-7 text-ink">{latestHumanReplySentAt}</dd>
-                  </div>
-                  <div>
-                    <dt className={detailLabelClassName}>{locale === "ar" ? "الخطوة التالية المحفوظة" : "Saved next action"}</dt>
-                    <dd className="mt-1 text-sm leading-7 text-ink">{persistedCase.latestHumanReply.nextAction}</dd>
-                  </div>
-                  <div>
-                    <dt className={detailLabelClassName}>{locale === "ar" ? "موعد الخطوة التالية" : "Next action due"}</dt>
-                    <dd className="mt-1 text-sm leading-7 text-ink">
-                      {formatDateTime(persistedCase.latestHumanReply.nextActionDueAt, locale)}
-                    </dd>
-                  </div>
-                </dl>
-                {latestHumanReplyOwnershipNote ? <p className="text-sm leading-7 text-ink-soft">{latestHumanReplyOwnershipNote}</p> : null}
-              </div>
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  badges={
+                    <>
+                      {latestHumanReplyLabel ? <StatusBadge tone="success">{latestHumanReplyLabel}</StatusBadge> : null}
+                      {latestHumanReplyOwnershipLabel ? <StatusBadge>{latestHumanReplyOwnershipLabel}</StatusBadge> : null}
+                      {latestHumanReplyEscalationLabel ? <StatusBadge tone="warning">{latestHumanReplyEscalationLabel}</StatusBadge> : null}
+                    </>
+                  }
+                  meta={<p className={caseMetaClassName}>{persistedCase.latestHumanReply.sentByName}</p>}
+                  summary={persistedCase.latestHumanReply.message}
+                  title={locale === "ar" ? "تفاصيل الرد الحالي" : "Current reply details"}
+                  tone="success"
+                >
+                  <dl className={detailListClassName}>
+                    <DetailListItem label={locale === "ar" ? "وقت الإرسال" : "Sent at"} value={latestHumanReplySentAt} />
+                    <DetailListItem label={locale === "ar" ? "الخطوة التالية المحفوظة" : "Saved next action"} value={persistedCase.latestHumanReply.nextAction} />
+                    <DetailListItem
+                      label={locale === "ar" ? "موعد الخطوة التالية" : "Next action due"}
+                      value={formatDateTime(persistedCase.latestHumanReply.nextActionDueAt, locale)}
+                    />
+                  </dl>
+                  {latestHumanReplyOwnershipNote ? <p className={caseMetaClassName}>{latestHumanReplyOwnershipNote}</p> : null}
+                </WorkflowCard>
+              </WorkflowPanelBody>
             ) : (
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
-                  ? "لم يُسجل على هذه الحالة أي رد بشري بعد."
-                  : "No human reply has been recorded on this case yet."}
-              </p>
+              <WorkflowPanelBody
+                summary={
+                  locale === "ar"
+                    ? "لم يُسجل على هذه الحالة أي رد بشري بعد."
+                    : "No human reply has been recorded on this case yet."
+                }
+              />
             )}
           </Panel>
 
           <Panel title={qaReviewRequestCopy.title}>
-            <div className="mt-4 space-y-4">
-              <p className={panelSummaryClassName}>{qaReviewRequestCopy.summary}</p>
-              <p className="text-sm leading-7 text-ink-soft">{qaSamplingGuardNote}</p>
+            <WorkflowPanelBody className="mt-4" note={qaSamplingGuardNote} summary={qaReviewRequestCopy.summary}>
               <QaReviewRequestForm
                 canManage={canManageQaSampling && qaReviewDisplay?.status !== "pending_review"}
                 caseId={persistedCase.caseId}
@@ -281,63 +279,76 @@ export default async function LeadProfilePage(props: PageProps) {
                 locale={locale}
                 returnPath={`/${locale}/leads/${persistedCase.caseId}`}
               />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
 
           <Panel title={locale === "ar" ? "حالة مراجعة الجودة" : "QA review status"}>
             {qaReviewDisplay ? (
-              <div className="mt-4 space-y-4">
-                <div className={rowBetweenClassName}>
-                  <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{qaReviewDisplay.sampleSummary}</h3>
-                  <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
-                </div>
-                <div className={statusRowWrapClassName}>
-                  <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
-                  <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                  {qaReviewDisplay.policySignalLabels.map((label) => (
-                    <StatusBadge key={label}>{label}</StatusBadge>
-                  ))}
-                </div>
-                {qaReviewDisplay.draftMessage ? <p className="text-sm leading-7 text-ink-soft">{qaReviewDisplay.draftMessage}</p> : null}
-                <p className="text-sm leading-7 text-ink-soft">{qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}</p>
-                {qaReviewDisplay.triggerEvidence.length > 0 ? (
-                  <p className={caseMetaClassName}>{qaReviewDisplay.triggerEvidence.join(", ")}</p>
-                ) : null}
-                <p className={caseMetaClassName}>
-                  {qaReviewDisplay.reviewerName ?? qaReviewDisplay.requestedByName}
-                  {" · "}
-                  {qaReviewDisplay.reviewedAt ?? qaReviewDisplay.updatedAt}
-                </p>
-                {canAccessQaWorkspace ? (
-                  <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
-                    {locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
-                  </Link>
-                ) : null}
-              </div>
+              <WorkflowPanelBody className="mt-4">
+                <WorkflowCard
+                  actions={
+                    canAccessQaWorkspace ? (
+                      <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
+                        {locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                      </Link>
+                    ) : null
+                  }
+                  badges={
+                    <>
+                      <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
+                      <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
+                      <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
+                      {qaReviewDisplay.policySignalLabels.map((label) => (
+                        <StatusBadge key={label}>{label}</StatusBadge>
+                      ))}
+                    </>
+                  }
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {qaReviewDisplay.reviewerName ?? qaReviewDisplay.requestedByName}
+                      {" · "}
+                      {qaReviewDisplay.reviewedAt ?? qaReviewDisplay.updatedAt}
+                    </p>
+                  }
+                  summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
+                  title={qaReviewDisplay.sampleSummary}
+                >
+                  {qaReviewDisplay.draftMessage ? <p className="text-sm leading-7 text-ink-soft">{qaReviewDisplay.draftMessage}</p> : null}
+                  {qaReviewDisplay.triggerEvidence.length > 0 ? (
+                    <p className={caseMetaClassName}>{qaReviewDisplay.triggerEvidence.join(", ")}</p>
+                  ) : null}
+                </WorkflowCard>
+              </WorkflowPanelBody>
             ) : (
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
-                  ? "لم تُرسل هذه الحالة إلى طابور الجودة بعد."
-                  : "This case has not been sent to the QA queue yet."}
-              </p>
+              <WorkflowPanelBody
+                summary={
+                  locale === "ar"
+                    ? "لم تُرسل هذه الحالة إلى طابور الجودة بعد."
+                    : "This case has not been sent to the QA queue yet."
+                }
+              />
             )}
           </Panel>
         </div>
 
         {persistedCase.handoverCase ? (
           <Panel title={locale === "ar" ? "حالة التسليم المرتبطة" : "Linked handover record"}>
-            <div className={`mt-4 ${rowBetweenClassName}`}>
-              <div className={stackTightClassName}>
-                <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{persistedCase.handoverCase.ownerName}</h3>
-                <p className={caseMetaClassName}>{buildCaseReferenceCode(persistedCase.handoverCase.handoverCaseId)}</p>
-              </div>
-              <StatusBadge tone="success">{getPersistedHandoverStatusLabel(locale, persistedCase.handoverCase)}</StatusBadge>
-            </div>
-            {canAccessHandoverWorkspace ? (
-              <Link className={`mt-4 ${inlineLinkClassName}`} href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
-                {locale === "ar" ? "فتح صفحة التسليم" : "Open handover page"}
-              </Link>
-            ) : null}
+            <WorkflowPanelBody className="mt-4">
+              <WorkflowCard
+                actions={
+                  canAccessHandoverWorkspace ? (
+                    <Link className={inlineLinkClassName} href={`/${locale}/handover/${persistedCase.handoverCase.handoverCaseId}`}>
+                      {locale === "ar" ? "فتح صفحة التسليم" : "Open handover page"}
+                    </Link>
+                  ) : null
+                }
+                badges={<StatusBadge tone="success">{getPersistedHandoverStatusLabel(locale, persistedCase.handoverCase)}</StatusBadge>}
+                meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(persistedCase.handoverCase.handoverCaseId)}</p>}
+                summary={locale === "ar" ? "سجل التسليم المرتبط متاح الآن من هذا الملف." : "The linked handover record is now available from this profile."}
+                title={persistedCase.handoverCase.ownerName}
+                tone="success"
+              />
+            </WorkflowPanelBody>
           </Panel>
         ) : null}
 
@@ -362,13 +373,13 @@ export default async function LeadProfilePage(props: PageProps) {
               emptyTitle={locale === "ar" ? "لا توجد عناصر مفتوحة" : "Nothing open right now"}
               items={interventionItems.filter((intervention) => intervention.status === "open")}
               renderItem={(intervention) => (
-                <article key={intervention.interventionId} className={criticalAlertCardClassName}>
-                  <div className={rowBetweenClassName}>
-                    <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{intervention.summary}</h3>
-                    <StatusBadge tone={intervention.severityTone}>{intervention.severityLabel}</StatusBadge>
-                  </div>
-                  <p className={`mt-3 ${caseMetaClassName}`}>{intervention.createdAt}</p>
-                </article>
+                <WorkflowCard
+                  key={intervention.interventionId}
+                  badges={<StatusBadge tone={intervention.severityTone}>{intervention.severityLabel}</StatusBadge>}
+                  meta={<p className={caseMetaClassName}>{intervention.createdAt}</p>}
+                  title={intervention.summary}
+                  tone="critical"
+                />
               )}
             />
           </Panel>
@@ -383,13 +394,13 @@ export default async function LeadProfilePage(props: PageProps) {
               emptyTitle={locale === "ar" ? "لا يوجد سجل محلول" : "No resolved history yet"}
               items={interventionItems.filter((intervention) => intervention.status === "resolved")}
               renderItem={(intervention) => (
-                <article key={intervention.interventionId} className={successCardClassName}>
-                  <div className={rowBetweenClassName}>
-                    <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{intervention.summary}</h3>
-                    <StatusBadge>{intervention.severityLabel}</StatusBadge>
-                  </div>
-                  <p className={`mt-3 ${caseMetaClassName}`}>{intervention.resolvedAt ?? intervention.createdAt}</p>
-                </article>
+                <WorkflowCard
+                  key={intervention.interventionId}
+                  badges={<StatusBadge>{intervention.severityLabel}</StatusBadge>}
+                  meta={<p className={caseMetaClassName}>{intervention.resolvedAt ?? intervention.createdAt}</p>}
+                  title={intervention.summary}
+                  tone="success"
+                />
               )}
             />
           </Panel>
@@ -398,46 +409,37 @@ export default async function LeadProfilePage(props: PageProps) {
         <div className={twoColumnGridClassName}>
           <Panel title={locale === "ar" ? "ملخص التأهيل الحالي" : "Current qualification"}>
             {qualificationSummary ? (
-              <dl className={detailListClassName}>
-                <div>
-                  <dt className={detailLabelClassName}>{locale === "ar" ? "نطاق الميزانية" : "Budget band"}</dt>
-                  <dd className="mt-1 text-sm leading-7 text-ink">{qualificationSummary.budgetBand}</dd>
-                </div>
-                <div>
-                  <dt className={detailLabelClassName}>{locale === "ar" ? "الإطار الزمني" : "Move-in timeline"}</dt>
-                  <dd className="mt-1 text-sm leading-7 text-ink">{qualificationSummary.moveInTimeline}</dd>
-                </div>
-                <div>
-                  <dt className={detailLabelClassName}>{locale === "ar" ? "الجاهزية" : "Readiness"}</dt>
-                  <dd className="mt-1 text-sm leading-7 text-ink">{qualificationSummary.readiness}</dd>
-                </div>
-                <div>
-                  <dt className={detailLabelClassName}>{locale === "ar" ? "آخر تحديث" : "Last updated"}</dt>
-                  <dd className="mt-1 text-sm leading-7 text-ink">{qualificationSummary.updatedAt}</dd>
-                </div>
-                <div>
-                  <dt className={detailLabelClassName}>{locale === "ar" ? "الملخص" : "Summary"}</dt>
-                  <dd className="mt-1 text-sm leading-7 text-ink">{qualificationSummary.intentSummary}</dd>
-                </div>
-              </dl>
+              <WorkflowPanelBody className="mt-4">
+                <dl className={detailListClassName}>
+                  <DetailListItem label={locale === "ar" ? "نطاق الميزانية" : "Budget band"} value={qualificationSummary.budgetBand} />
+                  <DetailListItem label={locale === "ar" ? "الإطار الزمني" : "Move-in timeline"} value={qualificationSummary.moveInTimeline} />
+                  <DetailListItem label={locale === "ar" ? "الجاهزية" : "Readiness"} value={qualificationSummary.readiness} />
+                  <DetailListItem label={locale === "ar" ? "آخر تحديث" : "Last updated"} value={qualificationSummary.updatedAt} />
+                  <DetailListItem label={locale === "ar" ? "الملخص" : "Summary"} value={qualificationSummary.intentSummary} />
+                </dl>
+              </WorkflowPanelBody>
             ) : (
-              <p className={panelSummaryClassName}>
-                {locale === "ar"
-                  ? "لم يتم حفظ التأهيل بعد. استخدم النموذج المجاور لتسجيل أول شريحة تأهيلية للحالة."
-                  : "Qualification has not been saved yet. Use the adjacent form to capture the first structured qualification snapshot."}
-              </p>
+              <WorkflowPanelBody
+                summary={
+                  locale === "ar"
+                    ? "لم يتم حفظ التأهيل بعد. استخدم النموذج المجاور لتسجيل أول شريحة تأهيلية للحالة."
+                    : "Qualification has not been saved yet. Use the adjacent form to capture the first structured qualification snapshot."
+                }
+              />
             )}
           </Panel>
 
           <Panel title={locale === "ar" ? "تحديث التأهيل" : "Update qualification"}>
-            <p className={panelSummaryClassName}>
-              {locale === "ar"
-                ? "هذا النموذج يرفع الحالة من عميل جديد إلى عميل مؤهل داخل المسار الحي."
-                : "This form moves the live case from a new lead into a qualified state."}
-            </p>
-            <div className="mt-4">
+            <WorkflowPanelBody
+              className="mt-4"
+              summary={
+                locale === "ar"
+                  ? "هذا النموذج يرفع الحالة من عميل جديد إلى عميل مؤهل داخل المسار الحي."
+                  : "This form moves the live case from a new lead into a qualified state."
+              }
+            >
               <QualificationForm caseId={persistedCase.caseId} locale={locale} returnPath={`/${locale}/leads/${persistedCase.caseId}`} />
-            </div>
+            </WorkflowPanelBody>
           </Panel>
         </div>
 
@@ -459,38 +461,28 @@ export default async function LeadProfilePage(props: PageProps) {
 
       <div className={twoColumnGridClassName}>
         <Panel title={caseItem.customerName}>
-          <div className={detailGridClassName}>
-            <div>
-              <p className={detailLabelClassName}>{messages.common.stage}</p>
-              <StatusBadge>{getLocalizedText(caseItem.stage, locale)}</StatusBadge>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{messages.common.currentOwner}</p>
-              <p className="text-sm leading-7 text-ink">{caseItem.owner}</p>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{messages.common.nextAction}</p>
-              <p className="text-sm leading-7 text-ink">{getLocalizedText(caseItem.nextAction, locale)}</p>
-            </div>
-            <div>
-              <p className={detailLabelClassName}>{messages.common.lastChange}</p>
-              <p className="text-sm leading-7 text-ink">{formatDateTime(caseItem.lastMeaningfulChange, locale)}</p>
-            </div>
-          </div>
-          <div className="mt-5 rounded-4xl border border-brand-100/80 bg-brand-50/70 p-4 text-sm leading-7 text-ink-soft">
-            <p>{getLocalizedText(caseItem.budgetLabel, locale)}</p>
-            <p>{getLocalizedText(caseItem.attentionNote, locale)}</p>
-          </div>
+          <WorkflowPanelBody className="mt-4">
+            <DetailGrid>
+              <DetailItem label={messages.common.stage} value={<StatusBadge>{getLocalizedText(caseItem.stage, locale)}</StatusBadge>} />
+              <DetailItem label={messages.common.currentOwner} value={caseItem.owner} />
+              <DetailItem label={messages.common.nextAction} value={getLocalizedText(caseItem.nextAction, locale)} />
+              <DetailItem label={messages.common.lastChange} value={formatDateTime(caseItem.lastMeaningfulChange, locale)} />
+            </DetailGrid>
+            <HighlightNotice>
+              <p>{getLocalizedText(caseItem.budgetLabel, locale)}</p>
+              <p>{getLocalizedText(caseItem.attentionNote, locale)}</p>
+            </HighlightNotice>
+          </WorkflowPanelBody>
         </Panel>
 
         <Panel title={messages.common.visitReadiness}>
-          <div className="mt-4">
-            <div className={caseStackCardClassName}>
-              <p className={detailLabelClassName}>{caseItem.visitPlan.scheduledAt}</p>
-              <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{getLocalizedText(caseItem.visitPlan.location, locale)}</h3>
-              <p className="text-sm leading-7 text-ink-soft">{getLocalizedText(caseItem.visitPlan.readinessNote, locale)}</p>
-            </div>
-          </div>
+          <WorkflowPanelBody className="mt-4">
+            <WorkflowCard
+              meta={<p className={detailLabelClassName}>{caseItem.visitPlan.scheduledAt}</p>}
+              summary={getLocalizedText(caseItem.visitPlan.readinessNote, locale)}
+              title={getLocalizedText(caseItem.visitPlan.location, locale)}
+            />
+          </WorkflowPanelBody>
         </Panel>
       </div>
 
