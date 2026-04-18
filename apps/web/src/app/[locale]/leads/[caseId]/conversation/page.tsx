@@ -10,9 +10,7 @@ import {
   inlineLinkClassName,
   pageStackClassName,
   Panel,
-  StatusBadge,
   twoColumnGridClassName,
-  WorkflowCard,
   WorkflowPanelBody
 } from "@real-estate-ai/ui";
 
@@ -21,6 +19,7 @@ import { CaseManualReplyForm } from "@/components/case-manual-reply-form";
 import { CaseReplyDraftQaRequestForm } from "@/components/case-reply-draft-qa-request-form";
 import { MessageThread } from "@/components/message-thread";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
+import { ReviewSummaryCard } from "@/components/review-summary-card";
 import { ScreenIntro } from "@/components/screen-intro";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import { getCaseManualReplyCopy, getCaseReplyDraftQaRequestCopy } from "@/lib/live-copy";
@@ -113,17 +112,13 @@ export default async function ConversationPage(props: PageProps) {
         {qaReviewDisplay ? (
           <Panel title={locale === "ar" ? "حالة التحكم البشري" : "Human takeover state"}>
             <WorkflowPanelBody className="mt-4">
-              <WorkflowCard
-                badges={
-                  <>
-                    <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
-                    <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
-                    <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                    {qaReviewDisplay.policySignalLabels.map((label) => (
-                      <StatusBadge key={label}>{label}</StatusBadge>
-                    ))}
-                  </>
-                }
+              <ReviewSummaryCard
+                badges={[
+                  { label: qaReviewDisplay.statusLabel, tone: qaReviewDisplay.statusTone },
+                  { label: qaReviewDisplay.subjectTypeLabel },
+                  { label: qaReviewDisplay.triggerSourceLabel },
+                  ...qaReviewDisplay.policySignalLabels.map((label) => ({ label }))
+                ]}
                 meta={qaReviewDisplay.draftMessage ? <p className={caseMetaClassName}>{qaReviewDisplay.draftMessage}</p> : null}
                 summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
                 title={locale === "ar" ? "بوابة التحكم الحالية" : "Current takeover gate"}
@@ -168,7 +163,7 @@ export default async function ConversationPage(props: PageProps) {
           <Panel title={locale === "ar" ? "حالة مسودة الرد" : "Reply-draft state"}>
             {currentReplyDraft ? (
               <WorkflowPanelBody className="mt-4">
-                <WorkflowCard
+                <ReviewSummaryCard
                   actions={
                     canAccessQaWorkspace ? (
                       <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
@@ -176,22 +171,18 @@ export default async function ConversationPage(props: PageProps) {
                       </Link>
                     ) : null
                   }
-                  badges={
-                    <>
-                      <StatusBadge tone={currentReplyDraft.statusTone}>{currentReplyDraft.statusLabel}</StatusBadge>
-                      <StatusBadge>{currentReplyDraft.triggerSourceLabel}</StatusBadge>
-                      {qaReviewDisplay?.policySignalLabels.map((label) => (
-                        <StatusBadge key={label}>{label}</StatusBadge>
-                      ))}
-                    </>
-                  }
+                  badges={[
+                    { label: currentReplyDraft.statusLabel, tone: currentReplyDraft.statusTone },
+                    { label: currentReplyDraft.triggerSourceLabel },
+                    ...(qaReviewDisplay?.policySignalLabels.map((label) => ({ label })) ?? [])
+                  ]}
                   meta={<p className={caseMetaClassName}>{currentReplyDraft.updatedAt}</p>}
                   summary={currentReplyDraft.reviewSummary ?? currentReplyDraft.sampleSummary}
                   title={currentReplyDraft.subjectTypeLabel}
                 >
                   <p className="text-sm leading-7 text-ink-soft">{currentReplyDraft.draftMessage}</p>
                   {currentReplyDraft.triggerEvidence.length > 0 ? <p className={caseMetaClassName}>{currentReplyDraft.triggerEvidence.join(", ")}</p> : null}
-                </WorkflowCard>
+                </ReviewSummaryCard>
               </WorkflowPanelBody>
             ) : (
               <WorkflowPanelBody

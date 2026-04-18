@@ -28,6 +28,7 @@ import { ManagerFollowUpForm } from "@/components/manager-follow-up-form";
 import { PlaceholderNotice } from "@/components/placeholder-notice";
 import { QaReviewRequestForm } from "@/components/qa-review-request-form";
 import { QualificationForm } from "@/components/qualification-form";
+import { ReviewSummaryCard } from "@/components/review-summary-card";
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
 import { TimelinePanel } from "@/components/timeline-panel";
@@ -285,7 +286,7 @@ export default async function LeadProfilePage(props: PageProps) {
           <Panel title={locale === "ar" ? "حالة مراجعة الجودة" : "QA review status"}>
             {qaReviewDisplay ? (
               <WorkflowPanelBody className="mt-4">
-                <WorkflowCard
+                <ReviewSummaryCard
                   actions={
                     canAccessQaWorkspace ? (
                       <Link className={inlineLinkClassName} href={`/${locale}/qa/cases/${persistedCase.caseId}`}>
@@ -293,16 +294,12 @@ export default async function LeadProfilePage(props: PageProps) {
                       </Link>
                     ) : null
                   }
-                  badges={
-                    <>
-                      <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
-                      <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
-                      <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                      {qaReviewDisplay.policySignalLabels.map((label) => (
-                        <StatusBadge key={label}>{label}</StatusBadge>
-                      ))}
-                    </>
-                  }
+                  badges={[
+                    { label: qaReviewDisplay.statusLabel, tone: qaReviewDisplay.statusTone },
+                    { label: qaReviewDisplay.subjectTypeLabel },
+                    { label: qaReviewDisplay.triggerSourceLabel },
+                    ...qaReviewDisplay.policySignalLabels.map((label) => ({ label }))
+                  ]}
                   meta={
                     <p className={caseMetaClassName}>
                       {qaReviewDisplay.reviewerName ?? qaReviewDisplay.requestedByName}
@@ -312,12 +309,13 @@ export default async function LeadProfilePage(props: PageProps) {
                   }
                   summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
                   title={qaReviewDisplay.sampleSummary}
+                  tone={qaReviewDisplay.statusTone}
                 >
                   {qaReviewDisplay.draftMessage ? <p className="text-sm leading-7 text-ink-soft">{qaReviewDisplay.draftMessage}</p> : null}
                   {qaReviewDisplay.triggerEvidence.length > 0 ? (
                     <p className={caseMetaClassName}>{qaReviewDisplay.triggerEvidence.join(", ")}</p>
                   ) : null}
-                </WorkflowCard>
+                </ReviewSummaryCard>
               </WorkflowPanelBody>
             ) : (
               <WorkflowPanelBody
