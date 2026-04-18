@@ -15,7 +15,8 @@ Premium bilingual real-estate operations software for AI-assisted lead response,
 
 ## Screenshots
 
-![alt text](.github/screenshots/image1.jpg)
+![alt text](.github/screenshots/image2.jpg)
+![alt text](.github/screenshots/image3.jpg)
 
 ## Overview
 
