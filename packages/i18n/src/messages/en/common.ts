@@ -3,6 +3,7 @@ import type { CommonSection } from "../types";
 export const enCommon: CommonSection = {
   switchLanguage: "Switch language",
   operatorRole: "Operator role",
+  accessKey: "Access key",
   applyRole: "Apply role",
   roleGuardNote: "Sensitive controls depend on a trusted local session with explicit role and workspace boundaries.",
   skipToContent: "Skip to main content",

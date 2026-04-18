@@ -3,6 +3,7 @@ import type { CommonSection } from "../types";
 export const arCommon: CommonSection = {
   switchLanguage: "تبديل اللغة",
   operatorRole: "دور المشغل",
+  accessKey: "مفتاح الوصول",
   applyRole: "تطبيق الدور",
   roleGuardNote: "الضوابط الحساسة تعتمد على جلسة محلية موثوقة مع حدود واضحة للدور ومساحة العمل.",
   skipToContent: "تخطي إلى المحتوى الرئيسي",

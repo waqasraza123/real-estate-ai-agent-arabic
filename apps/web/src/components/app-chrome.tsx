@@ -17,13 +17,24 @@ import {
   chromeBrandTitleClassName,
   chromeHeaderClassName,
   chromeHeaderInnerClassName,
+  chromeHeaderTopRowClassName,
+  chromeContextBarClassName,
+  chromeContextSummaryClassName,
+  chromeContextTitleClassName,
   chromeLayoutClassName,
   chromeMainClassName,
-  chromeRoleGroupClassName,
   chromeRoleNoteClassName,
   chromeShellClassName,
   chromeSidebarClassName,
+  chromeSessionDetailsClassName,
+  chromeSessionLabelClassName,
+  chromeSessionPanelClassName,
+  chromeSessionSummaryClassName,
+  chromeSessionValueClassName,
   chromeStatusClassName,
+  chromeMetaRowClassName,
+  chromeUtilityRowClassName,
+  chromeWorkspaceBadgeClassName,
   localeLinkClassName,
   localeSwitchClassName,
   sidebarLabelClassName,
@@ -50,7 +61,7 @@ export function AppChrome(props: {
     {
       href: `/${props.locale}`,
       label: props.messages.navigation.landing,
-      summary: props.messages.app.shellNote,
+      summary: props.messages.landing.summary,
       visible: true
     },
     {
@@ -80,6 +91,11 @@ export function AppChrome(props: {
       visible: canOperatorRoleAccessWorkspace("qa", props.currentOperatorRole)
     }
   ].filter((item) => item.visible);
+  const isActiveNavigationItem = (href: string) => pathname === href || (href !== `/${props.locale}` && pathname.startsWith(`${href}/`));
+  const activeNavigationItem =
+    navigation.find((item) => isActiveNavigationItem(item.href)) ??
+    navigation.find((item) => item.href === `/${props.locale}`) ??
+    navigation[0];
 
   return (
     <div className={chromeShellClassName} data-testid="app-chrome">
@@ -90,35 +106,60 @@ export function AppChrome(props: {
 
       <header className={chromeHeaderClassName}>
         <div className={chromeHeaderInnerClassName}>
-          <div className={chromeBrandClassName}>
-            <strong className={chromeBrandTitleClassName}>{props.messages.app.name}</strong>
-            <p className={chromeBrandCopyClassName}>{props.messages.app.shellNote}</p>
-          </div>
-          <div className={chromeActionsClassName}>
-            <span className={chromeStatusClassName}>{props.messages.app.phaseLabel}</span>
-            <div className={chromeRoleGroupClassName}>
-              <OperatorRoleSwitcher currentOperatorRole={props.currentOperatorRole} messages={props.messages} />
-              <p className={chromeRoleNoteClassName}>{props.messages.common.roleGuardNote}</p>
+          <div className={chromeHeaderTopRowClassName}>
+            <div className={chromeBrandClassName}>
+              <div className={chromeMetaRowClassName}>
+                <span className={chromeStatusClassName}>{props.messages.app.phaseLabel}</span>
+                {activeNavigationItem ? <span className={chromeWorkspaceBadgeClassName}>{activeNavigationItem.label}</span> : null}
+              </div>
+              <strong className={chromeBrandTitleClassName}>{props.messages.app.name}</strong>
+              <p className={chromeBrandCopyClassName}>{props.messages.app.shellNote}</p>
             </div>
-            <nav aria-label={props.messages.common.switchLanguage} className={localeSwitchClassName}>
-              {locales.map((locale) => (
-                <Link
-                  key={locale}
-                  aria-current={props.locale === locale ? "page" : undefined}
-                  className={localeLinkClassName(props.locale === locale)}
-                  href={replacePathLocale(pathname, locale)}
-                >
-                  {getLocaleLabel(locale)}
-                </Link>
-              ))}
-            </nav>
+
+            <div className={chromeActionsClassName}>
+              <div className={chromeUtilityRowClassName}>
+                <nav aria-label={props.messages.common.switchLanguage} className={localeSwitchClassName}>
+                  {locales.map((locale) => (
+                    <Link
+                      key={locale}
+                      aria-current={props.locale === locale ? "page" : undefined}
+                      className={localeLinkClassName(props.locale === locale)}
+                      href={replacePathLocale(pathname, locale)}
+                    >
+                      {getLocaleLabel(locale)}
+                    </Link>
+                  ))}
+                </nav>
+
+                <details className={chromeSessionDetailsClassName}>
+                  <summary className={chromeSessionSummaryClassName}>
+                    <span className="flex flex-col gap-1">
+                      <span className={chromeSessionLabelClassName}>{props.messages.common.operatorRole}</span>
+                      <span className={chromeSessionValueClassName}>{props.messages.roles[props.currentOperatorRole]}</span>
+                    </span>
+                    <span className={chromeWorkspaceBadgeClassName}>{props.messages.common.applyRole}</span>
+                  </summary>
+                  <div className={chromeSessionPanelClassName}>
+                    <OperatorRoleSwitcher compact currentOperatorRole={props.currentOperatorRole} messages={props.messages} />
+                    <p className={chromeRoleNoteClassName}>{props.messages.common.roleGuardNote}</p>
+                  </div>
+                </details>
+              </div>
+            </div>
           </div>
+
+          {activeNavigationItem ? (
+            <div className={chromeContextBarClassName}>
+              <p className={chromeContextTitleClassName}>{activeNavigationItem.label}</p>
+              <p className={chromeContextSummaryClassName}>{activeNavigationItem.summary}</p>
+            </div>
+          ) : null}
         </div>
       </header>
 
       <div className={chromeLayoutClassName}>
         <aside className={chromeSidebarClassName}>
-          <p className={sidebarLabelClassName}>{props.messages.app.phaseLabel}</p>
+          <p className={sidebarLabelClassName}>{props.messages.common.primaryNavigation}</p>
           <nav
             aria-label={props.messages.common.primaryNavigation}
             className={sidebarStackClassName}
@@ -127,8 +168,8 @@ export function AppChrome(props: {
             {navigation.map((item) => (
               <Link
                 key={item.href}
-                aria-current={pathname === item.href ? "page" : undefined}
-                className={sidebarLinkClassName(pathname === item.href)}
+                aria-current={isActiveNavigationItem(item.href) ? "page" : undefined}
+                className={sidebarLinkClassName(isActiveNavigationItem(item.href))}
                 href={item.href}
               >
                 <strong className={sidebarLinkTitleClassName}>{item.label}</strong>

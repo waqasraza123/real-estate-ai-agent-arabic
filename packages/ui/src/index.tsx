@@ -222,14 +222,30 @@ export const chromeShellClassName = "relative grid min-h-screen grid-rows-[auto_
 export const chromeHeaderClassName =
   "sticky top-0 z-30 border-b border-white/70 bg-white/72 shadow-panel-soft backdrop-blur-xl supports-[backdrop-filter]:bg-white/62";
 export const chromeHeaderInnerClassName =
-  "mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-start lg:justify-between lg:px-6";
+  "mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 lg:px-6";
+export const chromeHeaderTopRowClassName = "flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between";
 export const chromeBrandClassName = "flex max-w-3xl flex-col gap-1";
 export const chromeBrandTitleClassName = "font-display text-base font-semibold tracking-[0.01em] text-ink";
 export const chromeBrandCopyClassName = "text-sm leading-7 text-ink-soft";
-export const chromeActionsClassName = "flex flex-wrap items-start gap-3 lg:justify-end";
+export const chromeMetaRowClassName = "flex flex-wrap items-center gap-2";
+export const chromeActionsClassName = "flex flex-col gap-3 xl:items-end";
 export const chromeStatusClassName = "inline-flex items-center rounded-full border border-brand-200/80 bg-brand-50/90 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-brand-700 shadow-panel-soft backdrop-blur-sm";
+export const chromeWorkspaceBadgeClassName =
+  "inline-flex items-center rounded-full border border-canvas-line/70 bg-white/78 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-ink-soft shadow-panel-soft backdrop-blur-sm";
 export const chromeRoleGroupClassName = "flex flex-col gap-2";
 export const chromeRoleNoteClassName = "max-w-sm text-xs leading-6 text-ink-soft";
+export const chromeUtilityRowClassName = "flex flex-wrap items-center gap-3 xl:justify-end";
+export const chromeSessionDetailsClassName = "group relative min-w-[15rem]";
+export const chromeSessionSummaryClassName =
+  "flex min-h-12 list-none items-center justify-between gap-3 rounded-[1.5rem] border border-canvas-line/70 bg-white/78 px-4 py-3 text-start shadow-panel-soft backdrop-blur-sm transition duration-200 ease-soft-out hover:border-brand-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-raised [&::-webkit-details-marker]:hidden";
+export const chromeSessionLabelClassName = "text-[0.68rem] font-semibold tracking-[0.16em] text-ink-soft";
+export const chromeSessionValueClassName = "text-sm font-semibold text-ink";
+export const chromeSessionPanelClassName =
+  "mt-3 flex flex-col gap-3 rounded-4xl border border-white/70 bg-panel-gradient p-4 shadow-panel backdrop-blur-xl";
+export const chromeContextBarClassName =
+  "flex flex-col gap-2 rounded-4xl border border-white/70 bg-white/66 px-4 py-4 shadow-panel-soft backdrop-blur-sm sm:px-5";
+export const chromeContextTitleClassName = "font-display text-xl font-semibold tracking-[-0.03em] text-ink";
+export const chromeContextSummaryClassName = "max-w-3xl text-sm leading-7 text-ink-soft";
 export const chromeLayoutClassName = "mx-auto grid w-full max-w-[1600px] gap-6 px-4 py-6 lg:grid-cols-[19rem_minmax(0,1fr)] lg:px-6 xl:gap-7 xl:py-7";
 export const chromeSidebarClassName =
   "h-fit rounded-5xl border border-white/70 bg-white/74 p-4 shadow-panel backdrop-blur-xl lg:sticky lg:top-28";

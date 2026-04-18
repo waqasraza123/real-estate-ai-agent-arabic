@@ -32,6 +32,7 @@ export interface LandingSection {
 export interface CommonSection {
   switchLanguage: string;
   operatorRole: string;
+  accessKey: string;
   applyRole: string;
   roleGuardNote: string;
   skipToContent: string;
