@@ -13,7 +13,9 @@ Premium bilingual real-estate operations software for AI-assisted lead response,
   <img alt="Safe push verification" src="https://img.shields.io/badge/Safe_Push-Verified-166534?style=for-the-badge" />
 </p>
 
-**Tags:** `ai-agents` `real-estate` `proptech` `sales-automation` `leasing` `handover` `bilingual` `arabic` `rtl` `governance` `nextjs` `typescript` `monorepo`
+## Screenshots
+
+![alt text](.github/screenshots/image1.jpg)
 
 ## Overview
 
