@@ -92,11 +92,13 @@ export const caseLinkCardClassName =
 export const caseLinkAsideClassName = "mt-4 flex flex-wrap items-center gap-2 sm:mt-0";
 export const caseStackCardClassName = cx(cardBaseClassName, "space-y-3");
 export const slotCardClassName = cx(cardBaseClassName, "space-y-3");
-export const messageThreadClassName = "flex flex-col gap-4";
-export const messageCardClassName = "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel";
+export const activityFeedClassName = stackListClassName;
+export const activityEntryClassName = "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel";
+export const messageThreadClassName = activityFeedClassName;
+export const messageCardClassName = activityEntryClassName;
 export const messageMetaClassName = "text-xs text-ink-muted [unicode-bidi:plaintext]";
-export const timelineListClassName = "flex flex-col gap-4";
-export const timelineItemClassName = "rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel";
+export const timelineListClassName = activityFeedClassName;
+export const timelineItemClassName = activityEntryClassName;
 export const interventionCardClassName = cx("rounded-4xl border border-canvas-line/80 bg-canvas-raised/95 p-5 shadow-panel", cardDescendantTitleClassName, cardDescendantBodyClassName);
 export const interventionOpenCardClassName = cx(interventionCardClassName, "border-warning-200/80 bg-warning-50/70");
 export const interventionResolvedCardClassName = cx(interventionCardClassName, "border-success-200/80 bg-success-50/70");
@@ -413,6 +415,41 @@ export function WorkflowListItem(props: {
         {props.children}
       </div>
       {props.actions ? <div className={documentRowActionsClassName}>{props.actions}</div> : null}
+    </article>
+  );
+}
+
+export function ActivityFeed(props: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <div className={cx(activityFeedClassName, props.className)} data-testid={props.testId}>
+      {props.children}
+    </div>
+  );
+}
+
+export function ActivityEntry(props: {
+  badges?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  meta?: ReactNode;
+  summary?: ReactNode;
+  title: ReactNode;
+}) {
+  return (
+    <article className={cx(activityEntryClassName, props.className)}>
+      <div className="flex flex-col gap-4">
+        <div className={rowBetweenClassName}>
+          <h3 className={cardTitleClassName}>{props.title}</h3>
+          {props.badges ? <div className={statusRowWrapClassName}>{props.badges}</div> : null}
+        </div>
+        {props.summary ? <div className={bodyTextClassName}>{props.summary}</div> : null}
+        {props.children}
+        {props.meta ? <div className={messageMetaClassName}>{props.meta}</div> : null}
+      </div>
     </article>
   );
 }

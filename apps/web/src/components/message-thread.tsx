@@ -1,13 +1,12 @@
 import { getLocalizedText, type ConversationMessage, type SupportedLocale } from "@real-estate-ai/domain";
 import { getMessages } from "@real-estate-ai/i18n";
 import {
+  ActivityEntry,
+  ActivityFeed,
   EmptyState,
+  HighlightNotice,
   StatusBadge,
-  cx,
-  messageCardClassName,
-  messageMetaClassName,
-  messageThreadClassName,
-  rowBetweenClassName
+  bodyTextClassName
 } from "@real-estate-ai/ui";
 
 export function MessageThread(props: {
@@ -27,20 +26,22 @@ export function MessageThread(props: {
   }
 
   return (
-    <div className={messageThreadClassName} data-testid="conversation-thread">
+    <ActivityFeed testId="conversation-thread">
       {props.messages.map((message) => (
-        <article key={message.id} className={messageCardClassName}>
-          <div className={rowBetweenClassName}>
-            <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{ui.common[message.sender]}</h3>
-            {message.state ? <StatusBadge tone="warning">{getLocalizedText(message.state, props.locale)}</StatusBadge> : null}
-          </div>
-          <p className="mt-3 text-sm leading-7 text-ink-soft">{getLocalizedText(message.body, props.locale)}</p>
-          {message.translation ? <p className="mt-3 text-sm leading-7 text-ink-soft">{getLocalizedText(message.translation, props.locale)}</p> : null}
-          <div className={cx("mt-4", messageMetaClassName)}>
-            <span>{message.timestamp}</span>
-          </div>
-        </article>
+        <ActivityEntry
+          key={message.id}
+          badges={message.state ? <StatusBadge tone="warning">{getLocalizedText(message.state, props.locale)}</StatusBadge> : null}
+          meta={<span>{message.timestamp}</span>}
+          summary={getLocalizedText(message.body, props.locale)}
+          title={ui.common[message.sender]}
+        >
+          {message.translation ? (
+            <HighlightNotice tone="ai">
+              <p className={bodyTextClassName}>{getLocalizedText(message.translation, props.locale)}</p>
+            </HighlightNotice>
+          ) : null}
+        </ActivityEntry>
       ))}
-    </div>
+    </ActivityFeed>
   );
 }
