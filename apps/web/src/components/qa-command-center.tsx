@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { canOperatorRoleAccessWorkspace, type OperatorRole, type PersistedCaseSummary, type SupportedLocale } from "@real-estate-ai/contracts";
 import {
-  caseLinkCardClassName,
   caseMetaClassName,
   inlineLinkClassName,
   MetricTile,
@@ -10,13 +9,12 @@ import {
   pageStackClassName,
   Panel,
   panelSummaryClassName,
-  rowBetweenClassName,
   StatusBadge,
   statusRowWrapClassName,
-  successCardClassName,
   twoColumnGridClassName
 } from "@real-estate-ai/ui";
 
+import { ReviewSummaryCard } from "@/components/review-summary-card";
 import { ScreenIntro } from "@/components/screen-intro";
 import { StatefulStack } from "@/components/stateful-stack";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
@@ -105,21 +103,31 @@ export function QaCommandCenter(props: {
                 }
 
                 return (
-                  <Link key={caseItem.caseId} className={caseLinkCardClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
-                    <div className="space-y-1.5">
-                      <p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>
-                      <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{caseItem.customerName}</h3>
-                      <p className="text-sm leading-7 text-ink-soft">{qaReview.sampleSummary}</p>
-                      <p className={caseMetaClassName}>{qaReview.updatedAt}</p>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-0">
-                      <StatusBadge tone={qaReview.statusTone}>{qaReview.statusLabel}</StatusBadge>
-                      <StatusBadge>{qaReview.triggerSourceLabel}</StatusBadge>
-                      <StatusBadge>{qaReview.subjectLabel}</StatusBadge>
-                      {qaReview.policySignalLabels[0] ? <StatusBadge>{qaReview.policySignalLabels[0]}</StatusBadge> : null}
-                      <StatusBadge>{caseItem.ownerName}</StatusBadge>
-                    </div>
-                  </Link>
+                  <ReviewSummaryCard
+                    key={caseItem.caseId}
+                    actions={
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
+                        {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                      </Link>
+                    }
+                    badges={[
+                      { label: qaReview.statusLabel, tone: qaReview.statusTone },
+                      { label: qaReview.triggerSourceLabel },
+                      { label: qaReview.subjectLabel },
+                      ...(qaReview.policySignalLabels[0] ? [{ label: qaReview.policySignalLabels[0] }] : []),
+                      { label: caseItem.ownerName }
+                    ]}
+                    meta={
+                      <p className={caseMetaClassName}>
+                        {buildCaseReferenceCode(caseItem.caseId)}
+                        {" · "}
+                        {qaReview.updatedAt}
+                      </p>
+                    }
+                    summary={qaReview.reviewSummary ?? qaReview.sampleSummary}
+                    title={caseItem.customerName}
+                    tone="critical"
+                  />
                 );
               }}
             />
@@ -144,16 +152,28 @@ export function QaCommandCenter(props: {
                 }
 
                 return (
-                  <article key={caseItem.caseId} className={successCardClassName}>
-                    <div className={rowBetweenClassName}>
-                      <h3 className="text-base font-semibold tracking-[-0.02em] text-ink">{caseItem.customerName}</h3>
-                      <StatusBadge tone="success">{qaReview.statusLabel}</StatusBadge>
-                    </div>
-                    <p className="text-sm leading-7 text-ink-soft">{qaReview.reviewSummary ?? qaReview.sampleSummary}</p>
-                    <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
-                      {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
-                    </Link>
-                  </article>
+                  <ReviewSummaryCard
+                    key={caseItem.caseId}
+                    actions={
+                      <Link className={inlineLinkClassName} href={`/${props.locale}/qa/cases/${caseItem.caseId}`}>
+                        {props.locale === "ar" ? "فتح سجل الجودة" : "Open QA record"}
+                      </Link>
+                    }
+                    badges={[
+                      { label: qaReview.statusLabel, tone: "success" },
+                      { label: qaReview.subjectLabel }
+                    ]}
+                    meta={
+                      <p className={caseMetaClassName}>
+                        {buildCaseReferenceCode(caseItem.caseId)}
+                        {" · "}
+                        {qaReview.updatedAt}
+                      </p>
+                    }
+                    summary={qaReview.reviewSummary ?? qaReview.sampleSummary}
+                    title={caseItem.customerName}
+                    tone="success"
+                  />
                 );
               }}
             />

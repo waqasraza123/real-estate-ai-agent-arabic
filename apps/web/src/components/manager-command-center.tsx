@@ -30,6 +30,7 @@ import {
 } from "@real-estate-ai/ui";
 
 import { ScreenIntro } from "@/components/screen-intro";
+import { ReviewSummaryCard } from "@/components/review-summary-card";
 import { StatefulStack } from "@/components/stateful-stack";
 import { WorkspaceAccessPanel } from "@/components/workspace-access-panel";
 import { ManagerBulkFollowUpForm } from "@/components/manager-bulk-follow-up-form";
@@ -423,7 +424,7 @@ export function HandoverManagerCommandCenter(props: {
               }
 
               return (
-                <WorkflowCard
+                <ReviewSummaryCard
                   key={caseItem.caseId}
                   actions={
                     <>
@@ -437,24 +438,22 @@ export function HandoverManagerCommandCenter(props: {
                       ) : null}
                     </>
                   }
-                  badges={
-                    <>
-                      <StatusBadge tone={qaReviewDisplay.reviewStatusTone}>{qaReviewDisplay.reviewStatusLabel}</StatusBadge>
-                      <StatusBadge>{qaReviewDisplay.typeLabel}</StatusBadge>
-                    </>
+                  badges={[
+                    { label: qaReviewDisplay.reviewStatusLabel, tone: qaReviewDisplay.reviewStatusTone },
+                    { label: qaReviewDisplay.typeLabel },
+                    ...qaReviewDisplay.policySignalLabels.map((label) => ({ label }))
+                  ]}
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {buildCaseReferenceCode(caseItem.caseId)}
+                      {" · "}
+                      {qaReviewDisplay.updatedAt}
+                    </p>
                   }
-                  meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>}
                   summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.reviewSampleSummary}
                   title={caseItem.customerName}
                   tone="critical"
-                >
-                  <p className={caseMetaClassName}>{qaReviewDisplay.updatedAt}</p>
-                  <div className={statusRowWrapClassName}>
-                    {qaReviewDisplay.policySignalLabels.map((label) => (
-                      <StatusBadge key={`${caseItem.caseId}-${label}`}>{label}</StatusBadge>
-                    ))}
-                  </div>
-                </WorkflowCard>
+                />
               );
             }}
           />
@@ -1945,19 +1944,8 @@ export function RevenueManagerCommandCenter(props: {
               }
 
               return (
-                <WorkflowCard
+                <ReviewSummaryCard
                   key={caseItem.caseId}
-                  tone="critical"
-                  badges={
-                    <>
-                      <StatusBadge tone={qaReviewDisplay.statusTone}>{qaReviewDisplay.statusLabel}</StatusBadge>
-                      <StatusBadge>{qaReviewDisplay.subjectTypeLabel}</StatusBadge>
-                      <StatusBadge>{qaReviewDisplay.triggerSourceLabel}</StatusBadge>
-                    </>
-                  }
-                  meta={<p className={caseMetaClassName}>{buildCaseReferenceCode(caseItem.caseId)}</p>}
-                  summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
-                  title={caseItem.customerName}
                   actions={
                     <>
                       <Link className={inlineLinkClassName} href={`/${props.locale}/leads/${caseItem.caseId}`}>
@@ -1970,15 +1958,25 @@ export function RevenueManagerCommandCenter(props: {
                       ) : null}
                     </>
                   }
+                  badges={[
+                    { label: qaReviewDisplay.statusLabel, tone: qaReviewDisplay.statusTone },
+                    { label: qaReviewDisplay.subjectTypeLabel },
+                    { label: qaReviewDisplay.triggerSourceLabel },
+                    ...qaReviewDisplay.policySignalLabels.map((label) => ({ label }))
+                  ]}
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {buildCaseReferenceCode(caseItem.caseId)}
+                      {" · "}
+                      {qaReviewDisplay.updatedAt}
+                    </p>
+                  }
+                  summary={qaReviewDisplay.reviewSummary ?? qaReviewDisplay.sampleSummary}
+                  title={caseItem.customerName}
+                  tone="critical"
                 >
                   {qaReviewDisplay.draftMessage ? <p>{qaReviewDisplay.draftMessage}</p> : null}
-                  <p className={caseMetaClassName}>{qaReviewDisplay.updatedAt}</p>
-                  <div className={statusRowWrapClassName}>
-                    {qaReviewDisplay.policySignalLabels.map((label) => (
-                      <StatusBadge key={`${caseItem.caseId}-${label}`}>{label}</StatusBadge>
-                    ))}
-                  </div>
-                </WorkflowCard>
+                </ReviewSummaryCard>
               );
             }}
           />
