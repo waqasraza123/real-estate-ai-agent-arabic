@@ -51,6 +51,79 @@ describe("case agent worker", () => {
     expect(caseDetail?.agentRuns?.[0]?.proposedMessage).toContain("Marina Crest");
   });
 
+  it("queues an Arabic WhatsApp reply when a low-risk inbound message asks to schedule the next step", async () => {
+    const createdCase = await store.createWebsiteLeadCase({
+      customerName: "Layal Abbas",
+      email: "layal@example.com",
+      message: "Need details about the unit.",
+      nextAction: "Review the lead and continue qualification",
+      nextActionDueAt: "2026-04-12T08:00:00.000Z",
+      phone: "+966 55 555 1111",
+      preferredLocale: "en",
+      projectInterest: "Palm Horizon"
+    });
+
+    await store.recordWhatsAppInboundMessage({
+      messageId: "wamid.inbound.schedule.1",
+      normalizedPhone: "+966555551111",
+      profileName: "Layal Abbas",
+      receivedAt: "2026-04-12T09:00:00.000Z",
+      textBody: "ممكن نرتب زيارة غدا؟"
+    });
+
+    const cycle = await runPersistedCaseAgentCycle(store, {
+      canSendWhatsApp: true,
+      runAt: "2026-04-12T09:05:00.000Z"
+    });
+    const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+    expect(cycle.processedJobs).toBe(1);
+    expect(caseDetail?.preferredLocale).toBe("ar");
+    expect(caseDetail?.agentState?.latestTriggerType).toBe("inbound_customer_message");
+    expect(caseDetail?.agentState?.latestRecommendedAction).toBe("send_whatsapp_message");
+    expect(caseDetail?.agentState?.latestRunStatus).toBe("completed");
+    expect(caseDetail?.channelSummary?.latestOutboundStatus).toBe("queued");
+    expect(caseDetail?.agentRuns?.[0]?.proposedMessage).toContain("زيارة");
+    expect(caseDetail?.agentMemory?.latestIntentSummary).toContain("زيارة");
+  });
+
+  it("blocks the inbound-message agent path behind QA when the customer asks for a risky exception", async () => {
+    const createdCase = await store.createWebsiteLeadCase({
+      customerName: "Sami Khan",
+      email: "sami@example.com",
+      message: "Need details on the available layout.",
+      nextAction: "Review the lead and continue qualification",
+      nextActionDueAt: "2026-04-12T08:00:00.000Z",
+      phone: "+966 54 000 9898",
+      preferredLocale: "en",
+      projectInterest: "Palm Horizon"
+    });
+
+    await store.recordWhatsAppInboundMessage({
+      messageId: "wamid.inbound.exception.1",
+      normalizedPhone: "+966540009898",
+      profileName: "Sami Khan",
+      receivedAt: "2026-04-12T09:00:00.000Z",
+      textBody: "Can you give me a special approval or discount on this unit?"
+    });
+
+    const cycle = await runPersistedCaseAgentCycle(store, {
+      canSendWhatsApp: true,
+      runAt: "2026-04-12T09:05:00.000Z"
+    });
+    const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+    expect(cycle.processedJobs).toBe(1);
+    expect(cycle.blockedRuns).toBe(1);
+    expect(caseDetail?.currentQaReview?.status).toBe("pending_review");
+    expect(caseDetail?.currentQaReview?.triggerSource).toBe("policy_rule");
+    expect(caseDetail?.currentQaReview?.policySignals).toContain("exception_request");
+    expect(caseDetail?.agentState?.latestTriggerType).toBe("inbound_customer_message");
+    expect(caseDetail?.agentState?.latestRunStatus).toBe("blocked");
+    expect(caseDetail?.agentState?.latestBlockedReason).toBe("qa_hold");
+    expect(caseDetail?.channelSummary?.latestOutboundStatus).toBe("blocked");
+  });
+
   it("records a blocked run when client WhatsApp credentials are not available", async () => {
     const createdCase = await store.createWebsiteLeadCase({
       customerName: "Layal Abbas",

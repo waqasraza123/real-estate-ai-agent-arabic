@@ -2065,14 +2065,9 @@ function buildCaseAgentMemorySnapshot(
     now: string;
   }
 ) {
-  const latestInboundEvent = [...caseDetail.auditEvents]
-    .reverse()
-    .find((event) => event.eventType === "whatsapp_inbound_received");
-  const latestIntentSummary =
-    typeof latestInboundEvent?.payload?.textBody === "string"
-      ? latestInboundEvent.payload.textBody.slice(0, 280)
-      : caseDetail.message.slice(0, 280);
-  const lastObjectionSummary = extractRiskFlagSummary(caseDetail);
+  const latestInboundMessage = getLatestInboundMessage(caseDetail);
+  const latestIntentSummary = latestInboundMessage ? latestInboundMessage.slice(0, 280) : caseDetail.message.slice(0, 280);
+  const lastObjectionSummary = summarizeLatestObjection(caseDetail, latestInboundMessage);
   const qualificationSummary = caseDetail.qualificationSnapshot
     ? `${caseDetail.qualificationSnapshot.readiness} | ${caseDetail.qualificationSnapshot.budgetBand} | ${caseDetail.qualificationSnapshot.moveInTimeline}`
     : null;
@@ -2164,6 +2159,9 @@ async function resolveCaseAgentDecision(
 function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAgentDecision {
   const { caseDetail } = input;
   const { documentGapSummary, repeatedTriggerCount, riskFlags, triggerType } = input;
+  const latestInboundMessage = getLatestInboundMessage(caseDetail);
+  const responseLocale = getCaseResponseLocale(caseDetail, latestInboundMessage);
+  const inboundIntent = inferInboundIntent(latestInboundMessage);
 
   if (triggerType === "new_lead") {
     if (riskFlags.includes("policy_sensitive_lead")) {
@@ -2205,6 +2203,94 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
         caseDetail.preferredLocale === "ar"
           ? "العميل جديد والمحتوى منخفض المخاطر، لذلك يمكن إرسال أول رد تلقائي آمن."
           : "The lead is new and low-risk, so the first reply can be sent automatically.",
+      riskLevel: "low",
+      status: "completed",
+      toolExecutionStatus: "queued",
+      triggerType
+    };
+  }
+
+  if (triggerType === "inbound_customer_message") {
+    if (riskFlags.includes("policy_sensitive_lead")) {
+      return {
+        actionType: "request_manager_intervention",
+        blockedReason: null,
+        confidence: 0.9,
+        escalationReason:
+          responseLocale === "ar"
+            ? "رسالة العميل تحتوي على طلب حساس أو استثناء وتحتاج قراراً بشرياً قبل أي رد."
+            : "The customer message contains a sensitive request or exception and needs a human decision before any reply.",
+        proposedMessage: null,
+        proposedNextAction:
+          responseLocale === "ar"
+            ? "راجع الرسالة وحدد الرد أو مسار الاستثناء المناسب"
+            : "Review the message and decide the correct reply or exception path",
+        proposedNextActionDueAt: createFutureTimestamp(2),
+        rationaleSummary:
+          responseLocale === "ar"
+            ? "تم التصعيد لأن الرسالة الواردة تتجاوز حدود الرد الآلي الآمن."
+            : "Escalated because the inbound message exceeds the safe automated-reply boundary.",
+        riskLevel: "high",
+        status: "escalated",
+        toolExecutionStatus: "executed",
+        triggerType
+      };
+    }
+
+    if (riskFlags.includes("frustrated_customer_language")) {
+      return {
+        actionType: "create_reply_draft",
+        blockedReason: null,
+        confidence: 0.84,
+        escalationReason: null,
+        proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary),
+        proposedNextAction:
+          responseLocale === "ar"
+            ? "راجع مسودة الرد قبل تهدئة العميل ومتابعة الحالة"
+            : "Review the reply draft before de-escalating the customer and continuing the case",
+        proposedNextActionDueAt: createFutureTimestamp(2),
+        rationaleSummary:
+          responseLocale === "ar"
+            ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
+            : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
+        riskLevel: "medium",
+        status: "waiting",
+        toolExecutionStatus: "executed",
+        triggerType
+      };
+    }
+
+    return {
+      actionType: "send_whatsapp_message",
+      blockedReason: null,
+      confidence: 0.92,
+      escalationReason: null,
+      proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary),
+      proposedNextAction:
+        inboundIntent === "documents"
+          ? responseLocale === "ar"
+            ? "راجع المستندات الواردة وأكد للعميل أي عناصر إضافية إذا لزم الأمر"
+            : "Review the incoming documents and confirm any additional items if needed"
+          : inboundIntent === "scheduling"
+          ? responseLocale === "ar"
+            ? "ثبّت وقت الزيارة أو المكالمة التالية مع العميل"
+            : "Confirm the next visit or call time with the customer"
+          : responseLocale === "ar"
+            ? "تابع التأهيل بناءً على آخر رسالة واردة من العميل"
+            : "Continue qualification based on the customer's latest inbound message",
+      proposedNextActionDueAt: createFutureTimestamp(inboundIntent === "scheduling" ? 2 : 6),
+      rationaleSummary:
+        inboundIntent === "documents"
+          ? responseLocale === "ar"
+            ? "رسالة العميل تتعلق بالمستندات ويمكن الرد عليها تلقائياً مع متابعة سريعة للمراجعة."
+            : "The customer's message is about documents and can be answered automatically with a quick review follow-up."
+          : inboundIntent === "scheduling"
+          ? responseLocale === "ar"
+            ? "رسالة العميل تتعلق بترتيب الموعد ويمكن الرد عليها تلقائياً لتثبيت الخطوة التالية."
+            : "The customer's message is about scheduling and can be answered automatically to lock the next step."
+          : responseLocale === "ar"
+            ? "الرسالة الواردة منخفضة المخاطر ويمكن الرد عليها تلقائياً لمواصلة التقدم."
+            : "The inbound message is low-risk and can be answered automatically to keep progress moving.",
       riskLevel: "low",
       status: "completed",
       toolExecutionStatus: "queued",
@@ -2362,6 +2448,49 @@ function applyCaseAgentDecisionGuardrails(
     });
   }
 
+  if (input.triggerType === "inbound_customer_message" && input.riskFlags.includes("policy_sensitive_lead")) {
+    return buildEscalatedDecision(caseDetail, {
+      confidence: Math.max(decision.confidence, 0.9),
+      escalationReason:
+        caseDetail.preferredLocale === "ar"
+          ? "رسالة العميل تحتوي على طلب حساس أو استثناء وتحتاج قراراً بشرياً قبل أي رد."
+          : "The customer message contains a sensitive request or exception and needs a human decision before any reply.",
+      rationaleSummary:
+        caseDetail.preferredLocale === "ar"
+          ? "تم تصعيد الحالة لأن الرسالة الواردة تتجاوز حدود الرد الآلي الآمن."
+          : "Escalated because the inbound message exceeds the safe automated-reply boundary.",
+      riskLevel: "high",
+      triggerType: input.triggerType
+    });
+  }
+
+  if (
+    input.triggerType === "inbound_customer_message" &&
+    input.riskFlags.includes("frustrated_customer_language") &&
+    decision.actionType === "send_whatsapp_message"
+  ) {
+    return {
+      actionType: "create_reply_draft",
+      blockedReason: null,
+      confidence: Math.max(decision.confidence, 0.84),
+      escalationReason: null,
+      proposedMessage: decision.proposedMessage,
+      proposedNextAction:
+        caseDetail.preferredLocale === "ar"
+          ? "راجع مسودة الرد قبل تهدئة العميل ومتابعة الحالة"
+          : "Review the reply draft before de-escalating the customer and continuing the case",
+      proposedNextActionDueAt: createFutureTimestamp(2),
+      rationaleSummary:
+        caseDetail.preferredLocale === "ar"
+          ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
+          : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
+      riskLevel: "medium",
+      status: "waiting",
+      toolExecutionStatus: "executed",
+      triggerType: input.triggerType
+    };
+  }
+
   if (
     (input.triggerType === "no_response_follow_up" || input.triggerType === "document_missing") &&
     input.repeatedTriggerCount >= 1 &&
@@ -2491,6 +2620,10 @@ function buildEscalatedDecision(
         ? caseDetail.preferredLocale === "ar"
           ? "تحويل الحالة إلى المدير لمراجعة الرد الأول"
           : "Route the case to a manager for first-reply review"
+        : input.triggerType === "inbound_customer_message"
+        ? caseDetail.preferredLocale === "ar"
+          ? "راجع رسالة العميل وحدد الرد أو الاستثناء المناسب قبل المتابعة"
+          : "Review the customer message and decide the correct reply or exception path before proceeding"
         : input.triggerType === "document_missing"
         ? caseDetail.preferredLocale === "ar"
           ? "راجع التعثر مع العميل وحدد ما إذا كان يجب إعادة التعيين أو الإغلاق"
@@ -2498,7 +2631,9 @@ function buildEscalatedDecision(
         : caseDetail.preferredLocale === "ar"
           ? "قرر التصعيد أو إعادة التعيين أو الإغلاق بناءً على صمت العميل"
           : "Decide whether to escalate, reassign, or close based on the continued silence",
-    proposedNextActionDueAt: createFutureTimestamp(input.triggerType === "new_lead" ? 1 : 6),
+    proposedNextActionDueAt: createFutureTimestamp(
+      input.triggerType === "new_lead" ? 1 : input.triggerType === "inbound_customer_message" ? 2 : 6
+    ),
     rationaleSummary: input.rationaleSummary,
     riskLevel: input.riskLevel,
     status: "escalated",
@@ -2535,19 +2670,41 @@ function buildTriggerMessage(
   caseDetail: PersistedCaseDetail,
   documentGapSummary: string | null
 ) {
+  const latestInboundMessage = getLatestInboundMessage(caseDetail);
+  const responseLocale = getCaseResponseLocale(caseDetail, latestInboundMessage);
+  const inboundIntent = inferInboundIntent(latestInboundMessage);
+
   if (triggerType === "new_lead") {
-    return caseDetail.preferredLocale === "ar"
+    return responseLocale === "ar"
       ? `مرحباً ${caseDetail.customerName}، استلمنا اهتمامك بمشروع ${caseDetail.projectInterest}. يمكننا متابعة التفاصيل المناسبة لك هنا على واتساب متى كان ذلك مناسباً.`
       : `Hi ${caseDetail.customerName}, we received your interest in ${caseDetail.projectInterest}. We can continue the next suitable details with you here on WhatsApp whenever you're ready.`;
   }
 
+  if (triggerType === "inbound_customer_message") {
+    if (inboundIntent === "documents") {
+      return responseLocale === "ar"
+        ? `شكراً ${caseDetail.customerName}، استلمت رسالتك بخصوص المستندات. سنراجع ما ترسله ونخبرك مباشرة إذا احتجنا أي عنصر إضافي.`
+        : `Thanks ${caseDetail.customerName}, I received your message about the documents. We will review what you send and let you know directly if anything else is needed.`;
+    }
+
+    if (inboundIntent === "scheduling") {
+      return responseLocale === "ar"
+        ? `شكراً ${caseDetail.customerName}، يمكننا ترتيب الزيارة أو المكالمة التالية حسب الوقت المناسب لك. أرسل الوقت الأنسب وسننسق معك مباشرة.`
+        : `Thanks ${caseDetail.customerName}, we can arrange the next visit or call based on the time that suits you. Share the best time and we will coordinate directly.`;
+    }
+
+    return responseLocale === "ar"
+      ? `شكراً ${caseDetail.customerName}، استلمت رسالتك وسأتابع معك هنا على واتساب بالخطوة المناسبة التالية.`
+      : `Thanks ${caseDetail.customerName}, I received your message and will continue with you here on WhatsApp with the next suitable step.`;
+  }
+
   if (triggerType === "document_missing") {
-    return caseDetail.preferredLocale === "ar"
+    return responseLocale === "ar"
       ? `مرحباً ${caseDetail.customerName}، ما زلنا ننتظر بعض المستندات لإكمال الحالة${documentGapSummary ? `: ${documentGapSummary}` : ""}. أرسل ما هو متاح وسنتابع معك مباشرة.`
       : `Hi ${caseDetail.customerName}, we are still waiting on a few documents to keep the case moving${documentGapSummary ? `: ${documentGapSummary}` : ""}. Send what is available and we will continue from there.`;
   }
 
-  return caseDetail.preferredLocale === "ar"
+  return responseLocale === "ar"
     ? `مرحباً ${caseDetail.customerName}، أتابع معك بخصوص ${caseDetail.projectInterest}. إذا ما زلت مهتماً يمكننا إكمال الخطوة التالية معك هنا على واتساب.`
     : `Hi ${caseDetail.customerName}, following up with you about ${caseDetail.projectInterest}. If you are still interested, we can complete the next step with you here on WhatsApp.`;
 }
@@ -2642,6 +2799,7 @@ function documentRequestNeedsCustomerUpload(documentRequest: PersistedCaseDetail
 
 function buildRiskFlags(caseDetail: PersistedCaseDetail) {
   const flags = new Set<string>();
+  const latestInboundMessage = getLatestInboundMessage(caseDetail)?.toLowerCase() ?? "";
   const textCorpus = [
     caseDetail.message,
     ...caseDetail.auditEvents
@@ -2669,6 +2827,50 @@ function buildRiskFlags(caseDetail: PersistedCaseDetail) {
     flags.add("policy_sensitive_lead");
   }
 
+  if (
+    textCorpus.includes("frustrated") ||
+    textCorpus.includes("angry") ||
+    textCorpus.includes("upset") ||
+    textCorpus.includes("annoyed") ||
+    textCorpus.includes("not happy") ||
+    textCorpus.includes("منزعج") ||
+    textCorpus.includes("مستاء") ||
+    textCorpus.includes("غاضب") ||
+    textCorpus.includes("زعلان")
+  ) {
+    flags.add("frustrated_customer_language");
+  }
+
+  if (
+    latestInboundMessage.includes("visit") ||
+    latestInboundMessage.includes("call") ||
+    latestInboundMessage.includes("schedule") ||
+    latestInboundMessage.includes("appointment") ||
+    latestInboundMessage.includes("meeting") ||
+    latestInboundMessage.includes("زيارة") ||
+    latestInboundMessage.includes("اتصال") ||
+    latestInboundMessage.includes("موعد") ||
+    latestInboundMessage.includes("مكالمة")
+  ) {
+    flags.add("scheduling_request");
+  }
+
+  if (
+    latestInboundMessage.includes("upload") ||
+    latestInboundMessage.includes("uploaded") ||
+    latestInboundMessage.includes("document") ||
+    latestInboundMessage.includes("id") ||
+    latestInboundMessage.includes("bank statement") ||
+    latestInboundMessage.includes("proof") ||
+    latestInboundMessage.includes("employment") ||
+    latestInboundMessage.includes("مستند") ||
+    latestInboundMessage.includes("أرفقت") ||
+    latestInboundMessage.includes("ارسلت") ||
+    latestInboundMessage.includes("هوية")
+  ) {
+    flags.add("document_context");
+  }
+
   if (caseDetail.openInterventionsCount > 0) {
     flags.add("existing_manager_intervention");
   }
@@ -2686,7 +2888,12 @@ function extractRiskFlagSummary(caseDetail: PersistedCaseDetail) {
 }
 
 function readCaseAgentTriggerType(value: unknown): CaseAgentTriggerType | null {
-  if (value === "new_lead" || value === "no_response_follow_up" || value === "document_missing") {
+  if (
+    value === "new_lead" ||
+    value === "no_response_follow_up" ||
+    value === "document_missing" ||
+    value === "inbound_customer_message"
+  ) {
     return value;
   }
 
@@ -2695,4 +2902,99 @@ function readCaseAgentTriggerType(value: unknown): CaseAgentTriggerType | null {
 
 function createFutureTimestamp(hoursFromNow: number) {
   return new Date(Date.now() + hoursFromNow * 60 * 60 * 1000).toISOString();
+}
+
+function getLatestInboundMessage(caseDetail: PersistedCaseDetail) {
+  const latestInboundEvent = [...caseDetail.auditEvents]
+    .reverse()
+    .find((event) => event.eventType === "whatsapp_inbound_received");
+
+  return typeof latestInboundEvent?.payload?.textBody === "string" ? latestInboundEvent.payload.textBody : null;
+}
+
+function getCaseResponseLocale(caseDetail: PersistedCaseDetail, latestInboundMessage: string | null): SupportedLocale {
+  if (latestInboundMessage && /[\u0600-\u06FF]/.test(latestInboundMessage)) {
+    return "ar";
+  }
+
+  return caseDetail.preferredLocale;
+}
+
+function inferInboundIntent(latestInboundMessage: string | null): "documents" | "general" | "pricing" | "scheduling" {
+  const text = latestInboundMessage?.toLowerCase() ?? "";
+
+  if (
+    text.includes("discount") ||
+    text.includes("special approval") ||
+    text.includes("price") ||
+    text.includes("pricing") ||
+    text.includes("exception") ||
+    text.includes("سعر") ||
+    text.includes("خصم") ||
+    text.includes("استثناء")
+  ) {
+    return "pricing";
+  }
+
+  if (
+    text.includes("upload") ||
+    text.includes("uploaded") ||
+    text.includes("document") ||
+    text.includes("id") ||
+    text.includes("bank statement") ||
+    text.includes("employment") ||
+    text.includes("proof") ||
+    text.includes("مستند") ||
+    text.includes("أرفقت") ||
+    text.includes("ارسلت") ||
+    text.includes("هوية")
+  ) {
+    return "documents";
+  }
+
+  if (
+    text.includes("visit") ||
+    text.includes("call") ||
+    text.includes("schedule") ||
+    text.includes("appointment") ||
+    text.includes("meeting") ||
+    text.includes("زيارة") ||
+    text.includes("اتصال") ||
+    text.includes("موعد") ||
+    text.includes("مكالمة")
+  ) {
+    return "scheduling";
+  }
+
+  return "general";
+}
+
+function summarizeLatestObjection(caseDetail: PersistedCaseDetail, latestInboundMessage: string | null) {
+  const inboundIntent = inferInboundIntent(latestInboundMessage);
+
+  if (buildRiskFlags(caseDetail).includes("policy_sensitive_lead")) {
+    return caseDetail.preferredLocale === "ar"
+      ? "العميل طلب استثناء أو قدم إشارة حساسة تحتاج قراراً بشرياً."
+      : "The customer asked for an exception or raised a sensitive issue that needs a human decision.";
+  }
+
+  if (buildRiskFlags(caseDetail).includes("frustrated_customer_language")) {
+    return caseDetail.preferredLocale === "ar"
+      ? "لهجة العميل متوترة وتحتاج معالجة بشرية سريعة."
+      : "The customer tone is tense and needs quick human handling.";
+  }
+
+  if (inboundIntent === "documents") {
+    return caseDetail.preferredLocale === "ar"
+      ? "العميل يتابع بخصوص المستندات أو رفع الملفات."
+      : "The customer is following up about documents or uploaded files.";
+  }
+
+  if (inboundIntent === "scheduling") {
+    return caseDetail.preferredLocale === "ar"
+      ? "العميل يطلب تنسيق زيارة أو مكالمة."
+      : "The customer is asking to coordinate a visit or call.";
+  }
+
+  return extractRiskFlagSummary(caseDetail);
 }

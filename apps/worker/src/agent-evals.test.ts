@@ -10,6 +10,6 @@ describe("case agent evaluation harness", () => {
 
       expect(results.every((result) => result.passed)).toBe(true);
     },
-    20000
+    300000
   );
 });

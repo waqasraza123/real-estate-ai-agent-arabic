@@ -45,7 +45,12 @@ export const visitBookingStatusSchema = z.enum(["not_requested", "pending", "con
 export const managerInterventionTypeSchema = z.enum(["follow_up_overdue", "agent_decision_required"]);
 export const managerInterventionSeveritySchema = z.enum(["warning", "critical"]);
 export const managerInterventionStatusSchema = z.enum(["open", "resolved"]);
-export const caseAgentTriggerTypeSchema = z.enum(["new_lead", "no_response_follow_up", "document_missing"]);
+export const caseAgentTriggerTypeSchema = z.enum([
+  "new_lead",
+  "no_response_follow_up",
+  "document_missing",
+  "inbound_customer_message"
+]);
 export const caseAgentRunStatusSchema = z.enum(["completed", "waiting", "escalated", "blocked", "failed"]);
 export const caseAgentRiskLevelSchema = z.enum(["low", "medium", "high"]);
 export const caseAgentActionTypeSchema = z.enum([

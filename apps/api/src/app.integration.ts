@@ -267,6 +267,73 @@ describe("lead capture api", () => {
     await signedWebhookApp.close();
   });
 
+  it("stores inbound WhatsApp messages as first-class case input and updates the case locale when the customer switches to Arabic", async () => {
+    const createResponse = await app.inject({
+      method: "POST",
+      payload: {
+        customerName: "Layal Abbas",
+        email: "layal@example.com",
+        message: "Need details about the unit.",
+        phone: "+966 55 555 1111",
+        preferredLocale: "en",
+        projectInterest: "Palm Horizon"
+      },
+      url: "/v1/website-leads"
+    });
+    const createdCase = createResponse.json();
+
+    const webhookPayload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                contacts: [
+                  {
+                    profile: {
+                      name: "Layal Abbas"
+                    },
+                    wa_id: "966555551111"
+                  }
+                ],
+                messages: [
+                  {
+                    from: "966555551111",
+                    id: "wamid.inbound.locale.1",
+                    text: {
+                      body: "ممكن نرتب زيارة غدا؟"
+                    },
+                    timestamp: "1713517200",
+                    type: "text"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const webhookResponse = await app.inject({
+      method: "POST",
+      payload: webhookPayload,
+      url: "/v1/integrations/meta/whatsapp/webhook"
+    });
+
+    expect(webhookResponse.statusCode).toBe(200);
+
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/v1/cases/${createdCase.caseId}`
+    });
+    const caseDetail = detailResponse.json();
+
+    expect(caseDetail.preferredLocale).toBe("ar");
+    expect(caseDetail.channelSummary?.lastInboundAt).toBeTruthy();
+    expect(caseDetail.agentMemory?.latestIntentSummary).toContain("زيارة");
+    expect(caseDetail.auditEvents.some((event: { eventType: string }) => event.eventType === "whatsapp_inbound_received")).toBe(true);
+  });
+
   it("automatically opens a QA review when the inbound message matches policy triggers", async () => {
     const response = await app.inject({
       method: "POST",

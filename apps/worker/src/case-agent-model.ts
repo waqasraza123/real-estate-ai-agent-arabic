@@ -31,7 +31,12 @@ const caseAgentBlockedReasons = [
 const caseAgentRiskLevels = ["low", "medium", "high"] satisfies CaseAgentRiskLevel[];
 const caseAgentRunStatuses = ["completed", "waiting", "escalated", "blocked", "failed"] satisfies CaseAgentRunStatus[];
 const caseAgentToolExecutionStatuses = ["executed", "queued", "blocked", "skipped", "failed"] satisfies CaseAgentToolExecutionStatus[];
-const caseAgentTriggerTypes = ["new_lead", "no_response_follow_up", "document_missing"] satisfies CaseAgentTriggerType[];
+const caseAgentTriggerTypes = [
+  "new_lead",
+  "no_response_follow_up",
+  "document_missing",
+  "inbound_customer_message"
+] satisfies CaseAgentTriggerType[];
 const defaultOpenAiBaseUrl = "https://api.openai.com/v1";
 
 interface OpenAiResponsesEnvelope {
@@ -148,6 +153,13 @@ export function createOpenAiCaseAgentModelAdapter(input: {
 }
 
 function buildOpenAiCaseAgentPromptInput(input: CaseAgentModelInput) {
+  const latestInboundMessage = [...input.caseDetail.auditEvents]
+    .reverse()
+    .find((event) => event.eventType === "whatsapp_inbound_received")?.payload?.textBody;
+  const responseLocale =
+    typeof latestInboundMessage === "string" && /[\u0600-\u06FF]/.test(latestInboundMessage)
+      ? "ar"
+      : input.caseDetail.preferredLocale;
   const latestRun = input.caseDetail.agentRuns?.[0] ?? null;
   const openDocumentItems = input.caseDetail.documentRequests
     .filter((documentRequest) => documentRequest.status !== "accepted")
@@ -169,6 +181,7 @@ function buildOpenAiCaseAgentPromptInput(input: CaseAgentModelInput) {
       documentGapSummary: input.documentGapSummary,
       email: input.caseDetail.email,
       latestHumanReply: input.caseDetail.latestHumanReply ?? null,
+      latestInboundMessage: typeof latestInboundMessage === "string" ? latestInboundMessage : null,
       latestRun,
       message: input.caseDetail.message,
       nextAction: input.caseDetail.nextAction,
@@ -179,6 +192,7 @@ function buildOpenAiCaseAgentPromptInput(input: CaseAgentModelInput) {
       preferredLocale: input.caseDetail.preferredLocale,
       projectInterest: input.caseDetail.projectInterest,
       qualificationSnapshot: input.caseDetail.qualificationSnapshot ?? null,
+      responseLocale,
       source: input.caseDetail.source,
       visit: input.caseDetail.currentVisit ?? null
     },

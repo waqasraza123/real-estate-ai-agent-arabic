@@ -223,6 +223,92 @@ export async function runCaseAgentEvalScenarios(): Promise<CaseAgentEvalResult[]
         await store.close();
       }
     }),
+    evaluateScenario("arabic_inbound_message_updates_locale_and_queues_reply", async () => {
+      const store = await createAlphaLeadCaptureStore({ inMemory: true });
+
+      try {
+        const createdCase = await store.createWebsiteLeadCase({
+          customerName: "Layal Abbas",
+          email: "layal@example.com",
+          message: "Need details about the unit.",
+          nextAction: "Review the lead and continue qualification",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          phone: "+966 55 555 1111",
+          preferredLocale: "en",
+          projectInterest: "Palm Horizon"
+        });
+
+        await store.recordWhatsAppInboundMessage({
+          messageId: "wamid.eval.inbound.ar.1",
+          normalizedPhone: "+966555551111",
+          profileName: "Layal Abbas",
+          receivedAt: "2026-04-12T09:00:00.000Z",
+          textBody: "ممكن نرتب زيارة غدا؟"
+        });
+
+        await runPersistedCaseAgentCycle(store, {
+          canSendWhatsApp: true,
+          runAt: "2026-04-12T09:05:00.000Z"
+        });
+        const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+        if (
+          caseDetail?.preferredLocale !== "ar" ||
+          caseDetail.agentState?.latestTriggerType !== "inbound_customer_message" ||
+          caseDetail.agentState.latestRunStatus !== "completed" ||
+          caseDetail.channelSummary?.latestOutboundStatus !== "queued"
+        ) {
+          throw new Error("arabic_inbound_reply_assertion_failed");
+        }
+
+        return "Handles Arabic inbound messages as first-class input, updates locale, and queues the next WhatsApp reply.";
+      } finally {
+        await store.close();
+      }
+    }),
+    evaluateScenario("policy_sensitive_inbound_message_opens_qa_and_blocks_auto_reply", async () => {
+      const store = await createAlphaLeadCaptureStore({ inMemory: true });
+
+      try {
+        const createdCase = await store.createWebsiteLeadCase({
+          customerName: "Sami Khan",
+          email: "sami@example.com",
+          message: "Need details on the available layout.",
+          nextAction: "Review the lead and continue qualification",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          phone: "+966 54 000 9898",
+          preferredLocale: "en",
+          projectInterest: "Palm Horizon"
+        });
+
+        await store.recordWhatsAppInboundMessage({
+          messageId: "wamid.eval.inbound.risk.1",
+          normalizedPhone: "+966540009898",
+          profileName: "Sami Khan",
+          receivedAt: "2026-04-12T09:00:00.000Z",
+          textBody: "Can you give me a special approval or discount on this unit?"
+        });
+
+        await runPersistedCaseAgentCycle(store, {
+          canSendWhatsApp: true,
+          runAt: "2026-04-12T09:05:00.000Z"
+        });
+        const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+        if (
+          caseDetail?.currentQaReview?.status !== "pending_review" ||
+          caseDetail.agentState?.latestTriggerType !== "inbound_customer_message" ||
+          caseDetail.agentState.latestRunStatus !== "blocked" ||
+          caseDetail.agentState.latestBlockedReason !== "qa_hold"
+        ) {
+          throw new Error("policy_sensitive_inbound_assertion_failed");
+        }
+
+        return "Opens a QA hold on risky inbound exception requests and blocks automated replies until review clears.";
+      } finally {
+        await store.close();
+      }
+    }),
     evaluateScenario("adapter_failure_falls_back_to_deterministic", async () => {
       const store = await createAlphaLeadCaptureStore({ inMemory: true });
 

@@ -52,6 +52,7 @@ The repository is past bootstrap and currently contains a working local alpha fo
 - live alpha workflow for website lead intake, WhatsApp-first reply orchestration, qualification, visit scheduling, document tracking, and manager review
 - persisted document upload and authenticated download flow backed by local storage for live cases
 - production-style `CaseAgentOrchestrator` runtime for `new_lead`, `no_response_follow_up`, and `document_missing`
+- inbound WhatsApp intelligence that turns customer messages into first-class agent triggers with locale switching, QA holds, and next-step replies
 - asynchronous document-analysis pipeline with safe auto-accept, re-upload recommendation, and manual-review fallback over uploaded evidence
 - provider-ready text extraction with preview-first parsing and optional Tesseract OCR for uploaded documents
 - provider-backed model adapter boundary with deterministic fallback and scenario-based evaluation coverage

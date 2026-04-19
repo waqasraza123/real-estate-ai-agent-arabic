@@ -4214,6 +4214,9 @@ export async function createAlphaLeadCaptureStore(options?: {
     },
     async recordWhatsAppInboundMessage(input) {
       const store = this as LeadCaptureStore;
+      const inferredLocale = inferSupportedLocaleFromText(input.textBody);
+      const automaticQaMatches = detectQaPolicyMatches(input.textBody);
+      const automaticQaReviewId = automaticQaMatches.length > 0 ? randomUUID() : null;
       const existingCaseId = await store.findCaseIdByNormalizedPhone(input.normalizedPhone);
       const matchedCaseId =
         existingCaseId ??
@@ -4225,13 +4228,20 @@ export async function createAlphaLeadCaptureStore(options?: {
             nextAction: "Review inbound WhatsApp inquiry and continue qualification",
             nextActionDueAt: input.receivedAt,
             phone: input.normalizedPhone,
-            preferredLocale: "en",
+            preferredLocale: inferredLocale,
             projectInterest: "WhatsApp inquiry",
             source: "whatsapp"
           })
         ).caseId;
 
       await db.transaction(async (transaction) => {
+        const [caseRecord] = await transaction
+          .select({
+            leadId: cases.leadId
+          })
+          .from(cases)
+          .where(eq(cases.id, matchedCaseId))
+          .limit(1);
         const existingChannelState = await transaction
           .select({
             latestOutboundBlockReason: caseChannelStates.latestOutboundBlockReason,
@@ -4245,6 +4255,14 @@ export async function createAlphaLeadCaptureStore(options?: {
           })
           .from(caseChannelStates)
           .where(eq(caseChannelStates.caseId, matchedCaseId))
+          .limit(1);
+        const [currentQaReview] = await transaction
+          .select({
+            status: caseQaReviews.status
+          })
+          .from(caseQaReviews)
+          .where(eq(caseQaReviews.caseId, matchedCaseId))
+          .orderBy(desc(caseQaReviews.createdAt), desc(caseQaReviews.updatedAt))
           .limit(1);
 
         await upsertCaseChannelState(transaction, {
@@ -4267,6 +4285,15 @@ export async function createAlphaLeadCaptureStore(options?: {
           updatedAt: input.receivedAt
         });
 
+        if (caseRecord?.leadId) {
+          await transaction
+            .update(leads)
+            .set({
+              preferredLocale: inferredLocale
+            })
+            .where(eq(leads.id, caseRecord.leadId));
+        }
+
         await mergeCaseAgentMemory(transaction, matchedCaseId, {
           lastInboundAt: input.receivedAt,
           latestIntentSummary: input.textBody.slice(0, 280),
@@ -4284,6 +4311,49 @@ export async function createAlphaLeadCaptureStore(options?: {
             profileName: input.profileName,
             textBody: input.textBody
           }
+        });
+
+        if (
+          automaticQaReviewId &&
+          getCaseAutomationHoldReasonFromStatus(currentQaReview ? toCaseQaReviewStatus(currentQaReview.status) : null) === null
+        ) {
+          await createQaReviewRecord(transaction, {
+            caseId: matchedCaseId,
+            createdAt: input.receivedAt,
+            draftMessage: null,
+            policySignals: automaticQaMatches.map((match) => match.signal),
+            qaReviewId: automaticQaReviewId,
+            requestedByName: "QA Policy Engine",
+            sampleSummary: buildAutomaticQaSampleSummary(inferredLocale, automaticQaMatches.map((match) => match.signal)),
+            subjectType: "case_message",
+            triggerEvidence: automaticQaMatches.map((match) => match.evidence),
+            triggerSource: "policy_rule"
+          });
+
+          await transaction.insert(auditEvents).values({
+            caseId: matchedCaseId,
+            createdAt: input.receivedAt,
+            eventType: "qa_review_policy_opened",
+            id: randomUUID(),
+            payload: {
+              policySignals: automaticQaMatches.map((match) => match.signal),
+              qaReviewId: automaticQaReviewId,
+              subjectType: "case_message",
+              triggerEvidence: automaticQaMatches.map((match) => match.evidence),
+              triggerSource: "policy_rule"
+            }
+          });
+        }
+
+        await syncCaseAgentTriggerJob(transaction, {
+          caseId: matchedCaseId,
+          payload: {
+            messageId: input.messageId,
+            triggerSource: "whatsapp_inbound"
+          },
+          runAfter: input.receivedAt,
+          triggerType: "inbound_customer_message",
+          updatedAt: input.receivedAt
         });
       });
 
@@ -7741,11 +7811,20 @@ function toCaseAgentToolExecutionStatus(value: string): CaseAgentToolExecutionSt
 }
 
 function toCaseAgentTriggerType(value: string): CaseAgentTriggerType {
-  if (value === "new_lead" || value === "no_response_follow_up" || value === "document_missing") {
+  if (
+    value === "new_lead" ||
+    value === "no_response_follow_up" ||
+    value === "document_missing" ||
+    value === "inbound_customer_message"
+  ) {
     return value;
   }
 
   throw new Error(`unsupported_case_agent_trigger_type:${value}`);
+}
+
+function inferSupportedLocaleFromText(value: string): SupportedLocale {
+  return /[\u0600-\u06FF]/.test(value) ? "ar" : "en";
 }
 
 function toCaseStage(value: string): CaseStage {
