@@ -53,6 +53,33 @@ export const caseAgentTriggerTypeSchema = z.enum([
 ]);
 export const caseAgentRunStatusSchema = z.enum(["completed", "waiting", "escalated", "blocked", "failed"]);
 export const caseAgentRiskLevelSchema = z.enum(["low", "medium", "high"]);
+export const caseAgentIntentCategorySchema = z.enum([
+  "general",
+  "qualification",
+  "pricing",
+  "documents",
+  "scheduling",
+  "availability"
+]);
+export const caseAgentRequestedNextStepSchema = z.enum([
+  "none",
+  "share_details",
+  "share_pricing",
+  "schedule_visit",
+  "schedule_call",
+  "send_documents",
+  "review_documents",
+  "human_callback"
+]);
+export const caseAgentUrgencyLevelSchema = z.enum(["low", "medium", "high"]);
+export const caseAgentSentimentSchema = z.enum(["neutral", "interested", "frustrated", "urgent"]);
+export const caseAgentObjectionCategorySchema = z.enum([
+  "pricing",
+  "timeline",
+  "documents",
+  "trust",
+  "responsiveness"
+]);
 export const caseAgentActionTypeSchema = z.enum([
   "send_whatsapp_message",
   "save_follow_up_plan",
@@ -411,12 +438,17 @@ export const persistedCaseQaReviewSchema = z.object({
 
 export const persistedCaseAgentMemorySchema = z.object({
   activeRiskFlags: z.array(z.string()),
+  customerSentiment: caseAgentSentimentSchema.nullable(),
   documentGapSummary: z.string().nullable(),
   lastDecisionSummary: z.string().nullable(),
   lastInboundAt: z.iso.datetime().nullable(),
+  lastIntentCategory: caseAgentIntentCategorySchema.nullable(),
   lastObjectionSummary: z.string().nullable(),
+  objectionCategories: z.array(caseAgentObjectionCategorySchema),
   lastSuccessfulOutboundAt: z.iso.datetime().nullable(),
   latestIntentSummary: z.string().nullable(),
+  requestedNextStep: caseAgentRequestedNextStepSchema.nullable(),
+  responseUrgency: caseAgentUrgencyLevelSchema.nullable(),
   qualificationSummary: z.string().nullable(),
   updatedAt: z.iso.datetime()
 });
@@ -805,10 +837,15 @@ export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
 export type CaseAgentActionType = z.infer<typeof caseAgentActionTypeSchema>;
 export type CaseAgentBlockedReason = z.infer<typeof caseAgentBlockedReasonSchema>;
 export type CaseAgentDecision = z.infer<typeof caseAgentDecisionSchema>;
+export type CaseAgentIntentCategory = z.infer<typeof caseAgentIntentCategorySchema>;
+export type CaseAgentObjectionCategory = z.infer<typeof caseAgentObjectionCategorySchema>;
 export type CaseAgentRiskLevel = z.infer<typeof caseAgentRiskLevelSchema>;
 export type CaseAgentRunStatus = z.infer<typeof caseAgentRunStatusSchema>;
+export type CaseAgentRequestedNextStep = z.infer<typeof caseAgentRequestedNextStepSchema>;
+export type CaseAgentSentiment = z.infer<typeof caseAgentSentimentSchema>;
 export type CaseAgentToolExecutionStatus = z.infer<typeof caseAgentToolExecutionStatusSchema>;
 export type CaseAgentTriggerType = z.infer<typeof caseAgentTriggerTypeSchema>;
+export type CaseAgentUrgencyLevel = z.infer<typeof caseAgentUrgencyLevelSchema>;
 export type CaseAutomationHoldReason = z.infer<typeof caseAutomationHoldReasonSchema>;
 export type CaseContactChannel = z.infer<typeof caseContactChannelSchema>;
 export type CaseStage = z.infer<typeof caseStageSchema>;

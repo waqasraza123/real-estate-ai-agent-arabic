@@ -5,8 +5,13 @@ import type {
   CaseAgentActionType,
   CaseAgentBlockedReason,
   CaseAgentDecision,
+  CaseAgentIntentCategory,
+  CaseAgentObjectionCategory,
   CaseAgentRiskLevel,
+  CaseAgentRequestedNextStep,
+  CaseAgentSentiment,
   CaseAgentTriggerType,
+  CaseAgentUrgencyLevel,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
   CreateHandoverBlockerInput,
@@ -282,11 +287,20 @@ export async function runPersistedFollowUpCycle(
 export interface CaseAgentModelInput {
   allowedActions: CaseAgentActionType[];
   caseDetail: PersistedCaseDetail;
+  conversationIntelligence: CaseConversationIntelligence;
   documentGapSummary: string | null;
   now: string;
   repeatedTriggerCount: number;
   riskFlags: string[];
   triggerType: CaseAgentTriggerType;
+}
+
+export interface CaseConversationIntelligence {
+  customerSentiment: CaseAgentSentiment | null;
+  intentCategory: CaseAgentIntentCategory | null;
+  objectionCategories: CaseAgentObjectionCategory[];
+  requestedNextStep: CaseAgentRequestedNextStep | null;
+  urgencyLevel: CaseAgentUrgencyLevel | null;
 }
 
 export interface CaseAgentModelAdapter {
@@ -2066,25 +2080,31 @@ function buildCaseAgentMemorySnapshot(
   }
 ) {
   const latestInboundMessage = getLatestInboundMessage(caseDetail);
+  const conversationIntelligence = analyzeConversationIntelligence(caseDetail, latestInboundMessage);
   const latestIntentSummary = latestInboundMessage ? latestInboundMessage.slice(0, 280) : caseDetail.message.slice(0, 280);
-  const lastObjectionSummary = summarizeLatestObjection(caseDetail, latestInboundMessage);
+  const lastObjectionSummary = summarizeLatestObjection(caseDetail, latestInboundMessage, conversationIntelligence);
   const qualificationSummary = caseDetail.qualificationSnapshot
     ? `${caseDetail.qualificationSnapshot.readiness} | ${caseDetail.qualificationSnapshot.budgetBand} | ${caseDetail.qualificationSnapshot.moveInTimeline}`
     : null;
   const documentGapSummary = summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale);
 
   return {
-    activeRiskFlags: buildRiskFlags(caseDetail),
+    activeRiskFlags: buildRiskFlags(caseDetail, conversationIntelligence),
+    customerSentiment: conversationIntelligence.customerSentiment,
     documentGapSummary,
     lastDecisionSummary: input.decisionSummary,
     lastInboundAt: caseDetail.channelSummary?.lastInboundAt ?? caseDetail.agentMemory?.lastInboundAt ?? null,
+    lastIntentCategory: conversationIntelligence.intentCategory,
     lastObjectionSummary,
+    objectionCategories: conversationIntelligence.objectionCategories,
     lastSuccessfulOutboundAt:
       caseDetail.channelSummary?.latestOutboundStatus === "sent" || caseDetail.channelSummary?.latestOutboundStatus === "delivered"
         ? caseDetail.channelSummary.latestOutboundUpdatedAt
         : caseDetail.agentMemory?.lastSuccessfulOutboundAt ?? null,
     latestIntentSummary,
     qualificationSummary,
+    requestedNextStep: conversationIntelligence.requestedNextStep,
+    responseUrgency: conversationIntelligence.urgencyLevel,
     updatedAt: input.now
   };
 }
@@ -2113,7 +2133,8 @@ async function resolveCaseAgentDecision(
     };
   }
 
-  const riskFlags = buildRiskFlags(caseDetail);
+  const conversationIntelligence = analyzeConversationIntelligence(caseDetail);
+  const riskFlags = buildRiskFlags(caseDetail, conversationIntelligence);
   const documentGapSummary = summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale);
   const repeatedTriggerCount = (caseDetail.agentRuns ?? []).filter((run) => run.triggerType === input.triggerType).length;
   const modelInput: CaseAgentModelInput = {
@@ -2126,6 +2147,7 @@ async function resolveCaseAgentDecision(
       "create_reply_draft"
     ],
     caseDetail,
+    conversationIntelligence,
     documentGapSummary,
     now: input.now,
     repeatedTriggerCount,
@@ -2138,6 +2160,7 @@ async function resolveCaseAgentDecision(
 
     return {
       decision: applyCaseAgentDecisionGuardrails(caseDetail, adapterDecision, {
+        conversationIntelligence,
         now: input.now,
         repeatedTriggerCount,
         riskFlags,
@@ -2158,10 +2181,23 @@ async function resolveCaseAgentDecision(
 
 function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAgentDecision {
   const { caseDetail } = input;
-  const { documentGapSummary, repeatedTriggerCount, riskFlags, triggerType } = input;
+  const { conversationIntelligence, documentGapSummary, repeatedTriggerCount, riskFlags, triggerType } = input;
   const latestInboundMessage = getLatestInboundMessage(caseDetail);
   const responseLocale = getCaseResponseLocale(caseDetail, latestInboundMessage);
-  const inboundIntent = inferInboundIntent(latestInboundMessage);
+  const requestedNextStep = conversationIntelligence.requestedNextStep;
+  const customerSentiment = conversationIntelligence.customerSentiment;
+  const urgencyLevel = conversationIntelligence.urgencyLevel;
+  const objectionCategories = conversationIntelligence.objectionCategories;
+  const needsPricingClarification = requestedNextStep === "share_pricing" || objectionCategories.includes("pricing");
+  const needsHumanToneReview = customerSentiment === "frustrated" || objectionCategories.includes("trust");
+  const nextTouchHours =
+    urgencyLevel === "high" || requestedNextStep === "human_callback"
+      ? 1
+      : requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call"
+        ? 2
+        : requestedNextStep === "review_documents"
+          ? 4
+          : 6;
 
   if (triggerType === "new_lead") {
     if (riskFlags.includes("policy_sensitive_lead")) {
@@ -2188,21 +2224,56 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
       };
     }
 
+    if (needsHumanToneReview) {
+      return {
+        actionType: "create_reply_draft",
+        blockedReason: null,
+        confidence: 0.85,
+        escalationReason: null,
+        proposedMessage: buildTriggerMessage("new_lead", caseDetail, documentGapSummary, conversationIntelligence),
+        proposedNextAction:
+          responseLocale === "ar"
+            ? "راجع مسودة الرد الأول قبل المتابعة مع العميل"
+            : "Review the first-reply draft before continuing with the customer",
+        proposedNextActionDueAt: createFutureTimestamp(2),
+        rationaleSummary:
+          responseLocale === "ar"
+            ? "تم خفض الرد الأول إلى مسودة لأن العميل يحمل إشارة حساسة في النبرة أو الثقة."
+            : "Downgraded the first reply to a draft because the customer shows tone or trust signals that need human review.",
+        riskLevel: "medium",
+        status: "waiting",
+        toolExecutionStatus: "executed",
+        triggerType
+      };
+    }
+
     return {
       actionType: "send_whatsapp_message",
       blockedReason: null,
       confidence: 0.94,
       escalationReason: null,
-      proposedMessage: buildTriggerMessage("new_lead", caseDetail, documentGapSummary),
+      proposedMessage: buildTriggerMessage("new_lead", caseDetail, documentGapSummary, conversationIntelligence),
       proposedNextAction:
-        caseDetail.preferredLocale === "ar"
-          ? "انتظار رد العميل ومتابعة التأهيل إذا عاد على واتساب"
-          : "Wait for the customer reply and continue qualification on WhatsApp",
-      proposedNextActionDueAt: createFutureTimestamp(4),
+        requestedNextStep === "human_callback" || requestedNextStep === "schedule_call"
+          ? responseLocale === "ar"
+            ? "أكد وقت المكالمة الأنسب ثم واصل التأهيل على واتساب"
+            : "Confirm the best callback time, then continue qualification on WhatsApp"
+          : requestedNextStep === "share_pricing"
+            ? responseLocale === "ar"
+              ? "أكد الميزانية ونوع الوحدة قبل مشاركة التفاصيل المناسبة"
+              : "Confirm budget and unit type before sharing the right pricing details"
+            : responseLocale === "ar"
+              ? "انتظر رد العميل وواصل التأهيل على واتساب"
+              : "Wait for the customer reply and continue qualification on WhatsApp",
+      proposedNextActionDueAt: createFutureTimestamp(nextTouchHours),
       rationaleSummary:
-        caseDetail.preferredLocale === "ar"
-          ? "العميل جديد والمحتوى منخفض المخاطر، لذلك يمكن إرسال أول رد تلقائي آمن."
-          : "The lead is new and low-risk, so the first reply can be sent automatically.",
+        needsPricingClarification
+          ? responseLocale === "ar"
+            ? "العميل منخفض المخاطر لكنه يحتاج توضيحاً منظماً للتسعير قبل التقدم."
+            : "The lead is low-risk but needs a structured pricing clarification before progressing."
+          : responseLocale === "ar"
+            ? "العميل جديد والمحتوى منخفض المخاطر، لذلك يمكن إرسال أول رد تلقائي آمن."
+            : "The lead is new and low-risk, so the first reply can be sent automatically.",
       riskLevel: "low",
       status: "completed",
       toolExecutionStatus: "queued",
@@ -2237,22 +2308,26 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
       };
     }
 
-    if (riskFlags.includes("frustrated_customer_language")) {
+    if (needsHumanToneReview) {
       return {
         actionType: "create_reply_draft",
         blockedReason: null,
         confidence: 0.84,
         escalationReason: null,
-        proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary),
+        proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary, conversationIntelligence),
         proposedNextAction:
           responseLocale === "ar"
             ? "راجع مسودة الرد قبل تهدئة العميل ومتابعة الحالة"
             : "Review the reply draft before de-escalating the customer and continuing the case",
         proposedNextActionDueAt: createFutureTimestamp(2),
         rationaleSummary:
-          responseLocale === "ar"
-            ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
-            : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
+          objectionCategories.includes("trust")
+            ? responseLocale === "ar"
+              ? "تم خفض القرار إلى مسودة لأن العميل يحمل مخاوف ثقة أو قانونية تتطلب مراجعة بشرية."
+              : "Downgraded to a draft because the customer raised trust or legal concerns that need human review."
+            : responseLocale === "ar"
+              ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
+              : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
         riskLevel: "medium",
         status: "waiting",
         toolExecutionStatus: "executed",
@@ -2265,32 +2340,40 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
       blockedReason: null,
       confidence: 0.92,
       escalationReason: null,
-      proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary),
+      proposedMessage: buildTriggerMessage(triggerType, caseDetail, documentGapSummary, conversationIntelligence),
       proposedNextAction:
-        inboundIntent === "documents"
+        requestedNextStep === "review_documents"
           ? responseLocale === "ar"
             ? "راجع المستندات الواردة وأكد للعميل أي عناصر إضافية إذا لزم الأمر"
             : "Review the incoming documents and confirm any additional items if needed"
-          : inboundIntent === "scheduling"
-          ? responseLocale === "ar"
-            ? "ثبّت وقت الزيارة أو المكالمة التالية مع العميل"
-            : "Confirm the next visit or call time with the customer"
-          : responseLocale === "ar"
-            ? "تابع التأهيل بناءً على آخر رسالة واردة من العميل"
-            : "Continue qualification based on the customer's latest inbound message",
-      proposedNextActionDueAt: createFutureTimestamp(inboundIntent === "scheduling" ? 2 : 6),
+          : requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call" || requestedNextStep === "human_callback"
+            ? responseLocale === "ar"
+              ? "ثبّت وقت الخطوة التالية مع العميل"
+              : "Confirm the timing for the next step with the customer"
+            : needsPricingClarification
+              ? responseLocale === "ar"
+                ? "أكد الميزانية ونوع الوحدة قبل مشاركة أي تفاصيل تسعير"
+                : "Confirm budget and unit type before sharing any pricing details"
+              : responseLocale === "ar"
+                ? "تابع التأهيل بناءً على آخر رسالة واردة من العميل"
+                : "Continue qualification based on the customer's latest inbound message",
+      proposedNextActionDueAt: createFutureTimestamp(nextTouchHours),
       rationaleSummary:
-        inboundIntent === "documents"
+        requestedNextStep === "review_documents"
           ? responseLocale === "ar"
             ? "رسالة العميل تتعلق بالمستندات ويمكن الرد عليها تلقائياً مع متابعة سريعة للمراجعة."
             : "The customer's message is about documents and can be answered automatically with a quick review follow-up."
-          : inboundIntent === "scheduling"
-          ? responseLocale === "ar"
-            ? "رسالة العميل تتعلق بترتيب الموعد ويمكن الرد عليها تلقائياً لتثبيت الخطوة التالية."
-            : "The customer's message is about scheduling and can be answered automatically to lock the next step."
-          : responseLocale === "ar"
-            ? "الرسالة الواردة منخفضة المخاطر ويمكن الرد عليها تلقائياً لمواصلة التقدم."
-            : "The inbound message is low-risk and can be answered automatically to keep progress moving.",
+          : requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call" || requestedNextStep === "human_callback"
+            ? responseLocale === "ar"
+              ? "رسالة العميل تركز على الخطوة التالية المباشرة ويمكن الرد عليها تلقائياً لتثبيت التقدم."
+              : "The customer's message is focused on the next concrete step and can be answered automatically to keep momentum."
+            : needsPricingClarification
+              ? responseLocale === "ar"
+                ? "العميل يطلب معلومات تسعير غير استثنائية ويمكن الرد بأمان مع طلب توضيح إضافي."
+                : "The customer is asking for non-exception pricing information and can be answered safely with clarification."
+              : responseLocale === "ar"
+                ? "الرسالة الواردة منخفضة المخاطر ويمكن الرد عليها تلقائياً لمواصلة التقدم."
+                : "The inbound message is low-risk and can be answered automatically to keep progress moving.",
       riskLevel: "low",
       status: "completed",
       toolExecutionStatus: "queued",
@@ -2330,7 +2413,7 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
       blockedReason: null,
       confidence: 0.9,
       escalationReason: null,
-      proposedMessage: buildTriggerMessage("document_missing", caseDetail, documentGapSummary),
+      proposedMessage: buildTriggerMessage("document_missing", caseDetail, documentGapSummary, conversationIntelligence),
       proposedNextAction:
         caseDetail.preferredLocale === "ar"
           ? "تحقق من استلام المستندات المطلوبة أو صعد الحالة إذا استمر الغياب"
@@ -2378,16 +2461,32 @@ function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAge
     blockedReason: null,
     confidence: 0.89,
     escalationReason: null,
-    proposedMessage: buildTriggerMessage("no_response_follow_up", caseDetail, documentGapSummary),
+    proposedMessage: buildTriggerMessage("no_response_follow_up", caseDetail, documentGapSummary, conversationIntelligence),
     proposedNextAction:
-      caseDetail.preferredLocale === "ar"
-        ? "انتظر الرد التالي أو صعد الحالة إذا استمر الصمت"
-        : "Wait for the next reply or escalate if the customer stays silent",
-    proposedNextActionDueAt: createFutureTimestamp(24),
+      requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call" || requestedNextStep === "human_callback"
+        ? responseLocale === "ar"
+          ? "انتظر تأكيد الموعد التالي أو صعد الحالة إذا استمر الصمت"
+          : "Wait for the next appointment confirmation or escalate if silence continues"
+        : needsPricingClarification
+          ? responseLocale === "ar"
+            ? "انتظر رد العميل لتوضيح الميزانية أو صعد الحالة إذا استمر الصمت"
+            : "Wait for the customer to clarify budget or escalate if silence continues"
+          : responseLocale === "ar"
+            ? "انتظر الرد التالي أو صعد الحالة إذا استمر الصمت"
+            : "Wait for the next reply or escalate if the customer stays silent",
+    proposedNextActionDueAt: createFutureTimestamp(urgencyLevel === "high" ? 12 : 24),
     rationaleSummary:
-      caseDetail.preferredLocale === "ar"
-        ? "المتابعة مستحقة والعميل لم يرد بعد، لذلك أرسل متابعة واتساب قصيرة وآمنة."
-        : "The follow-up is due and the customer has not replied, so a short safe WhatsApp nudge is appropriate.",
+      requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call" || requestedNextStep === "human_callback"
+        ? responseLocale === "ar"
+          ? "المتابعة مستحقة على خطوة مباشرة، لذلك أرسل تذكيراً قصيراً يركز على الموعد التالي."
+          : "The follow-up is due on a concrete next step, so a short reminder focused on the next appointment is appropriate."
+        : needsPricingClarification
+          ? responseLocale === "ar"
+            ? "المتابعة مستحقة ويمكن تذكير العميل بأمان بتوضيح الميزانية أو الوحدة المطلوبة."
+            : "The follow-up is due and it is safe to remind the customer to clarify budget or unit preference."
+          : responseLocale === "ar"
+            ? "المتابعة مستحقة والعميل لم يرد بعد، لذلك أرسل متابعة واتساب قصيرة وآمنة."
+            : "The follow-up is due and the customer has not replied, so a short safe WhatsApp nudge is appropriate.",
     riskLevel: "low",
     status: "completed",
     toolExecutionStatus: "queued",
@@ -2399,6 +2498,7 @@ function applyCaseAgentDecisionGuardrails(
   caseDetail: PersistedCaseDetail,
   decision: CaseAgentDecision,
   input: {
+    conversationIntelligence: CaseConversationIntelligence;
     now: string;
     repeatedTriggerCount: number;
     riskFlags: string[];
@@ -2409,6 +2509,7 @@ function applyCaseAgentDecisionGuardrails(
     return decideCaseAgentActionDeterministic({
       allowedActions: [],
       caseDetail,
+      conversationIntelligence: input.conversationIntelligence,
       documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
       now: input.now,
       repeatedTriggerCount: input.repeatedTriggerCount,
@@ -2424,6 +2525,7 @@ function applyCaseAgentDecisionGuardrails(
     return decideCaseAgentActionDeterministic({
       allowedActions: [],
       caseDetail,
+      conversationIntelligence: input.conversationIntelligence,
       documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
       now: input.now,
       repeatedTriggerCount: input.repeatedTriggerCount,
@@ -2466,7 +2568,8 @@ function applyCaseAgentDecisionGuardrails(
 
   if (
     input.triggerType === "inbound_customer_message" &&
-    input.riskFlags.includes("frustrated_customer_language") &&
+    (input.riskFlags.includes("frustrated_customer_language") ||
+      input.conversationIntelligence.objectionCategories.includes("trust")) &&
     decision.actionType === "send_whatsapp_message"
   ) {
     return {
@@ -2481,9 +2584,13 @@ function applyCaseAgentDecisionGuardrails(
           : "Review the reply draft before de-escalating the customer and continuing the case",
       proposedNextActionDueAt: createFutureTimestamp(2),
       rationaleSummary:
-        caseDetail.preferredLocale === "ar"
-          ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
-          : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
+        input.conversationIntelligence.objectionCategories.includes("trust")
+          ? caseDetail.preferredLocale === "ar"
+            ? "تم خفض القرار إلى مسودة لأن الرسالة تحمل اعتراض ثقة أو قانون يحتاج مراجعة بشرية."
+            : "Downgraded to a draft because the message includes a trust or legal concern that needs human review."
+          : caseDetail.preferredLocale === "ar"
+            ? "تم خفض القرار إلى مسودة لأن لهجة العميل متوترة وتحتاج مراجعة بشرية سريعة."
+            : "Downgraded to a draft because the customer tone is tense and needs quick human review.",
       riskLevel: "medium",
       status: "waiting",
       toolExecutionStatus: "executed",
@@ -2587,7 +2694,8 @@ function buildBlockedCaseAgentDecision(
     proposedMessage: buildTriggerMessage(
       input.triggerType,
       caseDetail,
-      summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale)
+      summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
+      analyzeConversationIntelligence(caseDetail)
     ),
     proposedNextAction: buildBlockedNextAction(caseDetail.preferredLocale, input.blockedReason),
     proposedNextActionDueAt: createFutureTimestamp(input.blockedReason === "client_credentials_pending" ? 24 : 4),
@@ -2668,40 +2776,86 @@ function getCaseAgentBlockedReason(
 function buildTriggerMessage(
   triggerType: CaseAgentTriggerType,
   caseDetail: PersistedCaseDetail,
-  documentGapSummary: string | null
+  documentGapSummary: string | null,
+  conversationIntelligence: CaseConversationIntelligence
 ) {
   const latestInboundMessage = getLatestInboundMessage(caseDetail);
   const responseLocale = getCaseResponseLocale(caseDetail, latestInboundMessage);
-  const inboundIntent = inferInboundIntent(latestInboundMessage);
+  const requestedNextStep = conversationIntelligence.requestedNextStep;
+  const customerSentiment = conversationIntelligence.customerSentiment;
+  const acknowledgeDelay =
+    conversationIntelligence.objectionCategories.includes("responsiveness") && triggerType === "inbound_customer_message";
 
   if (triggerType === "new_lead") {
+    if (requestedNextStep === "human_callback" || requestedNextStep === "schedule_call") {
+      return responseLocale === "ar"
+        ? `مرحباً ${caseDetail.customerName}، استلمنا اهتمامك بمشروع ${caseDetail.projectInterest}. يمكننا ترتيب مكالمة مناسبة لك ومتابعة التفاصيل معك مباشرة على واتساب.`
+        : `Hi ${caseDetail.customerName}, we received your interest in ${caseDetail.projectInterest}. We can arrange a suitable call and continue the details with you directly on WhatsApp.`;
+    }
+
+    if (requestedNextStep === "share_pricing") {
+      return responseLocale === "ar"
+        ? `مرحباً ${caseDetail.customerName}، استلمنا اهتمامك بمشروع ${caseDetail.projectInterest}. شاركني الميزانية أو نوع الوحدة المطلوب وسأتابع معك الخيارات المناسبة هنا على واتساب.`
+        : `Hi ${caseDetail.customerName}, we received your interest in ${caseDetail.projectInterest}. Share your budget or preferred unit type and I will continue with the suitable options here on WhatsApp.`;
+    }
+
     return responseLocale === "ar"
       ? `مرحباً ${caseDetail.customerName}، استلمنا اهتمامك بمشروع ${caseDetail.projectInterest}. يمكننا متابعة التفاصيل المناسبة لك هنا على واتساب متى كان ذلك مناسباً.`
       : `Hi ${caseDetail.customerName}, we received your interest in ${caseDetail.projectInterest}. We can continue the next suitable details with you here on WhatsApp whenever you're ready.`;
   }
 
   if (triggerType === "inbound_customer_message") {
-    if (inboundIntent === "documents") {
+    if (requestedNextStep === "review_documents") {
       return responseLocale === "ar"
         ? `شكراً ${caseDetail.customerName}، استلمت رسالتك بخصوص المستندات. سنراجع ما ترسله ونخبرك مباشرة إذا احتجنا أي عنصر إضافي.`
         : `Thanks ${caseDetail.customerName}, I received your message about the documents. We will review what you send and let you know directly if anything else is needed.`;
     }
 
-    if (inboundIntent === "scheduling") {
+    if (requestedNextStep === "send_documents") {
       return responseLocale === "ar"
-        ? `شكراً ${caseDetail.customerName}، يمكننا ترتيب الزيارة أو المكالمة التالية حسب الوقت المناسب لك. أرسل الوقت الأنسب وسننسق معك مباشرة.`
-        : `Thanks ${caseDetail.customerName}, we can arrange the next visit or call based on the time that suits you. Share the best time and we will coordinate directly.`;
+        ? `شكراً ${caseDetail.customerName}، يمكننا إكمال هذه الخطوة فور استلام المستندات المطلوبة${documentGapSummary ? `: ${documentGapSummary}` : ""}. أرسل ما هو متاح وسأتابع معك مباشرة.`
+        : `Thanks ${caseDetail.customerName}, we can move this forward as soon as we receive the required documents${documentGapSummary ? `: ${documentGapSummary}` : ""}. Send what is available and I will continue directly with you.`;
+    }
+
+    if (requestedNextStep === "schedule_visit") {
+      return responseLocale === "ar"
+        ? `شكراً ${caseDetail.customerName}، يمكننا ترتيب الزيارة التالية حسب الوقت المناسب لك. أرسل اليوم أو الوقت الأنسب وسننسق معك مباشرة.`
+        : `Thanks ${caseDetail.customerName}, we can arrange the next visit based on the time that suits you. Share the best day or time and we will coordinate directly.`;
+    }
+
+    if (requestedNextStep === "schedule_call" || requestedNextStep === "human_callback") {
+      return responseLocale === "ar"
+        ? `شكراً ${caseDetail.customerName}، يمكننا ترتيب مكالمة في الوقت المناسب لك. أرسل الوقت الأنسب وسنتابع معك مباشرة.`
+        : `Thanks ${caseDetail.customerName}, we can arrange a call at the time that suits you. Share the best time and we will follow up directly.`;
+    }
+
+    if (requestedNextStep === "share_pricing") {
+      return responseLocale === "ar"
+        ? `شكراً ${caseDetail.customerName}، يسعدني متابعة الخيارات المناسبة لك. شاركني الميزانية أو نوع الوحدة المطلوب وسأوضح لك التفاصيل المتاحة هنا على واتساب.`
+        : `Thanks ${caseDetail.customerName}, I can help narrow the right options for you. Share your budget or preferred unit type and I will outline the suitable details here on WhatsApp.`;
     }
 
     return responseLocale === "ar"
-      ? `شكراً ${caseDetail.customerName}، استلمت رسالتك وسأتابع معك هنا على واتساب بالخطوة المناسبة التالية.`
-      : `Thanks ${caseDetail.customerName}, I received your message and will continue with you here on WhatsApp with the next suitable step.`;
+      ? `${acknowledgeDelay ? "شكراً على صبرك، " : ""}استلمت رسالتك يا ${caseDetail.customerName} وسأتابع معك هنا على واتساب بالخطوة المناسبة التالية${customerSentiment === "urgent" ? " بأولوية سريعة" : ""}.`
+      : `${acknowledgeDelay ? "Thanks for your patience, " : ""}I received your message, ${caseDetail.customerName}, and will continue with you here on WhatsApp with the next suitable step${customerSentiment === "urgent" ? " as a priority" : ""}.`;
   }
 
   if (triggerType === "document_missing") {
     return responseLocale === "ar"
       ? `مرحباً ${caseDetail.customerName}، ما زلنا ننتظر بعض المستندات لإكمال الحالة${documentGapSummary ? `: ${documentGapSummary}` : ""}. أرسل ما هو متاح وسنتابع معك مباشرة.`
       : `Hi ${caseDetail.customerName}, we are still waiting on a few documents to keep the case moving${documentGapSummary ? `: ${documentGapSummary}` : ""}. Send what is available and we will continue from there.`;
+  }
+
+  if (requestedNextStep === "schedule_visit" || requestedNextStep === "schedule_call" || requestedNextStep === "human_callback") {
+    return responseLocale === "ar"
+      ? `مرحباً ${caseDetail.customerName}، أتابع معك بخصوص ${caseDetail.projectInterest}. إذا ما زلت مهتماً يمكننا تثبيت الموعد التالي معك مباشرة على واتساب.`
+      : `Hi ${caseDetail.customerName}, following up with you about ${caseDetail.projectInterest}. If you are still interested, we can lock the next appointment with you directly on WhatsApp.`;
+  }
+
+  if (requestedNextStep === "share_pricing") {
+    return responseLocale === "ar"
+      ? `مرحباً ${caseDetail.customerName}، أتابع معك بخصوص ${caseDetail.projectInterest}. إذا رغبت نكمل من هنا بتحديد الميزانية أو نوع الوحدة حتى نشاركك الخيارات الأنسب.`
+      : `Hi ${caseDetail.customerName}, following up with you about ${caseDetail.projectInterest}. If helpful, we can continue here by confirming budget or unit type so we can share the most suitable options.`;
   }
 
   return responseLocale === "ar"
@@ -2797,9 +2951,9 @@ function documentRequestNeedsCustomerUpload(documentRequest: PersistedCaseDetail
   return documentRequest.uploads[0]?.analysis?.recommendation === "request_reupload";
 }
 
-function buildRiskFlags(caseDetail: PersistedCaseDetail) {
+function buildRiskFlags(caseDetail: PersistedCaseDetail, conversationIntelligence?: CaseConversationIntelligence) {
   const flags = new Set<string>();
-  const latestInboundMessage = getLatestInboundMessage(caseDetail)?.toLowerCase() ?? "";
+  const intelligence = conversationIntelligence ?? analyzeConversationIntelligence(caseDetail);
   const textCorpus = [
     caseDetail.message,
     ...caseDetail.auditEvents
@@ -2813,62 +2967,40 @@ function buildRiskFlags(caseDetail: PersistedCaseDetail) {
     flags.add("qa_hold");
   }
 
-  if (
-    textCorpus.includes("lawyer") ||
-    textCorpus.includes("legal") ||
-    textCorpus.includes("guarantee") ||
-    textCorpus.includes("special approval") ||
-    textCorpus.includes("discount") ||
-    textCorpus.includes("محامي") ||
-    textCorpus.includes("قانون") ||
-    textCorpus.includes("ضمان") ||
-    textCorpus.includes("استثناء")
-  ) {
+  if (containsAnyKeyword(textCorpus, policySensitiveKeywords)) {
     flags.add("policy_sensitive_lead");
   }
 
-  if (
-    textCorpus.includes("frustrated") ||
-    textCorpus.includes("angry") ||
-    textCorpus.includes("upset") ||
-    textCorpus.includes("annoyed") ||
-    textCorpus.includes("not happy") ||
-    textCorpus.includes("منزعج") ||
-    textCorpus.includes("مستاء") ||
-    textCorpus.includes("غاضب") ||
-    textCorpus.includes("زعلان")
-  ) {
+  if (intelligence.customerSentiment === "frustrated") {
     flags.add("frustrated_customer_language");
   }
 
-  if (
-    latestInboundMessage.includes("visit") ||
-    latestInboundMessage.includes("call") ||
-    latestInboundMessage.includes("schedule") ||
-    latestInboundMessage.includes("appointment") ||
-    latestInboundMessage.includes("meeting") ||
-    latestInboundMessage.includes("زيارة") ||
-    latestInboundMessage.includes("اتصال") ||
-    latestInboundMessage.includes("موعد") ||
-    latestInboundMessage.includes("مكالمة")
-  ) {
+  if (intelligence.requestedNextStep === "schedule_visit" || intelligence.requestedNextStep === "schedule_call") {
     flags.add("scheduling_request");
   }
 
-  if (
-    latestInboundMessage.includes("upload") ||
-    latestInboundMessage.includes("uploaded") ||
-    latestInboundMessage.includes("document") ||
-    latestInboundMessage.includes("id") ||
-    latestInboundMessage.includes("bank statement") ||
-    latestInboundMessage.includes("proof") ||
-    latestInboundMessage.includes("employment") ||
-    latestInboundMessage.includes("مستند") ||
-    latestInboundMessage.includes("أرفقت") ||
-    latestInboundMessage.includes("ارسلت") ||
-    latestInboundMessage.includes("هوية")
-  ) {
+  if (intelligence.requestedNextStep === "send_documents" || intelligence.requestedNextStep === "review_documents") {
     flags.add("document_context");
+  }
+
+  if (intelligence.requestedNextStep === "share_pricing") {
+    flags.add("pricing_request");
+  }
+
+  if (intelligence.urgencyLevel === "high") {
+    flags.add("urgent_customer_request");
+  }
+
+  if (intelligence.objectionCategories.includes("pricing")) {
+    flags.add("budget_or_pricing_objection");
+  }
+
+  if (intelligence.objectionCategories.includes("trust")) {
+    flags.add("trust_objection");
+  }
+
+  if (intelligence.objectionCategories.includes("responsiveness")) {
+    flags.add("responsiveness_objection");
   }
 
   if (caseDetail.openInterventionsCount > 0) {
@@ -2882,8 +3014,8 @@ function buildRiskFlags(caseDetail: PersistedCaseDetail) {
   return Array.from(flags);
 }
 
-function extractRiskFlagSummary(caseDetail: PersistedCaseDetail) {
-  const riskFlags = buildRiskFlags(caseDetail);
+function extractRiskFlagSummary(caseDetail: PersistedCaseDetail, conversationIntelligence?: CaseConversationIntelligence) {
+  const riskFlags = buildRiskFlags(caseDetail, conversationIntelligence);
   return riskFlags.length > 0 ? riskFlags.join(", ") : null;
 }
 
@@ -2920,81 +3052,310 @@ function getCaseResponseLocale(caseDetail: PersistedCaseDetail, latestInboundMes
   return caseDetail.preferredLocale;
 }
 
-function inferInboundIntent(latestInboundMessage: string | null): "documents" | "general" | "pricing" | "scheduling" {
-  const text = latestInboundMessage?.toLowerCase() ?? "";
+function analyzeConversationIntelligence(
+  caseDetail: PersistedCaseDetail,
+  latestInboundMessage = getLatestInboundMessage(caseDetail)
+): CaseConversationIntelligence {
+  const text = normalizeConversationText(latestInboundMessage ?? caseDetail.message);
+  const requestedNextStep = inferRequestedNextStep(text);
+  const objectionCategories = inferObjectionCategories(text);
+  const intentCategory = inferIntentCategory(text);
+  const customerSentiment = inferCustomerSentiment(text, intentCategory);
+  const urgencyLevel = inferUrgencyLevel(text, requestedNextStep);
 
-  if (
-    text.includes("discount") ||
-    text.includes("special approval") ||
-    text.includes("price") ||
-    text.includes("pricing") ||
-    text.includes("exception") ||
-    text.includes("سعر") ||
-    text.includes("خصم") ||
-    text.includes("استثناء")
-  ) {
-    return "pricing";
-  }
-
-  if (
-    text.includes("upload") ||
-    text.includes("uploaded") ||
-    text.includes("document") ||
-    text.includes("id") ||
-    text.includes("bank statement") ||
-    text.includes("employment") ||
-    text.includes("proof") ||
-    text.includes("مستند") ||
-    text.includes("أرفقت") ||
-    text.includes("ارسلت") ||
-    text.includes("هوية")
-  ) {
-    return "documents";
-  }
-
-  if (
-    text.includes("visit") ||
-    text.includes("call") ||
-    text.includes("schedule") ||
-    text.includes("appointment") ||
-    text.includes("meeting") ||
-    text.includes("زيارة") ||
-    text.includes("اتصال") ||
-    text.includes("موعد") ||
-    text.includes("مكالمة")
-  ) {
-    return "scheduling";
-  }
-
-  return "general";
+  return {
+    customerSentiment,
+    intentCategory,
+    objectionCategories,
+    requestedNextStep,
+    urgencyLevel
+  };
 }
 
-function summarizeLatestObjection(caseDetail: PersistedCaseDetail, latestInboundMessage: string | null) {
-  const inboundIntent = inferInboundIntent(latestInboundMessage);
-
-  if (buildRiskFlags(caseDetail).includes("policy_sensitive_lead")) {
+function summarizeLatestObjection(
+  caseDetail: PersistedCaseDetail,
+  latestInboundMessage: string | null,
+  conversationIntelligence = analyzeConversationIntelligence(caseDetail, latestInboundMessage)
+) {
+  if (buildRiskFlags(caseDetail, conversationIntelligence).includes("policy_sensitive_lead")) {
     return caseDetail.preferredLocale === "ar"
       ? "العميل طلب استثناء أو قدم إشارة حساسة تحتاج قراراً بشرياً."
       : "The customer asked for an exception or raised a sensitive issue that needs a human decision.";
   }
 
-  if (buildRiskFlags(caseDetail).includes("frustrated_customer_language")) {
+  if (conversationIntelligence.objectionCategories.includes("trust")) {
+    return caseDetail.preferredLocale === "ar"
+      ? "العميل لديه مخاوف ثقة أو قانونية وتحتاج مراجعة بشرية قبل الرد."
+      : "The customer raised trust or legal concerns that need human review before replying.";
+  }
+
+  if (conversationIntelligence.customerSentiment === "frustrated") {
     return caseDetail.preferredLocale === "ar"
       ? "لهجة العميل متوترة وتحتاج معالجة بشرية سريعة."
       : "The customer tone is tense and needs quick human handling.";
   }
 
-  if (inboundIntent === "documents") {
+  if (conversationIntelligence.requestedNextStep === "review_documents" || conversationIntelligence.requestedNextStep === "send_documents") {
     return caseDetail.preferredLocale === "ar"
       ? "العميل يتابع بخصوص المستندات أو رفع الملفات."
       : "The customer is following up about documents or uploaded files.";
   }
 
-  if (inboundIntent === "scheduling") {
+  if (
+    conversationIntelligence.requestedNextStep === "schedule_visit" ||
+    conversationIntelligence.requestedNextStep === "schedule_call" ||
+    conversationIntelligence.requestedNextStep === "human_callback"
+  ) {
     return caseDetail.preferredLocale === "ar"
       ? "العميل يطلب تنسيق زيارة أو مكالمة."
       : "The customer is asking to coordinate a visit or call.";
   }
 
-  return extractRiskFlagSummary(caseDetail);
+  if (conversationIntelligence.requestedNextStep === "share_pricing") {
+    return caseDetail.preferredLocale === "ar"
+      ? "العميل يطلب معلومات تسعير أو يناقش الميزانية."
+      : "The customer is asking for pricing information or discussing budget.";
+  }
+
+  return extractRiskFlagSummary(caseDetail, conversationIntelligence);
+}
+
+const policySensitiveKeywords = [
+  "lawyer",
+  "legal",
+  "guarantee",
+  "special approval",
+  "discount",
+  "exception",
+  "محامي",
+  "قانون",
+  "ضمان",
+  "استثناء",
+  "خصم"
+];
+const frustrationKeywords = [
+  "frustrated",
+  "angry",
+  "upset",
+  "annoyed",
+  "not happy",
+  "منزعج",
+  "مستاء",
+  "غاضب",
+  "زعلان"
+];
+const urgencyKeywords = ["urgent", "asap", "today", "immediately", "now", "بأسرع", "اليوم", "فورا", "الآن", "حالاً"];
+const pricingKeywords = [
+  "price",
+  "pricing",
+  "budget",
+  "installment",
+  "payment plan",
+  "cost",
+  "discount",
+  "special approval",
+  "exception",
+  "سعر",
+  "ميزانية",
+  "قسط",
+  "دفعة",
+  "تكلفة",
+  "خصم",
+  "استثناء"
+];
+const documentKeywords = [
+  "upload",
+  "uploaded",
+  "attached",
+  "document",
+  "documents",
+  "id",
+  "bank statement",
+  "proof",
+  "employment",
+  "مستند",
+  "مستندات",
+  "أرفقت",
+  "ارسلت",
+  "رفعت",
+  "هوية",
+  "كشف حساب",
+  "تعريف"
+];
+const reviewDocumentKeywords = ["uploaded", "attached", "sent", "أرفقت", "ارسلت", "رفعت"];
+const visitKeywords = ["visit", "tour", "site visit", "زيارة", "معاينة"];
+const callKeywords = ["call", "meeting", "appointment", "اتصال", "مكالمة", "موعد"];
+const callbackKeywords = ["callback", "call me", "اتصل", "كلمني", "كلموني"];
+const availabilityKeywords = [
+  "available",
+  "availability",
+  "layout",
+  "unit",
+  "bedroom",
+  "available units",
+  "متاح",
+  "الوحدات",
+  "وحدة",
+  "غرفة",
+  "غرفتين",
+  "المخطط"
+];
+const qualificationKeywords = [
+  "interested",
+  "reservation",
+  "reserve",
+  "requirements",
+  "next step",
+  "details",
+  "مهتم",
+  "حجز",
+  "الخطوة التالية",
+  "التفاصيل"
+];
+const trustKeywords = ["contract", "legal", "lawyer", "guarantee", "موثق", "عقد", "محامي", "قانون", "ضمان"];
+const responsivenessKeywords = [
+  "no one replied",
+  "nobody replied",
+  "waiting for your reply",
+  "late reply",
+  "ماحد رد",
+  "ما رديتوا",
+  "منتظر ردكم",
+  "تأخر الرد"
+];
+const timelineKeywords = [
+  "later",
+  "next month",
+  "after summer",
+  "not ready",
+  "later on",
+  "الشهر القادم",
+  "لاحقا",
+  "لاحقاً",
+  "بعد",
+  "غير جاهز",
+  "مو جاهز"
+];
+
+function normalizeConversationText(value: string) {
+  return value.toLowerCase();
+}
+
+function containsAnyKeyword(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function inferIntentCategory(text: string): CaseAgentIntentCategory {
+  if (containsAnyKeyword(text, documentKeywords)) {
+    return "documents";
+  }
+
+  if (containsAnyKeyword(text, [...visitKeywords, ...callKeywords, ...callbackKeywords])) {
+    return "scheduling";
+  }
+
+  if (containsAnyKeyword(text, pricingKeywords)) {
+    return "pricing";
+  }
+
+  if (containsAnyKeyword(text, availabilityKeywords)) {
+    return "availability";
+  }
+
+  if (containsAnyKeyword(text, qualificationKeywords)) {
+    return "qualification";
+  }
+
+  return "general";
+}
+
+function inferRequestedNextStep(text: string): CaseAgentRequestedNextStep {
+  if (containsAnyKeyword(text, visitKeywords)) {
+    return "schedule_visit";
+  }
+
+  if (containsAnyKeyword(text, callbackKeywords)) {
+    return "human_callback";
+  }
+
+  if (containsAnyKeyword(text, callKeywords)) {
+    return "schedule_call";
+  }
+
+  if (containsAnyKeyword(text, reviewDocumentKeywords)) {
+    return "review_documents";
+  }
+
+  if (containsAnyKeyword(text, documentKeywords)) {
+    return "send_documents";
+  }
+
+  if (containsAnyKeyword(text, pricingKeywords)) {
+    return "share_pricing";
+  }
+
+  if (containsAnyKeyword(text, [...availabilityKeywords, ...qualificationKeywords])) {
+    return "share_details";
+  }
+
+  return "none";
+}
+
+function inferObjectionCategories(text: string): CaseAgentObjectionCategory[] {
+  const categories = new Set<CaseAgentObjectionCategory>();
+
+  if (containsAnyKeyword(text, pricingKeywords)) {
+    categories.add("pricing");
+  }
+
+  if (containsAnyKeyword(text, documentKeywords)) {
+    categories.add("documents");
+  }
+
+  if (containsAnyKeyword(text, trustKeywords)) {
+    categories.add("trust");
+  }
+
+  if (containsAnyKeyword(text, responsivenessKeywords)) {
+    categories.add("responsiveness");
+  }
+
+  if (containsAnyKeyword(text, timelineKeywords)) {
+    categories.add("timeline");
+  }
+
+  return Array.from(categories);
+}
+
+function inferCustomerSentiment(text: string, intentCategory: CaseAgentIntentCategory): CaseAgentSentiment {
+  if (containsAnyKeyword(text, frustrationKeywords)) {
+    return "frustrated";
+  }
+
+  if (containsAnyKeyword(text, urgencyKeywords)) {
+    return "urgent";
+  }
+
+  if (intentCategory !== "general") {
+    return "interested";
+  }
+
+  return "neutral";
+}
+
+function inferUrgencyLevel(text: string, requestedNextStep: CaseAgentRequestedNextStep): CaseAgentUrgencyLevel {
+  if (containsAnyKeyword(text, urgencyKeywords) || requestedNextStep === "human_callback") {
+    return "high";
+  }
+
+  if (
+    requestedNextStep === "schedule_visit" ||
+    requestedNextStep === "schedule_call" ||
+    requestedNextStep === "review_documents" ||
+    requestedNextStep === "send_documents"
+  ) {
+    return "medium";
+  }
+
+  return "low";
 }

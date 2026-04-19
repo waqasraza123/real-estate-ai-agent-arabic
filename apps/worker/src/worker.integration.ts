@@ -85,6 +85,10 @@ describe("case agent worker", () => {
     expect(caseDetail?.channelSummary?.latestOutboundStatus).toBe("queued");
     expect(caseDetail?.agentRuns?.[0]?.proposedMessage).toContain("زيارة");
     expect(caseDetail?.agentMemory?.latestIntentSummary).toContain("زيارة");
+    expect(caseDetail?.agentMemory?.lastIntentCategory).toBe("scheduling");
+    expect(caseDetail?.agentMemory?.requestedNextStep).toBe("schedule_visit");
+    expect(caseDetail?.agentMemory?.responseUrgency).toBe("medium");
+    expect(caseDetail?.agentMemory?.customerSentiment).toBe("interested");
   });
 
   it("blocks the inbound-message agent path behind QA when the customer asks for a risky exception", async () => {
@@ -122,6 +126,9 @@ describe("case agent worker", () => {
     expect(caseDetail?.agentState?.latestRunStatus).toBe("blocked");
     expect(caseDetail?.agentState?.latestBlockedReason).toBe("qa_hold");
     expect(caseDetail?.channelSummary?.latestOutboundStatus).toBe("blocked");
+    expect(caseDetail?.agentMemory?.lastIntentCategory).toBe("pricing");
+    expect(caseDetail?.agentMemory?.requestedNextStep).toBe("share_pricing");
+    expect(caseDetail?.agentMemory?.objectionCategories).toContain("pricing");
   });
 
   it("records a blocked run when client WhatsApp credentials are not available", async () => {

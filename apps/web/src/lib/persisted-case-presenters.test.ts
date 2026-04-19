@@ -6,6 +6,11 @@ import {
   buildPersistedConversation,
   formatLatestManagerFollowUpSavedAt,
   formatLatestHumanReplySentAt,
+  getPersistedAgentIntentLabel,
+  getPersistedAgentNextStepLabel,
+  getPersistedAgentObjectionLabels,
+  getPersistedAgentSentimentLabel,
+  getPersistedAgentUrgencyLabel,
   getPersistedChannelStatusLabel,
   getPersistedChannelStatusNote,
   getPersistedLatestManagerFollowUpLabel,
@@ -258,5 +263,32 @@ describe("buildPersistedConversation", () => {
     expect(getPersistedChannelStatusNote("en", caseDetail.channelSummary)).toBe(
       "The WhatsApp code path is ready, but it is waiting for real client credentials before activation."
     );
+  });
+
+  it("formats structured agent conversation intelligence for lead surfaces", () => {
+    const caseDetail = buildCaseDetail([]);
+
+    caseDetail.agentMemory = {
+      activeRiskFlags: ["pricing_request"],
+      customerSentiment: "urgent",
+      documentGapSummary: null,
+      lastDecisionSummary: "The customer asked for pricing and an immediate callback.",
+      lastInboundAt: "2026-04-13T09:30:00.000Z",
+      lastIntentCategory: "pricing",
+      lastObjectionSummary: "The customer is asking for pricing information or discussing budget.",
+      lastSuccessfulOutboundAt: null,
+      latestIntentSummary: "Please call me today and explain the payment plan.",
+      objectionCategories: ["pricing"],
+      qualificationSummary: null,
+      requestedNextStep: "human_callback",
+      responseUrgency: "high",
+      updatedAt: "2026-04-13T09:31:00.000Z"
+    };
+
+    expect(getPersistedAgentIntentLabel("en", caseDetail.agentMemory)).toBe("Pricing");
+    expect(getPersistedAgentNextStepLabel("en", caseDetail.agentMemory)).toBe("Callback request");
+    expect(getPersistedAgentUrgencyLabel("en", caseDetail.agentMemory)).toBe("High");
+    expect(getPersistedAgentSentimentLabel("en", caseDetail.agentMemory)).toBe("Urgent");
+    expect(getPersistedAgentObjectionLabels("en", caseDetail.agentMemory)).toEqual(["Pricing objection"]);
   });
 });

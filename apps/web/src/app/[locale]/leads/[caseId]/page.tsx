@@ -44,8 +44,13 @@ import {
   formatLatestManagerFollowUpSavedAt,
   formatLatestHumanReplySentAt,
   getPersistedAgentActionLabel,
+  getPersistedAgentIntentLabel,
+  getPersistedAgentNextStepLabel,
+  getPersistedAgentObjectionLabels,
+  getPersistedAgentSentimentLabel,
   getPersistedAgentStateNote,
   getPersistedAgentStatusLabel,
+  getPersistedAgentUrgencyLabel,
   getPersistedAutomationLabel,
   getPersistedAutomationHoldReasonLabel,
   getPersistedAutomationHoldReasonNote,
@@ -150,6 +155,11 @@ export default async function LeadProfilePage(props: PageProps) {
     const agentStatusLabel = getPersistedAgentStatusLabel(locale, persistedCase.agentState);
     const agentActionLabel = getPersistedAgentActionLabel(locale, persistedCase.agentState);
     const agentStateNote = getPersistedAgentStateNote(locale, persistedCase.agentState);
+    const agentIntentLabel = getPersistedAgentIntentLabel(locale, persistedCase.agentMemory);
+    const agentNextStepLabel = getPersistedAgentNextStepLabel(locale, persistedCase.agentMemory);
+    const agentUrgencyLabel = getPersistedAgentUrgencyLabel(locale, persistedCase.agentMemory);
+    const agentSentimentLabel = getPersistedAgentSentimentLabel(locale, persistedCase.agentMemory);
+    const agentObjectionLabels = getPersistedAgentObjectionLabels(locale, persistedCase.agentMemory);
     const bookingStatusLabel =
       persistedCase.currentVisit?.booking?.status === "confirmed"
         ? locale === "ar"
@@ -268,12 +278,25 @@ export default async function LeadProfilePage(props: PageProps) {
               <DetailGrid>
                 <DetailItem label={locale === "ar" ? "الحالة الأخيرة" : "Latest status"} value={agentStatusLabel ?? "—"} />
                 <DetailItem label={locale === "ar" ? "آخر إجراء" : "Latest action"} value={agentActionLabel ?? "—"} />
+                <DetailItem label={locale === "ar" ? "النية الأخيرة" : "Latest intent"} value={agentIntentLabel ?? "—"} />
+                <DetailItem label={locale === "ar" ? "الخطوة المطلوبة" : "Requested next step"} value={agentNextStepLabel ?? "—"} />
+                <DetailItem label={locale === "ar" ? "الإلحاح" : "Urgency"} value={agentUrgencyLabel ?? "—"} />
+                <DetailItem label={locale === "ar" ? "نبرة العميل" : "Customer sentiment"} value={agentSentimentLabel ?? "—"} />
                 <DetailItem
                   label={locale === "ar" ? "الاستيقاظ التالي" : "Next wake-up"}
                   value={persistedCase.agentState?.nextWakeUpAt ? formatDateTime(persistedCase.agentState.nextWakeUpAt, locale) : "—"}
                 />
                 <DetailItem label={locale === "ar" ? "آخر تشغيل" : "Latest run"} value={persistedCase.agentState?.latestRunAt ? formatDateTime(persistedCase.agentState.latestRunAt, locale) : "—"} />
               </DetailGrid>
+              {agentObjectionLabels.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {agentObjectionLabels.map((label) => (
+                    <StatusBadge key={label} tone="warning">
+                      {label}
+                    </StatusBadge>
+                  ))}
+                </div>
+              ) : null}
               {agentStateNote ? <p className={caseMetaClassName}>{agentStateNote}</p> : null}
             </WorkflowPanelBody>
           </Panel>

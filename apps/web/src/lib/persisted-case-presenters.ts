@@ -516,6 +516,130 @@ export function getPersistedAgentStateNote(
   );
 }
 
+export function getPersistedAgentIntentLabel(locale: SupportedLocale, agentMemory: PersistedCaseDetail["agentMemory"]) {
+  if (!agentMemory?.lastIntentCategory) {
+    return null;
+  }
+
+  const labels = {
+    ar: {
+      availability: "بحث عن التوفر",
+      documents: "مستندات",
+      general: "عام",
+      pricing: "تسعير",
+      qualification: "تأهيل",
+      scheduling: "تنسيق موعد"
+    },
+    en: {
+      availability: "Availability",
+      documents: "Documents",
+      general: "General",
+      pricing: "Pricing",
+      qualification: "Qualification",
+      scheduling: "Scheduling"
+    }
+  } as const;
+
+  return labels[locale][agentMemory.lastIntentCategory];
+}
+
+export function getPersistedAgentNextStepLabel(locale: SupportedLocale, agentMemory: PersistedCaseDetail["agentMemory"]) {
+  if (!agentMemory?.requestedNextStep) {
+    return null;
+  }
+
+  const labels = {
+    ar: {
+      human_callback: "طلب مكالمة",
+      none: "غير محدد",
+      review_documents: "مراجعة ملفات",
+      schedule_call: "تنسيق مكالمة",
+      schedule_visit: "تنسيق زيارة",
+      send_documents: "إرسال مستندات",
+      share_details: "مشاركة التفاصيل",
+      share_pricing: "مشاركة التسعير"
+    },
+    en: {
+      human_callback: "Callback request",
+      none: "None",
+      review_documents: "Review uploads",
+      schedule_call: "Schedule call",
+      schedule_visit: "Schedule visit",
+      send_documents: "Send documents",
+      share_details: "Share details",
+      share_pricing: "Share pricing"
+    }
+  } as const;
+
+  return labels[locale][agentMemory.requestedNextStep];
+}
+
+export function getPersistedAgentUrgencyLabel(locale: SupportedLocale, agentMemory: PersistedCaseDetail["agentMemory"]) {
+  if (!agentMemory?.responseUrgency) {
+    return null;
+  }
+
+  return locale === "ar"
+    ? agentMemory.responseUrgency === "high"
+      ? "عالية"
+      : agentMemory.responseUrgency === "medium"
+        ? "متوسطة"
+        : "منخفضة"
+    : agentMemory.responseUrgency === "high"
+      ? "High"
+      : agentMemory.responseUrgency === "medium"
+        ? "Medium"
+        : "Low";
+}
+
+export function getPersistedAgentSentimentLabel(locale: SupportedLocale, agentMemory: PersistedCaseDetail["agentMemory"]) {
+  if (!agentMemory?.customerSentiment) {
+    return null;
+  }
+
+  const labels = {
+    ar: {
+      frustrated: "منزعج",
+      interested: "مهتم",
+      neutral: "محايد",
+      urgent: "مستعجل"
+    },
+    en: {
+      frustrated: "Frustrated",
+      interested: "Interested",
+      neutral: "Neutral",
+      urgent: "Urgent"
+    }
+  } as const;
+
+  return labels[locale][agentMemory.customerSentiment];
+}
+
+export function getPersistedAgentObjectionLabels(locale: SupportedLocale, agentMemory: PersistedCaseDetail["agentMemory"]) {
+  if (!agentMemory?.objectionCategories.length) {
+    return [];
+  }
+
+  const labels = {
+    ar: {
+      documents: "اعتراض مستندات",
+      pricing: "اعتراض تسعير",
+      responsiveness: "شكوى متابعة",
+      timeline: "اعتراض توقيت",
+      trust: "مخاوف ثقة"
+    },
+    en: {
+      documents: "Document objection",
+      pricing: "Pricing objection",
+      responsiveness: "Response complaint",
+      timeline: "Timing objection",
+      trust: "Trust concern"
+    }
+  } as const;
+
+  return agentMemory.objectionCategories.map((category) => labels[locale][category]);
+}
+
 export function getPersistedDocumentDisplay(locale: SupportedLocale, caseDetail: PersistedCaseDetail) {
   return caseDetail.documentRequests.map((documentRequest) => ({
     analysisSummary: getDocumentAnalysisSummary(locale, documentRequest.latestUpload?.analysis ?? null),

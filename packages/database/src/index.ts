@@ -7,10 +7,15 @@ import type {
   CalendarProvider,
   CaseAgentActionType,
   CaseAgentBlockedReason,
+  CaseAgentIntentCategory,
+  CaseAgentObjectionCategory,
   CaseAgentRiskLevel,
+  CaseAgentRequestedNextStep,
+  CaseAgentSentiment,
   CaseAgentRunStatus,
   CaseAgentToolExecutionStatus,
   CaseAgentTriggerType,
+  CaseAgentUrgencyLevel,
   CaseAutomationHoldReason,
   CaseContactChannel,
   CaseStage,
@@ -111,7 +116,7 @@ import type {
   UpdateHandoverTaskStatusInput,
   VisitBookingStatus
 } from "@real-estate-ai/contracts";
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { normalizePhoneNumber } from "@real-estate-ai/integrations";
@@ -180,13 +185,18 @@ const caseAgentMemories = pgTable("case_agent_memories", {
     .notNull()
     .references(() => cases.id, { onDelete: "cascade" })
     .unique(),
+  customerSentiment: text("customer_sentiment"),
   documentGapSummary: text("document_gap_summary"),
   lastDecisionSummary: text("last_decision_summary"),
   lastInboundAt: timestamp("last_inbound_at", { mode: "string", withTimezone: true }),
+  lastIntentCategory: text("last_intent_category"),
   lastObjectionSummary: text("last_objection_summary"),
+  objectionCategories: jsonb("objection_categories").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   lastSuccessfulOutboundAt: timestamp("last_successful_outbound_at", { mode: "string", withTimezone: true }),
   latestIntentSummary: text("latest_intent_summary"),
   qualificationSummary: text("qualification_summary"),
+  requestedNextStep: text("requested_next_step"),
+  responseUrgency: text("response_urgency"),
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
@@ -1033,6 +1043,11 @@ export async function createAlphaLeadCaptureStore(options?: {
       latest_intent_summary text,
       qualification_summary text,
       last_objection_summary text,
+      last_intent_category text,
+      requested_next_step text,
+      response_urgency text,
+      customer_sentiment text,
+      objection_categories jsonb not null default '[]'::jsonb,
       document_gap_summary text,
       last_decision_summary text,
       last_inbound_at timestamptz,
@@ -1044,6 +1059,11 @@ export async function createAlphaLeadCaptureStore(options?: {
     alter table case_agent_memories add column if not exists latest_intent_summary text;
     alter table case_agent_memories add column if not exists qualification_summary text;
     alter table case_agent_memories add column if not exists last_objection_summary text;
+    alter table case_agent_memories add column if not exists last_intent_category text;
+    alter table case_agent_memories add column if not exists requested_next_step text;
+    alter table case_agent_memories add column if not exists response_urgency text;
+    alter table case_agent_memories add column if not exists customer_sentiment text;
+    alter table case_agent_memories add column if not exists objection_categories jsonb not null default '[]'::jsonb;
     alter table case_agent_memories add column if not exists document_gap_summary text;
     alter table case_agent_memories add column if not exists last_decision_summary text;
     alter table case_agent_memories add column if not exists last_inbound_at timestamptz;
@@ -2503,13 +2523,18 @@ export async function createAlphaLeadCaptureStore(options?: {
           .select({
             activeRiskFlags: caseAgentMemories.activeRiskFlags,
             caseId: caseAgentMemories.caseId,
+            customerSentiment: caseAgentMemories.customerSentiment,
             documentGapSummary: caseAgentMemories.documentGapSummary,
             lastDecisionSummary: caseAgentMemories.lastDecisionSummary,
             lastInboundAt: caseAgentMemories.lastInboundAt,
+            lastIntentCategory: caseAgentMemories.lastIntentCategory,
             lastObjectionSummary: caseAgentMemories.lastObjectionSummary,
+            objectionCategories: caseAgentMemories.objectionCategories,
             lastSuccessfulOutboundAt: caseAgentMemories.lastSuccessfulOutboundAt,
             latestIntentSummary: caseAgentMemories.latestIntentSummary,
             qualificationSummary: caseAgentMemories.qualificationSummary,
+            requestedNextStep: caseAgentMemories.requestedNextStep,
+            responseUrgency: caseAgentMemories.responseUrgency,
             updatedAt: caseAgentMemories.updatedAt
           })
           .from(caseAgentMemories)
@@ -2744,13 +2769,18 @@ export async function createAlphaLeadCaptureStore(options?: {
     const existingRecord = await transaction
       .select({
         activeRiskFlags: caseAgentMemories.activeRiskFlags,
+        customerSentiment: caseAgentMemories.customerSentiment,
         documentGapSummary: caseAgentMemories.documentGapSummary,
         lastDecisionSummary: caseAgentMemories.lastDecisionSummary,
         lastInboundAt: caseAgentMemories.lastInboundAt,
+        lastIntentCategory: caseAgentMemories.lastIntentCategory,
         lastObjectionSummary: caseAgentMemories.lastObjectionSummary,
+        objectionCategories: caseAgentMemories.objectionCategories,
         lastSuccessfulOutboundAt: caseAgentMemories.lastSuccessfulOutboundAt,
         latestIntentSummary: caseAgentMemories.latestIntentSummary,
-        qualificationSummary: caseAgentMemories.qualificationSummary
+        qualificationSummary: caseAgentMemories.qualificationSummary,
+        requestedNextStep: caseAgentMemories.requestedNextStep,
+        responseUrgency: caseAgentMemories.responseUrgency
       })
       .from(caseAgentMemories)
       .where(eq(caseAgentMemories.caseId, caseId))
@@ -2761,13 +2791,19 @@ export async function createAlphaLeadCaptureStore(options?: {
       .values({
         activeRiskFlags: input.activeRiskFlags ?? existingRecord[0]?.activeRiskFlags ?? [],
         caseId,
+        customerSentiment:
+          input.customerSentiment === undefined ? existingRecord[0]?.customerSentiment ?? null : input.customerSentiment,
         documentGapSummary:
           input.documentGapSummary === undefined ? existingRecord[0]?.documentGapSummary ?? null : input.documentGapSummary,
         lastDecisionSummary:
           input.lastDecisionSummary === undefined ? existingRecord[0]?.lastDecisionSummary ?? null : input.lastDecisionSummary,
         lastInboundAt: input.lastInboundAt === undefined ? existingRecord[0]?.lastInboundAt ?? null : input.lastInboundAt,
+        lastIntentCategory:
+          input.lastIntentCategory === undefined ? existingRecord[0]?.lastIntentCategory ?? null : input.lastIntentCategory,
         lastObjectionSummary:
           input.lastObjectionSummary === undefined ? existingRecord[0]?.lastObjectionSummary ?? null : input.lastObjectionSummary,
+        objectionCategories:
+          input.objectionCategories === undefined ? existingRecord[0]?.objectionCategories ?? [] : input.objectionCategories,
         lastSuccessfulOutboundAt:
           input.lastSuccessfulOutboundAt === undefined
             ? existingRecord[0]?.lastSuccessfulOutboundAt ?? null
@@ -2776,18 +2812,28 @@ export async function createAlphaLeadCaptureStore(options?: {
           input.latestIntentSummary === undefined ? existingRecord[0]?.latestIntentSummary ?? null : input.latestIntentSummary,
         qualificationSummary:
           input.qualificationSummary === undefined ? existingRecord[0]?.qualificationSummary ?? null : input.qualificationSummary,
+        requestedNextStep:
+          input.requestedNextStep === undefined ? existingRecord[0]?.requestedNextStep ?? null : input.requestedNextStep,
+        responseUrgency:
+          input.responseUrgency === undefined ? existingRecord[0]?.responseUrgency ?? null : input.responseUrgency,
         updatedAt: input.updatedAt
       })
       .onConflictDoUpdate({
         set: {
           activeRiskFlags: input.activeRiskFlags ?? existingRecord[0]?.activeRiskFlags ?? [],
+          customerSentiment:
+            input.customerSentiment === undefined ? existingRecord[0]?.customerSentiment ?? null : input.customerSentiment,
           documentGapSummary:
             input.documentGapSummary === undefined ? existingRecord[0]?.documentGapSummary ?? null : input.documentGapSummary,
           lastDecisionSummary:
             input.lastDecisionSummary === undefined ? existingRecord[0]?.lastDecisionSummary ?? null : input.lastDecisionSummary,
           lastInboundAt: input.lastInboundAt === undefined ? existingRecord[0]?.lastInboundAt ?? null : input.lastInboundAt,
+          lastIntentCategory:
+            input.lastIntentCategory === undefined ? existingRecord[0]?.lastIntentCategory ?? null : input.lastIntentCategory,
           lastObjectionSummary:
             input.lastObjectionSummary === undefined ? existingRecord[0]?.lastObjectionSummary ?? null : input.lastObjectionSummary,
+          objectionCategories:
+            input.objectionCategories === undefined ? existingRecord[0]?.objectionCategories ?? [] : input.objectionCategories,
           lastSuccessfulOutboundAt:
             input.lastSuccessfulOutboundAt === undefined
               ? existingRecord[0]?.lastSuccessfulOutboundAt ?? null
@@ -2796,6 +2842,10 @@ export async function createAlphaLeadCaptureStore(options?: {
             input.latestIntentSummary === undefined ? existingRecord[0]?.latestIntentSummary ?? null : input.latestIntentSummary,
           qualificationSummary:
             input.qualificationSummary === undefined ? existingRecord[0]?.qualificationSummary ?? null : input.qualificationSummary,
+          requestedNextStep:
+            input.requestedNextStep === undefined ? existingRecord[0]?.requestedNextStep ?? null : input.requestedNextStep,
+          responseUrgency:
+            input.responseUrgency === undefined ? existingRecord[0]?.responseUrgency ?? null : input.responseUrgency,
           updatedAt: input.updatedAt
         },
         target: caseAgentMemories.caseId
@@ -7317,24 +7367,34 @@ function hydrateLinkedHandoverCase(value: {
 
 function hydrateCaseAgentMemory(value: {
   activeRiskFlags: string[] | null;
+  customerSentiment: string | null;
   documentGapSummary: string | null;
   lastDecisionSummary: string | null;
   lastInboundAt: string | null;
+  lastIntentCategory: string | null;
   lastObjectionSummary: string | null;
+  objectionCategories: string[] | null;
   lastSuccessfulOutboundAt: string | null;
   latestIntentSummary: string | null;
   qualificationSummary: string | null;
+  requestedNextStep: string | null;
+  responseUrgency: string | null;
   updatedAt: string;
 }): PersistedCaseAgentMemory {
   return {
     activeRiskFlags: value.activeRiskFlags ?? [],
+    customerSentiment: value.customerSentiment ? toCaseAgentSentiment(value.customerSentiment) : null,
     documentGapSummary: value.documentGapSummary,
     lastDecisionSummary: value.lastDecisionSummary,
     lastInboundAt: value.lastInboundAt,
+    lastIntentCategory: value.lastIntentCategory ? toCaseAgentIntentCategory(value.lastIntentCategory) : null,
     lastObjectionSummary: value.lastObjectionSummary,
+    objectionCategories: (value.objectionCategories ?? []).map((category) => toCaseAgentObjectionCategory(category)),
     lastSuccessfulOutboundAt: value.lastSuccessfulOutboundAt,
     latestIntentSummary: value.latestIntentSummary,
     qualificationSummary: value.qualificationSummary,
+    requestedNextStep: value.requestedNextStep ? toCaseAgentRequestedNextStep(value.requestedNextStep) : null,
+    responseUrgency: value.responseUrgency ? toCaseAgentUrgencyLevel(value.responseUrgency) : null,
     updatedAt: value.updatedAt
   };
 }
@@ -7792,6 +7852,68 @@ function toCaseAgentRiskLevel(value: string): CaseAgentRiskLevel {
   }
 
   throw new Error(`unsupported_case_agent_risk_level:${value}`);
+}
+
+function toCaseAgentIntentCategory(value: string): CaseAgentIntentCategory {
+  if (
+    value === "general" ||
+    value === "qualification" ||
+    value === "pricing" ||
+    value === "documents" ||
+    value === "scheduling" ||
+    value === "availability"
+  ) {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_intent_category:${value}`);
+}
+
+function toCaseAgentRequestedNextStep(value: string): CaseAgentRequestedNextStep {
+  if (
+    value === "none" ||
+    value === "share_details" ||
+    value === "share_pricing" ||
+    value === "schedule_visit" ||
+    value === "schedule_call" ||
+    value === "send_documents" ||
+    value === "review_documents" ||
+    value === "human_callback"
+  ) {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_requested_next_step:${value}`);
+}
+
+function toCaseAgentSentiment(value: string): CaseAgentSentiment {
+  if (value === "neutral" || value === "interested" || value === "frustrated" || value === "urgent") {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_sentiment:${value}`);
+}
+
+function toCaseAgentObjectionCategory(value: string): CaseAgentObjectionCategory {
+  if (
+    value === "pricing" ||
+    value === "timeline" ||
+    value === "documents" ||
+    value === "trust" ||
+    value === "responsiveness"
+  ) {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_objection_category:${value}`);
+}
+
+function toCaseAgentUrgencyLevel(value: string): CaseAgentUrgencyLevel {
+  if (value === "low" || value === "medium" || value === "high") {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_urgency_level:${value}`);
 }
 
 function toCaseAgentRunStatus(value: string): CaseAgentRunStatus {

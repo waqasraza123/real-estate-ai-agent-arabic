@@ -28,10 +28,15 @@ import { getPreferredOperatorSurfacePath } from "@/lib/operator-role";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
 import {
   buildCaseReferenceCode,
+  buildPersistedConversation,
   getPersistedAgentActionLabel,
+  getPersistedAgentIntentLabel,
+  getPersistedAgentNextStepLabel,
+  getPersistedAgentObjectionLabels,
+  getPersistedAgentSentimentLabel,
   getPersistedAgentStateNote,
   getPersistedAgentStatusLabel,
-  buildPersistedConversation,
+  getPersistedAgentUrgencyLabel,
   getPersistedChannelStatusLabel,
   getPersistedChannelStatusNote,
   getPersistedQaReviewDisplay
@@ -117,6 +122,11 @@ export default async function ConversationPage(props: PageProps) {
     const agentStatusLabel = getPersistedAgentStatusLabel(locale, persistedCase.agentState);
     const agentActionLabel = getPersistedAgentActionLabel(locale, persistedCase.agentState);
     const agentStateNote = getPersistedAgentStateNote(locale, persistedCase.agentState);
+    const agentIntentLabel = getPersistedAgentIntentLabel(locale, persistedCase.agentMemory);
+    const agentNextStepLabel = getPersistedAgentNextStepLabel(locale, persistedCase.agentMemory);
+    const agentUrgencyLabel = getPersistedAgentUrgencyLabel(locale, persistedCase.agentMemory);
+    const agentSentimentLabel = getPersistedAgentSentimentLabel(locale, persistedCase.agentMemory);
+    const agentObjectionLabels = getPersistedAgentObjectionLabels(locale, persistedCase.agentMemory);
 
     return (
       <div className={pageStackClassName}>
@@ -168,6 +178,12 @@ export default async function ConversationPage(props: PageProps) {
                 {agentStatusLabel}
                 {agentActionLabel ? ` · ${agentActionLabel}` : ""}
               </p>
+              {agentIntentLabel || agentNextStepLabel || agentUrgencyLabel || agentSentimentLabel ? (
+                <p className={caseMetaClassName}>
+                  {[agentIntentLabel, agentNextStepLabel, agentUrgencyLabel, agentSentimentLabel].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
+              {agentObjectionLabels.length > 0 ? <p className={caseMetaClassName}>{agentObjectionLabels.join(" · ")}</p> : null}
               {agentStateNote ? <p className={caseMetaClassName}>{agentStateNote}</p> : null}
               {persistedCase.agentState?.nextWakeUpAt ? (
                 <p className={caseMetaClassName}>

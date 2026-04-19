@@ -266,6 +266,91 @@ export async function runCaseAgentEvalScenarios(): Promise<CaseAgentEvalResult[]
         await store.close();
       }
     }),
+    evaluateScenario("pricing_question_is_structured_without_exception_escalation", async () => {
+      const store = await createAlphaLeadCaptureStore({ inMemory: true });
+
+      try {
+        const createdCase = await store.createWebsiteLeadCase({
+          customerName: "Rana Saleh",
+          email: "rana@example.com",
+          message: "Please share details about the available unit.",
+          nextAction: "Continue qualification on WhatsApp",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          phone: "+966 50 777 2000",
+          preferredLocale: "en",
+          projectInterest: "Harbor Gate"
+        });
+
+        await store.recordWhatsAppInboundMessage({
+          messageId: "wamid.eval.pricing.1",
+          normalizedPhone: "+966507772000",
+          profileName: "Rana Saleh",
+          receivedAt: "2026-04-12T09:00:00.000Z",
+          textBody: "What price range and payment plan do you have for this unit?"
+        });
+
+        await runPersistedCaseAgentCycle(store, {
+          canSendWhatsApp: true,
+          runAt: "2026-04-12T09:05:00.000Z"
+        });
+        const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+        if (
+          caseDetail?.agentState?.latestRunStatus !== "completed" ||
+          caseDetail.agentMemory?.lastIntentCategory !== "pricing" ||
+          caseDetail.agentMemory?.requestedNextStep !== "share_pricing" ||
+          caseDetail.agentMemory?.objectionCategories.includes("trust")
+        ) {
+          throw new Error("pricing_intelligence_assertion_failed");
+        }
+
+        return "Treats ordinary pricing questions as structured clarification work instead of escalating them as exceptions.";
+      } finally {
+        await store.close();
+      }
+    }),
+    evaluateScenario("trust_concern_downgrades_inbound_reply_to_draft", async () => {
+      const store = await createAlphaLeadCaptureStore({ inMemory: true });
+
+      try {
+        const createdCase = await store.createWebsiteLeadCase({
+          customerName: "Huda Karim",
+          email: "huda@example.com",
+          message: "Please share the next reservation step.",
+          nextAction: "Continue qualification on WhatsApp",
+          nextActionDueAt: "2026-04-12T08:00:00.000Z",
+          phone: "+966 50 700 1000",
+          preferredLocale: "en",
+          projectInterest: "Palm Horizon"
+        });
+
+        await store.recordWhatsAppInboundMessage({
+          messageId: "wamid.eval.trust.1",
+          normalizedPhone: "+966507001000",
+          profileName: "Huda Karim",
+          receivedAt: "2026-04-12T09:00:00.000Z",
+          textBody: "Before I continue, I need to understand the contract process because I want everything documented clearly."
+        });
+
+        await runPersistedCaseAgentCycle(store, {
+          canSendWhatsApp: true,
+          runAt: "2026-04-12T09:05:00.000Z"
+        });
+        const caseDetail = await store.getCaseDetail(createdCase.caseId);
+
+        if (
+          caseDetail?.agentState?.latestRecommendedAction !== "create_reply_draft" ||
+          caseDetail.agentState.latestRunStatus !== "waiting" ||
+          !caseDetail.agentMemory?.objectionCategories.includes("trust")
+        ) {
+          throw new Error("trust_draft_assertion_failed");
+        }
+
+        return "Downgrades trust or legal concerns into a human-visible draft instead of auto-sending the reply.";
+      } finally {
+        await store.close();
+      }
+    }),
     evaluateScenario("policy_sensitive_inbound_message_opens_qa_and_blocks_auto_reply", async () => {
       const store = await createAlphaLeadCaptureStore({ inMemory: true });
 
