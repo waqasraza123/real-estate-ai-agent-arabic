@@ -1,9 +1,9 @@
 import type {
   ApproveHandoverCustomerUpdateInput,
   CaseAgentActionType,
+  CaseAgentBlockedReason,
+  CaseAgentDecision,
   CaseAgentRiskLevel,
-  CaseAgentRunStatus,
-  CaseAgentToolExecutionStatus,
   CaseAgentTriggerType,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
@@ -43,6 +43,7 @@ import type {
   UpdateHandoverMilestoneInput,
   UpdateHandoverTaskStatusInput
 } from "@real-estate-ai/contracts";
+import { caseAgentDecisionSchema } from "@real-estate-ai/contracts";
 import {
   deriveCustomerUpdateStatusFromMilestone,
   buildHandoverCustomerUpdateQaSampleSummary,
@@ -269,19 +270,30 @@ export async function runPersistedFollowUpCycle(
   });
 }
 
-interface CaseAgentDecision {
-  actionType: CaseAgentActionType;
-  blockedReason: string | null;
-  confidence: number;
-  escalationReason: string | null;
-  proposedMessage: string | null;
-  proposedNextAction: string;
-  proposedNextActionDueAt: string;
-  rationaleSummary: string;
-  riskLevel: CaseAgentRiskLevel;
-  status: CaseAgentRunStatus;
-  toolExecutionStatus: CaseAgentToolExecutionStatus | null;
+export interface CaseAgentModelInput {
+  allowedActions: CaseAgentActionType[];
+  caseDetail: PersistedCaseDetail;
+  documentGapSummary: string | null;
+  now: string;
+  repeatedTriggerCount: number;
+  riskFlags: string[];
   triggerType: CaseAgentTriggerType;
+}
+
+export interface CaseAgentModelAdapter {
+  modelMode: string;
+  generateDecision(input: CaseAgentModelInput): Promise<CaseAgentDecision>;
+}
+
+const deterministicCaseAgentModelAdapter: CaseAgentModelAdapter = {
+  modelMode: "deterministic_v1",
+  async generateDecision(input) {
+    return decideCaseAgentActionDeterministic(input);
+  }
+};
+
+export function createDeterministicCaseAgentModelAdapter(): CaseAgentModelAdapter {
+  return deterministicCaseAgentModelAdapter;
 }
 
 export async function runPersistedCaseAgentCycle(
@@ -289,10 +301,12 @@ export async function runPersistedCaseAgentCycle(
   input?: {
     canSendWhatsApp?: boolean;
     limit?: number;
+    modelAdapter?: CaseAgentModelAdapter;
     runAt?: string;
   }
 ): Promise<CaseAgentCycleResult> {
   const runAt = input?.runAt ?? new Date().toISOString();
+  const modelAdapter = input?.modelAdapter ?? deterministicCaseAgentModelAdapter;
   const dueJobs = await store.getDueAutomationJobs({
     jobType: "case_agent_trigger",
     limit: input?.limit ?? 25,
@@ -318,8 +332,9 @@ export async function runPersistedCaseAgentCycle(
     }
 
     const startedAt = runAt;
-    const decision = decideCaseAgentAction(caseDetail, {
+    const { decision, modelMode } = await resolveCaseAgentDecision(caseDetail, {
       canSendWhatsApp: input?.canSendWhatsApp ?? false,
+      modelAdapter,
       now: runAt,
       triggerType
     });
@@ -408,7 +423,7 @@ export async function runPersistedCaseAgentCycle(
       confidence: decision.confidence,
       escalationReason: decision.escalationReason,
       finishedAt: runAt,
-      modelMode: "deterministic_v1",
+      modelMode,
       proposedMessage: decision.proposedMessage,
       proposedNextAction: decision.proposedNextAction,
       proposedNextActionDueAt: decision.proposedNextActionDueAt,
@@ -1592,37 +1607,78 @@ function buildCaseAgentMemorySnapshot(
   };
 }
 
-function decideCaseAgentAction(
+async function resolveCaseAgentDecision(
   caseDetail: PersistedCaseDetail,
   input: {
     canSendWhatsApp: boolean;
+    modelAdapter: CaseAgentModelAdapter;
     now: string;
     triggerType: CaseAgentTriggerType;
   }
-): CaseAgentDecision {
+): Promise<{
+  decision: CaseAgentDecision;
+  modelMode: string;
+}> {
   const baseBlockedReason = getCaseAgentBlockedReason(caseDetail, input.canSendWhatsApp);
-  const riskFlags = buildRiskFlags(caseDetail);
-  const documentGapSummary = summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale);
-  const repeatedTriggerCount = (caseDetail.agentRuns ?? []).filter((run) => run.triggerType === input.triggerType).length;
 
   if (baseBlockedReason) {
     return {
-      actionType: "send_whatsapp_message",
-      blockedReason: baseBlockedReason,
-      confidence: 0.99,
-      escalationReason: null,
-      proposedMessage: buildTriggerMessage(input.triggerType, caseDetail, documentGapSummary),
-      proposedNextAction: buildBlockedNextAction(caseDetail.preferredLocale, baseBlockedReason),
-      proposedNextActionDueAt: createFutureTimestamp(baseBlockedReason === "client_credentials_pending" ? 24 : 4),
-      rationaleSummary: buildBlockedRationale(caseDetail.preferredLocale, baseBlockedReason),
-      riskLevel: "medium",
-      status: "blocked",
-      toolExecutionStatus: "blocked",
-      triggerType: input.triggerType
+      decision: buildBlockedCaseAgentDecision(caseDetail, {
+        blockedReason: baseBlockedReason,
+        triggerType: input.triggerType
+      }),
+      modelMode: "policy_guardrail_v1"
     };
   }
 
-  if (input.triggerType === "new_lead") {
+  const riskFlags = buildRiskFlags(caseDetail);
+  const documentGapSummary = summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale);
+  const repeatedTriggerCount = (caseDetail.agentRuns ?? []).filter((run) => run.triggerType === input.triggerType).length;
+  const modelInput: CaseAgentModelInput = {
+    allowedActions: [
+      "send_whatsapp_message",
+      "save_follow_up_plan",
+      "request_manager_intervention",
+      "pause_automation",
+      "request_document_follow_up",
+      "create_reply_draft"
+    ],
+    caseDetail,
+    documentGapSummary,
+    now: input.now,
+    repeatedTriggerCount,
+    riskFlags,
+    triggerType: input.triggerType
+  };
+
+  try {
+    const adapterDecision = caseAgentDecisionSchema.parse(await input.modelAdapter.generateDecision(modelInput));
+
+    return {
+      decision: applyCaseAgentDecisionGuardrails(caseDetail, adapterDecision, {
+        now: input.now,
+        repeatedTriggerCount,
+        riskFlags,
+        triggerType: input.triggerType
+      }),
+      modelMode: input.modelAdapter.modelMode
+    };
+  } catch {
+    return {
+      decision: decideCaseAgentActionDeterministic(modelInput),
+      modelMode:
+        input.modelAdapter.modelMode === deterministicCaseAgentModelAdapter.modelMode
+          ? deterministicCaseAgentModelAdapter.modelMode
+          : `${input.modelAdapter.modelMode}_fallback`
+    };
+  }
+}
+
+function decideCaseAgentActionDeterministic(input: CaseAgentModelInput): CaseAgentDecision {
+  const { caseDetail } = input;
+  const { documentGapSummary, repeatedTriggerCount, riskFlags, triggerType } = input;
+
+  if (triggerType === "new_lead") {
     if (riskFlags.includes("policy_sensitive_lead")) {
       return {
         actionType: "request_manager_intervention",
@@ -1643,7 +1699,7 @@ function decideCaseAgentAction(
         riskLevel: "high",
         status: "escalated",
         toolExecutionStatus: "executed",
-        triggerType: input.triggerType
+        triggerType
       };
     }
 
@@ -1665,11 +1721,11 @@ function decideCaseAgentAction(
       riskLevel: "low",
       status: "completed",
       toolExecutionStatus: "queued",
-      triggerType: input.triggerType
+      triggerType
     };
   }
 
-  if (input.triggerType === "document_missing") {
+  if (triggerType === "document_missing") {
     if (repeatedTriggerCount >= 1) {
       return {
         actionType: "request_manager_intervention",
@@ -1692,7 +1748,7 @@ function decideCaseAgentAction(
         riskLevel: "medium",
         status: "escalated",
         toolExecutionStatus: "executed",
-        triggerType: input.triggerType
+        triggerType
       };
     }
 
@@ -1714,7 +1770,7 @@ function decideCaseAgentAction(
       riskLevel: "low",
       status: "completed",
       toolExecutionStatus: "queued",
-      triggerType: input.triggerType
+      triggerType
     };
   }
 
@@ -1740,7 +1796,7 @@ function decideCaseAgentAction(
       riskLevel: "medium",
       status: "escalated",
       toolExecutionStatus: "executed",
-      triggerType: input.triggerType
+      triggerType
     };
   }
 
@@ -1762,6 +1818,204 @@ function decideCaseAgentAction(
     riskLevel: "low",
     status: "completed",
     toolExecutionStatus: "queued",
+    triggerType
+  };
+}
+
+function applyCaseAgentDecisionGuardrails(
+  caseDetail: PersistedCaseDetail,
+  decision: CaseAgentDecision,
+  input: {
+    now: string;
+    repeatedTriggerCount: number;
+    riskFlags: string[];
+    triggerType: CaseAgentTriggerType;
+  }
+): CaseAgentDecision {
+  if (decision.triggerType !== input.triggerType) {
+    return decideCaseAgentActionDeterministic({
+      allowedActions: [],
+      caseDetail,
+      documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
+      now: input.now,
+      repeatedTriggerCount: input.repeatedTriggerCount,
+      riskFlags: input.riskFlags,
+      triggerType: input.triggerType
+    });
+  }
+
+  if (
+    (decision.actionType === "send_whatsapp_message" || decision.actionType === "create_reply_draft") &&
+    !decision.proposedMessage
+  ) {
+    return decideCaseAgentActionDeterministic({
+      allowedActions: [],
+      caseDetail,
+      documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
+      now: input.now,
+      repeatedTriggerCount: input.repeatedTriggerCount,
+      riskFlags: input.riskFlags,
+      triggerType: input.triggerType
+    });
+  }
+
+  if (input.triggerType === "new_lead" && input.riskFlags.includes("policy_sensitive_lead")) {
+    return buildEscalatedDecision(caseDetail, {
+      confidence: Math.max(decision.confidence, 0.88),
+      escalationReason:
+        caseDetail.preferredLocale === "ar"
+          ? "الحالة تحتوي على إشارة حساسة وتحتاج قراراً بشرياً قبل أي رد تلقائي."
+          : "The lead contains a sensitive signal and needs a human decision before any automated reply.",
+      rationaleSummary:
+        caseDetail.preferredLocale === "ar"
+          ? "تم تصعيد الحالة لأن محتوى العميل يتجاوز حدود الرد الآلي الآمن."
+          : "Escalated because the customer message exceeds the safe automated-response boundary.",
+      riskLevel: "high",
+      triggerType: input.triggerType
+    });
+  }
+
+  if (
+    (input.triggerType === "no_response_follow_up" || input.triggerType === "document_missing") &&
+    input.repeatedTriggerCount >= 1 &&
+    decision.actionType === "send_whatsapp_message"
+  ) {
+    return buildEscalatedDecision(caseDetail, {
+      confidence: Math.max(decision.confidence, 0.84),
+      escalationReason:
+        input.triggerType === "document_missing"
+          ? caseDetail.preferredLocale === "ar"
+            ? "المستندات ما زالت ناقصة بعد متابعة سابقة وتحتاج تدخلاً بشرياً."
+            : "Documents are still missing after a prior follow-up and now need human intervention."
+          : caseDetail.preferredLocale === "ar"
+            ? "العميل ما زال صامتاً بعد متابعة سابقة ويحتاج تدخلاً من المدير."
+            : "The customer is still silent after a prior follow-up and needs manager intervention.",
+      rationaleSummary:
+        input.triggerType === "document_missing"
+          ? caseDetail.preferredLocale === "ar"
+            ? "تم التصعيد لأن الحالة عالقة في المستندات بعد أكثر من دورة متابعة."
+            : "Escalated because the case remains stuck in document collection after more than one cycle."
+          : caseDetail.preferredLocale === "ar"
+            ? "تم التصعيد لأن المتابعة السابقة لم تستعد التفاعل."
+            : "Escalated because the prior follow-up did not recover engagement.",
+      riskLevel: "medium",
+      triggerType: input.triggerType
+    });
+  }
+
+  if (decision.actionType === "send_whatsapp_message" && decision.riskLevel === "high") {
+    return buildEscalatedDecision(caseDetail, {
+      confidence: Math.max(decision.confidence, 0.9),
+      escalationReason:
+        decision.escalationReason ??
+        (caseDetail.preferredLocale === "ar"
+          ? "القرار المقترح عالي المخاطر ويحتاج موافقة بشرية قبل التواصل مع العميل."
+          : "The proposed action is high-risk and needs human approval before contacting the customer."),
+      rationaleSummary:
+        decision.rationaleSummary ||
+        (caseDetail.preferredLocale === "ar"
+          ? "تم تصعيد الحالة لأن النموذج صنفها على أنها عالية المخاطر."
+          : "Escalated because the model classified the case as high-risk."),
+      riskLevel: "high",
+      triggerType: input.triggerType
+    });
+  }
+
+  if (
+    decision.actionType === "send_whatsapp_message" &&
+    (decision.riskLevel === "medium" || decision.confidence < 0.86)
+  ) {
+    return {
+      ...decision,
+      actionType: "create_reply_draft",
+      escalationReason: null,
+      status: "waiting",
+      toolExecutionStatus: "executed"
+    };
+  }
+
+  if (decision.actionType === "request_manager_intervention") {
+    return {
+      ...decision,
+      status: "escalated",
+      toolExecutionStatus: decision.toolExecutionStatus ?? "executed"
+    };
+  }
+
+  if (decision.actionType === "create_reply_draft") {
+    return {
+      ...decision,
+      status: "waiting",
+      toolExecutionStatus: decision.toolExecutionStatus ?? "executed"
+    };
+  }
+
+  return decision;
+}
+
+function buildBlockedCaseAgentDecision(
+  caseDetail: PersistedCaseDetail,
+  input: {
+    blockedReason: Extract<
+      CaseAgentBlockedReason,
+      "missing_phone" | "automation_paused" | "qa_hold" | "client_credentials_pending"
+    >;
+    triggerType: CaseAgentTriggerType;
+  }
+): CaseAgentDecision {
+  return {
+    actionType: "send_whatsapp_message",
+    blockedReason: input.blockedReason,
+    confidence: 0.99,
+    escalationReason: null,
+    proposedMessage: buildTriggerMessage(
+      input.triggerType,
+      caseDetail,
+      summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale)
+    ),
+    proposedNextAction: buildBlockedNextAction(caseDetail.preferredLocale, input.blockedReason),
+    proposedNextActionDueAt: createFutureTimestamp(input.blockedReason === "client_credentials_pending" ? 24 : 4),
+    rationaleSummary: buildBlockedRationale(caseDetail.preferredLocale, input.blockedReason),
+    riskLevel: "medium",
+    status: "blocked",
+    toolExecutionStatus: "blocked",
+    triggerType: input.triggerType
+  };
+}
+
+function buildEscalatedDecision(
+  caseDetail: PersistedCaseDetail,
+  input: {
+    confidence: number;
+    escalationReason: string;
+    rationaleSummary: string;
+    riskLevel: CaseAgentRiskLevel;
+    triggerType: CaseAgentTriggerType;
+  }
+): CaseAgentDecision {
+  return {
+    actionType: "request_manager_intervention",
+    blockedReason: null,
+    confidence: input.confidence,
+    escalationReason: input.escalationReason,
+    proposedMessage: null,
+    proposedNextAction:
+      input.triggerType === "new_lead"
+        ? caseDetail.preferredLocale === "ar"
+          ? "تحويل الحالة إلى المدير لمراجعة الرد الأول"
+          : "Route the case to a manager for first-reply review"
+        : input.triggerType === "document_missing"
+        ? caseDetail.preferredLocale === "ar"
+          ? "راجع التعثر مع العميل وحدد ما إذا كان يجب إعادة التعيين أو الإغلاق"
+          : "Review the stall with the customer and decide whether to reassign or close the case"
+        : caseDetail.preferredLocale === "ar"
+          ? "قرر التصعيد أو إعادة التعيين أو الإغلاق بناءً على صمت العميل"
+          : "Decide whether to escalate, reassign, or close based on the continued silence",
+    proposedNextActionDueAt: createFutureTimestamp(input.triggerType === "new_lead" ? 1 : 6),
+    rationaleSummary: input.rationaleSummary,
+    riskLevel: input.riskLevel,
+    status: "escalated",
+    toolExecutionStatus: "executed",
     triggerType: input.triggerType
   };
 }
@@ -1769,7 +2023,7 @@ function decideCaseAgentAction(
 function getCaseAgentBlockedReason(
   caseDetail: PersistedCaseDetail,
   canSendWhatsApp: boolean
-): "missing_phone" | "automation_paused" | "qa_hold" | "client_credentials_pending" | null {
+): Extract<CaseAgentBlockedReason, "missing_phone" | "automation_paused" | "qa_hold" | "client_credentials_pending"> | null {
   if (!caseDetail.channelSummary?.contactValue && !caseDetail.phone) {
     return "missing_phone";
   }

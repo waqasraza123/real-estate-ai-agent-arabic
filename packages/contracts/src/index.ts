@@ -53,6 +53,14 @@ export const caseAgentActionTypeSchema = z.enum([
   "create_reply_draft"
 ]);
 export const caseAgentToolExecutionStatusSchema = z.enum(["executed", "queued", "blocked", "skipped", "failed"]);
+export const caseAgentBlockedReasonSchema = z.enum([
+  "missing_phone",
+  "automation_paused",
+  "qa_hold",
+  "client_credentials_pending",
+  "model_provider_error",
+  "invalid_model_output"
+]);
 export const caseQaReviewStatusSchema = z.enum(["pending_review", "approved", "follow_up_required"]);
 export const caseQaReviewTriggerSourceSchema = z.enum(["manual_request", "policy_rule"]);
 export const caseQaReviewSubjectTypeSchema = z.enum(["case_message", "prepared_reply_draft"]);
@@ -374,10 +382,25 @@ export const persistedCaseAgentMemorySchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const caseAgentDecisionSchema = z.object({
+  actionType: caseAgentActionTypeSchema,
+  blockedReason: caseAgentBlockedReasonSchema.nullable(),
+  confidence: z.number().min(0).max(1),
+  escalationReason: z.string().nullable(),
+  proposedMessage: z.string().trim().min(10).max(2000).nullable(),
+  proposedNextAction: z.string().trim().min(4).max(200),
+  proposedNextActionDueAt: z.iso.datetime(),
+  rationaleSummary: z.string().trim().min(10).max(500),
+  riskLevel: caseAgentRiskLevelSchema,
+  status: caseAgentRunStatusSchema,
+  toolExecutionStatus: caseAgentToolExecutionStatusSchema.nullable(),
+  triggerType: caseAgentTriggerTypeSchema
+});
+
 export const persistedCaseAgentRunSchema = z.object({
   actionType: caseAgentActionTypeSchema.nullable(),
   agentRunId: z.uuid(),
-  blockedReason: z.string().nullable(),
+  blockedReason: caseAgentBlockedReasonSchema.nullable(),
   confidence: z.number().min(0).max(1),
   createdAt: z.iso.datetime(),
   escalationReason: z.string().nullable(),
@@ -396,7 +419,7 @@ export const persistedCaseAgentRunSchema = z.object({
 });
 
 export const persistedCaseAgentStateSchema = z.object({
-  latestBlockedReason: z.string().nullable(),
+  latestBlockedReason: caseAgentBlockedReasonSchema.nullable(),
   latestDecisionSummary: z.string().nullable(),
   latestEscalationReason: z.string().nullable(),
   latestRecommendedAction: caseAgentActionTypeSchema.nullable(),
@@ -741,6 +764,8 @@ export type ApproveHandoverCustomerUpdateInput = z.infer<typeof approveHandoverC
 export type AutomationStatus = z.infer<typeof automationStatusSchema>;
 export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
 export type CaseAgentActionType = z.infer<typeof caseAgentActionTypeSchema>;
+export type CaseAgentBlockedReason = z.infer<typeof caseAgentBlockedReasonSchema>;
+export type CaseAgentDecision = z.infer<typeof caseAgentDecisionSchema>;
 export type CaseAgentRiskLevel = z.infer<typeof caseAgentRiskLevelSchema>;
 export type CaseAgentRunStatus = z.infer<typeof caseAgentRunStatusSchema>;
 export type CaseAgentToolExecutionStatus = z.infer<typeof caseAgentToolExecutionStatusSchema>;

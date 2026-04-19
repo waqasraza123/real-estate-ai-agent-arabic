@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@real-estate-ai/contracts": "workspace:*",
     "@real-estate-ai/database": "workspace:*",
     "@real-estate-ai/integrations": "workspace:*",
     "@real-estate-ai/workflows": "workspace:*",

@@ -17,6 +17,7 @@
 - The API application is a Fastify service with schema-validated website lead intake, qualification, visit scheduling, follow-up-plan mutation, automation control, document state mutation, manager-readable case list and case detail endpoints, and persisted handover intake, milestone-planning, customer-update-boundary, and readiness-task endpoints
 - The worker application now processes both overdue follow-up watches and queued WhatsApp initial-reply jobs, with bounded retry handling and explicit failed-delivery state when provider sends do not complete
 - The worker now also runs a persisted `CaseAgentOrchestrator` loop for `new_lead`, `no_response_follow_up`, and `document_missing` triggers, with typed run records, compact case-agent memory, explicit manager-escalation boundaries, and WhatsApp transport delegated through the lower-level outbound queue
+- The worker-side case-agent runtime is now adapter-backed: workflows own the typed decision contract plus deterministic policy fallback, while `apps/worker` can optionally call a provider-backed OpenAI Responses adapter behind the same boundary and fall back safely on provider or schema failure
 - The current persisted alpha store uses Drizzle over local `PGlite` for safe Phase 2 and early Phase 3 development without introducing remote infrastructure
 - A shared `packages/integrations` layer is now live for Meta WhatsApp Cloud API send contracts, Meta webhook parsing, Google Calendar booking contracts, and shared phone normalization
 - The API now exposes Meta WhatsApp webhook endpoints plus provider-aware Google Calendar booking persistence, and the persisted store now tracks normalized lead phone numbers, case channel state, delivery status, and visit booking status
@@ -51,6 +52,7 @@
 - Early document workflow coverage is already live locally through persisted document request tracking, queue-backed follow-up interventions, automation pause or resume controls, and manager follow-up reset actions
 - Phase 4: wedge-supporting controls and reporting tied directly to the live operational flow
 - The first production-style agent runtime is now live locally for the core wedge, so the next step should be improving the decision model and evaluation harness rather than adding another parallel rules engine
+- The first provider-ready decision-model upgrade is now live locally as well, so the next step after this should be either deeper scenario coverage plus live-model rollout, or real document upload/storage for stronger `document_missing` inputs
 - Phase 5: handover as an add-on workflow after the core wedge is proven with real integrations and KPI movement
 - Existing Phase 4 and Phase 5 handover/governance slices remain implemented locally, but they are no longer the near-term product priority
 - The first persisted Phase 5 control boundary is now live locally: role-aware restrictions now protect post-completion review, aftercare follow-up, and archive mutations behind local handover-manager or admin control
@@ -106,6 +108,7 @@
 - Added `apps/worker` plus queue-backed overdue follow-up processing, persisted manager interventions, automation pause or resume controls, and manager follow-up reset actions
 - Added the first real integration slice with `packages/integrations`, persisted case-channel and visit-booking state, website-lead-triggered WhatsApp reply queueing, Meta webhook ingestion, Google Calendar booking persistence, core lead-surface visibility for delivery/booking status, and passing fast plus integration verification
 - Tightened the real integration slice so human case replies now update WhatsApp channel state, queue provider-backed outbound delivery through the worker, and keep the case synced to one primary communication layer instead of splitting initial automation and later human replies into separate paths
+- Added the next production-grade agent slice with a provider-agnostic decision contract, optional OpenAI Responses worker adapter, deterministic fallback inside workflow execution, and a reusable scenario evaluation harness for new lead, no-response, and document-missing agent behavior
 - Added the first persisted handover slice with manager-approved intake creation, seeded readiness tasks, handover audit events, and live handover-task status updates
 - Added the next persisted handover slice with milestone planning, customer-update approval boundaries, linked audit events, and live handover milestone/customer-boundary controls
 - Added the next persisted handover slice with appointment planning, internal confirmation, linked audit events, and live handover appointment controls
@@ -251,9 +254,8 @@
 - Real identity, durable sessions, and server-trusted role assignment beyond the current signed local operator-session control mode
 - External integrations
 - Dashboards and analytics
-- Agent orchestration and workflow automation
 - Real provider integrations
-- Real AI execution and automation enforcement
+- Full live model-provider rollout and credentialed evaluation beyond the local fallback-ready adapter path
 - Deeper qualification policy logic and approval boundaries beyond the current structured alpha form
 - Broader QA policy packs beyond the current intake sampling, prepared revenue reply-draft approval gate, prepared handover customer-update draft gate, and the current manager-facing governance summary plus exportable event reporting
 - Redis or BullMQ-backed durable job orchestration beyond the current local alpha worker

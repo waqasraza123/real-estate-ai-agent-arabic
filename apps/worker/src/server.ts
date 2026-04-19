@@ -2,6 +2,7 @@ import { createAlphaLeadCaptureStore } from "@real-estate-ai/database";
 import { createMetaWhatsAppClient, type WhatsAppClient } from "@real-estate-ai/integrations";
 import { runPersistedCaseAgentCycle, runPersistedFollowUpCycle } from "@real-estate-ai/workflows";
 
+import { createWorkerCaseAgentModelAdapter } from "./case-agent-model";
 import { parseWorkerEnvironment } from "./env";
 
 const whatsappAgentReplyJobType = "whatsapp_agent_reply";
@@ -22,6 +23,13 @@ const whatsappClient: WhatsAppClient | null =
         phoneNumberId: environment.WORKER_META_WHATSAPP_PHONE_NUMBER_ID
       })
     : null;
+const caseAgentModelAdapter = createWorkerCaseAgentModelAdapter({
+  apiKey: environment.WORKER_AGENT_OPENAI_API_KEY,
+  baseUrl: environment.WORKER_AGENT_OPENAI_BASE_URL,
+  fetchImplementation: fetch,
+  model: environment.WORKER_AGENT_OPENAI_MODEL,
+  timeoutMs: environment.WORKER_AGENT_OPENAI_TIMEOUT_MS
+});
 
 async function runWhatsAppOutboundCycle(input: {
   jobType: string;
@@ -184,6 +192,7 @@ const runCycle = async () => {
   const caseAgentResult = await runPersistedCaseAgentCycle(store, {
     canSendWhatsApp: Boolean(whatsappClient),
     limit: environment.WORKER_BATCH_LIMIT,
+    modelAdapter: caseAgentModelAdapter,
     runAt
   });
   const [agentReplyResult, initialReplyResult, caseReplyResult] = await Promise.all([

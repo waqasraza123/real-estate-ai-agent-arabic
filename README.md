@@ -1,6 +1,6 @@
 # AI Agent for Automated Real Estate Sales, Leasing & Handover
 
-Premium bilingual real-estate operations software for AI-assisted lead response, WhatsApp follow-up, visit scheduling, document readiness, and manager oversight.
+Premium bilingual real-estate operations software for AI-agent-driven lead response, WhatsApp follow-up, visit scheduling, document readiness, and manager oversight.
 
 <p align="left">
   <img alt="Premium real-estate ops" src="https://img.shields.io/badge/Premium-Real_Estate_Ops-111111?style=for-the-badge" />
@@ -50,6 +50,8 @@ The repository is past bootstrap and currently contains a working local alpha fo
 - English and Arabic locale routing with RTL-aware rendering
 - hybrid web routes that fall back to premium seeded demo data when the API is unavailable
 - live alpha workflow for website lead intake, WhatsApp-first reply orchestration, qualification, visit scheduling, document tracking, and manager review
+- production-style `CaseAgentOrchestrator` runtime for `new_lead`, `no_response_follow_up`, and `document_missing`
+- provider-backed model adapter boundary with deterministic fallback and scenario-based evaluation coverage
 - Playwright smoke tests and opt-in visual regression baselines
 - integration-tested website lead capture, WhatsApp webhook handling, qualification, visit scheduling, document updates, and manager-readable persisted case APIs
 - versioned safe-push verification via `.githooks/pre-push`
@@ -65,7 +67,7 @@ Not implemented yet:
 
 ## Product Positioning
 
-This product is not positioned as an autonomous deal closer. It is an operational layer that helps teams work faster, with more consistency, auditability, and bilingual quality.
+This product is not positioned as an autonomous deal closer. It is an operational layer with a policy-bounded case agent that helps teams work faster, with more consistency, auditability, and bilingual quality.
 
 The product promise is operational excellence:
 
@@ -186,6 +188,15 @@ Recommended Meta configuration:
 - `WORKER_META_WHATSAPP_PHONE_NUMBER_ID`: used for outbound sends
 - `WORKER_META_WHATSAPP_API_VERSION`: defaults to `v20.0`
 
+Optional agent-decision provider configuration:
+
+- `WORKER_AGENT_OPENAI_API_KEY`: enables model-backed case-agent decisions in the worker
+- `WORKER_AGENT_OPENAI_MODEL`: defaults to `gpt-5.4-mini`
+- `WORKER_AGENT_OPENAI_BASE_URL`: defaults to `https://api.openai.com/v1`
+- `WORKER_AGENT_OPENAI_TIMEOUT_MS`: request timeout for model calls
+
+If those worker variables are unset, the `CaseAgentOrchestrator` still runs through the deterministic policy adapter. If the provider call fails or returns invalid structured output, the worker falls back to deterministic policy and records the run as a provider fallback mode.
+
 Google Calendar configuration:
 
 - `API_GOOGLE_CALENDAR_ACCESS_TOKEN`
@@ -214,6 +225,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm test:fast
+pnpm test:agent-evals
 pnpm test:integration
 pnpm test:web-smoke
 ```

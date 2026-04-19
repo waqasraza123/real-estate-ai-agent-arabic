@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "setup:githooks": "git config core.hooksPath .githooks && chmod +x .githooks/pre-push scripts/verify-push.sh scripts/safe-push.sh",
     "safe-push": "bash ./scripts/safe-push.sh",
+    "test:agent-evals": "vitest run apps/worker/src/agent-evals.test.ts",
     "test": "pnpm test:fast && pnpm test:integration && pnpm test:web-smoke",
     "test:fast": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",

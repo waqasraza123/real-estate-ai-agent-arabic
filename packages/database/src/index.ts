@@ -6,6 +6,7 @@ import type {
   AutomationStatus,
   CalendarProvider,
   CaseAgentActionType,
+  CaseAgentBlockedReason,
   CaseAgentRiskLevel,
   CaseAgentRunStatus,
   CaseAgentToolExecutionStatus,
@@ -3595,7 +3596,7 @@ export async function createAlphaLeadCaptureStore(options?: {
           actionType: input.actionType,
           blockedReason: input.blockedReason,
           caseId,
-          confidencePercent: Math.max(0, Math.min(100, Math.round(input.confidence))),
+          confidencePercent: Math.max(0, Math.min(100, Math.round(input.confidence * 100))),
           createdAt: input.updatedAt,
           escalationReason: input.escalationReason,
           finishedAt: input.finishedAt,
@@ -6690,7 +6691,7 @@ function hydrateCaseAgentRun(value: {
   return {
     actionType: value.actionType ? toCaseAgentActionType(value.actionType) : null,
     agentRunId: value.runId,
-    blockedReason: value.blockedReason,
+    blockedReason: value.blockedReason ? toCaseAgentBlockedReason(value.blockedReason) : null,
     confidence: Math.max(0, Math.min(1, value.confidencePercent / 100)),
     createdAt: value.createdAt,
     escalationReason: value.escalationReason,
@@ -7042,6 +7043,21 @@ function toCaseAgentActionType(value: string): CaseAgentActionType {
   }
 
   throw new Error(`unsupported_case_agent_action_type:${value}`);
+}
+
+function toCaseAgentBlockedReason(value: string): CaseAgentBlockedReason {
+  if (
+    value === "missing_phone" ||
+    value === "automation_paused" ||
+    value === "qa_hold" ||
+    value === "client_credentials_pending" ||
+    value === "model_provider_error" ||
+    value === "invalid_model_output"
+  ) {
+    return value;
+  }
+
+  throw new Error(`unsupported_case_agent_blocked_reason:${value}`);
 }
 
 function toCaseAgentRiskLevel(value: string): CaseAgentRiskLevel {
