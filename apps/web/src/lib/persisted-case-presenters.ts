@@ -640,6 +640,54 @@ export function getPersistedAgentObjectionLabels(locale: SupportedLocale, agentM
   return agentMemory.objectionCategories.map((category) => labels[locale][category]);
 }
 
+export function getPersistedAgentGroundingLabel(
+  locale: SupportedLocale,
+  agentRun: NonNullable<PersistedCaseDetail["agentRuns"]>[number] | null | undefined
+) {
+  if (!agentRun) {
+    return null;
+  }
+
+  const labels = {
+    ar: {
+      grounded: "مدعوم بحقائق معتمدة",
+      missing_required_evidence: "ينقصه دليل معتمد",
+      not_required: "لا يتطلب حقائق تجارية"
+    },
+    en: {
+      grounded: "Grounded on approved facts",
+      missing_required_evidence: "Missing approved evidence",
+      not_required: "No commercial facts required"
+    }
+  } as const;
+
+  return labels[locale][agentRun.commercialFactGroundingStatus];
+}
+
+export function getPersistedAgentGroundingNote(
+  locale: SupportedLocale,
+  agentRun: NonNullable<PersistedCaseDetail["agentRuns"]>[number] | null | undefined
+) {
+  if (!agentRun) {
+    return null;
+  }
+
+  if (agentRun.commercialFactWarnings.length > 0) {
+    return agentRun.commercialFactWarnings.join(locale === "ar" ? "، " : ", ");
+  }
+
+  if (agentRun.commercialFactReferences.length > 0) {
+    const sourceLabels = Array.from(new Set(agentRun.commercialFactReferences.map((fact) => fact.sourceLabel))).slice(0, 2);
+    return locale === "ar"
+      ? `استند القرار إلى ${agentRun.commercialFactReferences.length} مرجع معتمد: ${sourceLabels.join("، ")}.`
+      : `Decision used ${agentRun.commercialFactReferences.length} approved references: ${sourceLabels.join(", ")}.`;
+  }
+
+  return locale === "ar"
+    ? "لم يحتج هذا القرار إلى مرجع تجاري قبل التنفيذ."
+    : "This decision did not require a commercial fact reference before execution.";
+}
+
 export function getPersistedDocumentDisplay(locale: SupportedLocale, caseDetail: PersistedCaseDetail) {
   return caseDetail.documentRequests.map((documentRequest) => ({
     analysisSummary: getDocumentAnalysisSummary(locale, documentRequest.latestUpload?.analysis ?? null),

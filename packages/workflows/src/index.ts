@@ -12,6 +12,8 @@ import type {
   CaseAgentSentiment,
   CaseAgentTriggerType,
   CaseAgentUrgencyLevel,
+  CommercialFactGroundingStatus,
+  CommercialFactKind,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
   CreateHandoverBlockerInput,
@@ -35,6 +37,7 @@ import type {
   PrepareHandoverCustomerUpdateDeliveryInput,
   PersistedCaseDetail,
   PersistedCaseSummary,
+  PersistedCommercialFactReference,
   PersistedDocumentUpload,
   PersistedGovernanceEventList,
   PersistedGovernanceSummary,
@@ -287,6 +290,7 @@ export async function runPersistedFollowUpCycle(
 export interface CaseAgentModelInput {
   allowedActions: CaseAgentActionType[];
   caseDetail: PersistedCaseDetail;
+  commercialFactGrounding: CaseAgentFactGrounding;
   conversationIntelligence: CaseConversationIntelligence;
   documentGapSummary: string | null;
   now: string;
@@ -301,6 +305,14 @@ export interface CaseConversationIntelligence {
   objectionCategories: CaseAgentObjectionCategory[];
   requestedNextStep: CaseAgentRequestedNextStep | null;
   urgencyLevel: CaseAgentUrgencyLevel | null;
+}
+
+export interface CaseAgentFactGrounding {
+  checkedAt: string;
+  references: PersistedCommercialFactReference[];
+  requiredKinds: CommercialFactKind[];
+  status: CommercialFactGroundingStatus;
+  warnings: string[];
 }
 
 export interface CaseAgentModelAdapter {
@@ -390,8 +402,10 @@ export async function runPersistedCaseAgentCycle(
     }
 
     const startedAt = runAt;
+    const commercialFactGrounding = await buildCaseAgentFactGrounding(store, caseDetail, runAt);
     const { decision, modelMode } = await resolveCaseAgentDecision(caseDetail, {
       canSendWhatsApp: input?.canSendWhatsApp ?? false,
+      commercialFactGrounding,
       modelAdapter,
       now: runAt,
       triggerType
@@ -478,6 +492,10 @@ export async function runPersistedCaseAgentCycle(
       actionType: decision.actionType,
       agentRunId: job.jobId,
       blockedReason: decision.blockedReason,
+      commercialFactGroundingStatus: commercialFactGrounding.status,
+      commercialFactReferences: commercialFactGrounding.references,
+      commercialFactRequiredKinds: commercialFactGrounding.requiredKinds,
+      commercialFactWarnings: commercialFactGrounding.warnings,
       confidence: decision.confidence,
       escalationReason: decision.escalationReason,
       finishedAt: runAt,
@@ -2113,6 +2131,7 @@ async function resolveCaseAgentDecision(
   caseDetail: PersistedCaseDetail,
   input: {
     canSendWhatsApp: boolean;
+    commercialFactGrounding: CaseAgentFactGrounding;
     modelAdapter: CaseAgentModelAdapter;
     now: string;
     triggerType: CaseAgentTriggerType;
@@ -2147,6 +2166,7 @@ async function resolveCaseAgentDecision(
       "create_reply_draft"
     ],
     caseDetail,
+    commercialFactGrounding: input.commercialFactGrounding,
     conversationIntelligence,
     documentGapSummary,
     now: input.now,
@@ -2160,6 +2180,7 @@ async function resolveCaseAgentDecision(
 
     return {
       decision: applyCaseAgentDecisionGuardrails(caseDetail, adapterDecision, {
+        commercialFactGrounding: input.commercialFactGrounding,
         conversationIntelligence,
         now: input.now,
         repeatedTriggerCount,
@@ -2498,6 +2519,7 @@ function applyCaseAgentDecisionGuardrails(
   caseDetail: PersistedCaseDetail,
   decision: CaseAgentDecision,
   input: {
+    commercialFactGrounding: CaseAgentFactGrounding;
     conversationIntelligence: CaseConversationIntelligence;
     now: string;
     repeatedTriggerCount: number;
@@ -2509,6 +2531,7 @@ function applyCaseAgentDecisionGuardrails(
     return decideCaseAgentActionDeterministic({
       allowedActions: [],
       caseDetail,
+      commercialFactGrounding: input.commercialFactGrounding,
       conversationIntelligence: input.conversationIntelligence,
       documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
       now: input.now,
@@ -2525,6 +2548,7 @@ function applyCaseAgentDecisionGuardrails(
     return decideCaseAgentActionDeterministic({
       allowedActions: [],
       caseDetail,
+      commercialFactGrounding: input.commercialFactGrounding,
       conversationIntelligence: input.conversationIntelligence,
       documentGapSummary: summarizeDocumentGaps(caseDetail, caseDetail.preferredLocale),
       now: input.now,
@@ -2642,6 +2666,45 @@ function applyCaseAgentDecisionGuardrails(
       riskLevel: "high",
       triggerType: input.triggerType
     });
+  }
+
+  const outboundCommitmentRisk =
+    decision.actionType === "send_whatsapp_message" && decision.proposedMessage
+      ? analyzeOutboundCommitmentRisk(decision.proposedMessage)
+      : null;
+
+  if (outboundCommitmentRisk?.unsafeCommitment) {
+    return buildEscalatedDecision(caseDetail, {
+      confidence: Math.max(decision.confidence, 0.91),
+      escalationReason:
+        caseDetail.preferredLocale === "ar"
+          ? "الرد المقترح يحتوي على وعد تجاري أو قانوني يحتاج موافقة بشرية قبل الإرسال."
+          : "The proposed reply contains a commercial or legal commitment that needs human approval before send.",
+      rationaleSummary:
+        caseDetail.preferredLocale === "ar"
+          ? "أوقفت بوابة الحقائق التجارية الإرسال لأن الرسالة تحمل وعداً لا يجوز إرساله من دون اعتماد صريح."
+          : "The commercial fact boundary stopped the send because the message carries a promise that requires explicit approval.",
+      riskLevel: "high",
+      triggerType: input.triggerType
+    });
+  }
+
+  if (
+    outboundCommitmentRisk?.requiresGrounding &&
+    input.commercialFactGrounding.status === "missing_required_evidence"
+  ) {
+    return {
+      ...decision,
+      actionType: "create_reply_draft",
+      escalationReason: null,
+      rationaleSummary:
+        caseDetail.preferredLocale === "ar"
+          ? `تم خفض الرد إلى مسودة لأن ${input.commercialFactGrounding.warnings.join("، ")}.`
+          : `Downgraded to a draft because ${input.commercialFactGrounding.warnings.join(", ")}.`,
+      riskLevel: "medium",
+      status: "waiting",
+      toolExecutionStatus: "executed"
+    };
   }
 
   if (
@@ -3014,6 +3077,126 @@ function buildRiskFlags(caseDetail: PersistedCaseDetail, conversationIntelligenc
   return Array.from(flags);
 }
 
+async function buildCaseAgentFactGrounding(
+  store: LeadCaptureStore,
+  caseDetail: PersistedCaseDetail,
+  checkedAt: string
+): Promise<CaseAgentFactGrounding> {
+  const conversationIntelligence = analyzeConversationIntelligence(caseDetail);
+  const requiredKinds = getRequiredCommercialFactKinds(caseDetail, conversationIntelligence);
+
+  if (requiredKinds.length === 0) {
+    return {
+      checkedAt,
+      references: [],
+      requiredKinds,
+      status: "not_required",
+      warnings: []
+    };
+  }
+
+  const references = await store.listApprovedCommercialFacts({
+    kinds: requiredKinds,
+    locale: getCaseResponseLocale(caseDetail, getLatestInboundMessage(caseDetail)),
+    now: checkedAt,
+    projectInterest: caseDetail.projectInterest
+  });
+  const groundedKinds = new Set(references.map((fact) => fact.kind));
+  const missingKinds = requiredKinds.filter((kind) => !groundedKinds.has(kind));
+
+  return {
+    checkedAt,
+    references: references.map(toPersistedCommercialFactReference).slice(0, 6),
+    requiredKinds,
+    status: missingKinds.length === 0 ? "grounded" : "missing_required_evidence",
+    warnings: missingKinds.map((kind) => buildMissingCommercialFactWarning(caseDetail.preferredLocale, kind))
+  };
+}
+
+function getRequiredCommercialFactKinds(
+  caseDetail: PersistedCaseDetail,
+  conversationIntelligence: CaseConversationIntelligence
+): CommercialFactKind[] {
+  const requiredKinds = new Set<CommercialFactKind>();
+
+  if (
+    conversationIntelligence.requestedNextStep === "share_pricing" ||
+    conversationIntelligence.objectionCategories.includes("pricing")
+  ) {
+    requiredKinds.add("pricing");
+    requiredKinds.add("payment_plan");
+    requiredKinds.add("policy");
+  }
+
+  if (
+    conversationIntelligence.intentCategory === "availability" ||
+    conversationIntelligence.requestedNextStep === "share_details"
+  ) {
+    requiredKinds.add("availability");
+    requiredKinds.add("policy");
+  }
+
+  if (
+    conversationIntelligence.requestedNextStep === "send_documents" ||
+    conversationIntelligence.requestedNextStep === "review_documents" ||
+    caseDetail.documentRequests.some((documentRequest) => documentRequest.status !== "accepted")
+  ) {
+    requiredKinds.add("document_requirement");
+  }
+
+  return Array.from(requiredKinds);
+}
+
+function toPersistedCommercialFactReference(value: PersistedCommercialFactReference): PersistedCommercialFactReference {
+  return {
+    approvedAt: value.approvedAt,
+    content: value.content,
+    expiresAt: value.expiresAt,
+    factId: value.factId,
+    kind: value.kind,
+    locale: value.locale,
+    projectInterest: value.projectInterest,
+    sourceLabel: value.sourceLabel,
+    sourceReference: value.sourceReference,
+    title: value.title
+  };
+}
+
+function buildMissingCommercialFactWarning(locale: SupportedLocale, kind: CommercialFactKind) {
+  const labels = {
+    ar: {
+      availability: "دليل التوفر المعتمد مفقود",
+      document_requirement: "دليل متطلبات المستندات المعتمد مفقود",
+      payment_plan: "دليل خطة الدفع المعتمد مفقود",
+      policy: "دليل حدود السياسة المعتمد مفقود",
+      pricing: "دليل التسعير المعتمد مفقود"
+    },
+    en: {
+      availability: "approved availability evidence is missing",
+      document_requirement: "approved document-requirement evidence is missing",
+      payment_plan: "approved payment-plan evidence is missing",
+      policy: "approved policy-boundary evidence is missing",
+      pricing: "approved pricing evidence is missing"
+    }
+  } as const;
+
+  return labels[locale][kind];
+}
+
+function analyzeOutboundCommitmentRisk(message: string) {
+  const normalizedMessage = normalizeConversationText(message);
+  const unsafeCommitment = containsAnyKeyword(normalizedMessage, unsafeCommercialCommitmentKeywords);
+  const requiresGrounding =
+    unsafeCommitment ||
+    containsAnyKeyword(normalizedMessage, pricingCommitmentKeywords) ||
+    /(?:sar|ريال|﷼|\$|usd)\s*\d|\d+\s*(?:sar|ريال|﷼|usd)|\d+\s*%/.test(normalizedMessage);
+
+  return {
+    requiresGrounding,
+    unsafeCommitment
+  };
+}
+
 function extractRiskFlagSummary(caseDetail: PersistedCaseDetail, conversationIntelligence?: CaseConversationIntelligence) {
   const riskFlags = buildRiskFlags(caseDetail, conversationIntelligence);
   return riskFlags.length > 0 ? riskFlags.join(", ") : null;
@@ -3132,6 +3315,43 @@ const policySensitiveKeywords = [
   "ضمان",
   "استثناء",
   "خصم"
+];
+const pricingCommitmentKeywords = [
+  "price",
+  "pricing",
+  "payment plan",
+  "booking fee",
+  "installment",
+  "starting from",
+  "starts from",
+  "سعر",
+  "التسعير",
+  "خطة الدفع",
+  "رسوم الحجز",
+  "دفعة",
+  "يبدأ من"
+];
+const unsafeCommercialCommitmentKeywords = [
+  "guarantee",
+  "guaranteed",
+  "discount",
+  "exception approval",
+  "legal guarantee",
+  "no legal issue",
+  "possession date",
+  "keys on",
+  "lock in",
+  "waive",
+  "أضمن",
+  "مضمون",
+  "خصم",
+  "اعتماد الاستثناء",
+  "ضمان قانوني",
+  "لا توجد مشكلة قانونية",
+  "تاريخ التسليم",
+  "المفاتيح في",
+  "تثبيت السعر",
+  "إعفاء"
 ];
 const frustrationKeywords = [
   "frustrated",

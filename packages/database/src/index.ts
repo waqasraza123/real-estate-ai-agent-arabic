@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import type {
   ApproveHandoverCustomerUpdateInput,
+  ApprovedCommercialFact,
   AutomationStatus,
   CalendarProvider,
   CaseAgentActionType,
@@ -24,6 +25,8 @@ import type {
   CaseQaReviewSubjectType,
   CaseQaReviewTriggerSource,
   CompleteHandoverInput,
+  CommercialFactGroundingStatus,
+  CommercialFactKind,
   ConfirmHandoverAppointmentInput,
   HandoverClosureState,
   HandoverArchiveOutcome,
@@ -70,6 +73,7 @@ import type {
   PersistedCaseAgentState,
   PersistedCaseChannelSummary,
   PersistedCaseQaReview,
+  PersistedCommercialFactReference,
   PersistedCaseDetail,
   PersistedCaseSummary,
   PersistedCurrentHandoverCustomerUpdateQaReview,
@@ -150,6 +154,149 @@ const caseAgentJobType = "case_agent_trigger";
 const documentUploadAnalysisJobType = "document_upload_analysis";
 const whatsappAgentReplyJobType = "whatsapp_agent_reply";
 const whatsappCaseReplyJobType = "whatsapp_case_reply";
+const globalCommercialFactProject = "*";
+const defaultApprovedCommercialFacts: ApprovedCommercialFact[] = [
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "Automation may acknowledge pricing questions and collect budget or unit preference, but exact prices, discounts, incentives, and final net figures require an approved current sales sheet or manager confirmation.",
+    expiresAt: null,
+    factId: "11111111-1111-4111-8111-111111111111",
+    kind: "pricing",
+    locale: "en",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "Approved commercial policy pack",
+    sourceReference: "commercial-policy/pricing-boundary-v1",
+    title: "Pricing reply boundary",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "Payment-plan discussion may stay at qualification level until the sales desk confirms the active unit, availability, booking amount, installment schedule, and any approval conditions.",
+    expiresAt: null,
+    factId: "22222222-2222-4222-8222-222222222222",
+    kind: "payment_plan",
+    locale: "en",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "Approved commercial policy pack",
+    sourceReference: "commercial-policy/payment-plan-boundary-v1",
+    title: "Payment-plan reply boundary",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "Availability can be discussed only as a live sales-desk check. Automation may ask for preferred unit type, size, and timing, but must not confirm final availability without a current inventory source.",
+    expiresAt: null,
+    factId: "99999999-9999-4999-8999-999999999999",
+    kind: "availability",
+    locale: "en",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "Approved commercial policy pack",
+    sourceReference: "commercial-policy/availability-boundary-v1",
+    title: "Availability reply boundary",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "Outbound automation must not promise discounts, exception approvals, legal guarantees, possession dates, or final availability. Route those requests to a human owner.",
+    expiresAt: null,
+    factId: "33333333-3333-4333-8333-333333333333",
+    kind: "policy",
+    locale: "en",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "Approved commercial policy pack",
+    sourceReference: "commercial-policy/promise-boundary-v1",
+    title: "Unsafe promise boundary",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "Required document follow-up may request government ID, proof of funds, and employment letter. Ambiguous or mismatched uploads remain under manual review.",
+    expiresAt: null,
+    factId: "44444444-4444-4444-8444-444444444444",
+    kind: "document_requirement",
+    locale: "en",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "Approved document readiness policy",
+    sourceReference: "document-policy/readiness-checklist-v1",
+    title: "Document readiness boundary",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "يمكن للأتمتة استقبال أسئلة التسعير وجمع الميزانية أو نوع الوحدة، لكن الأسعار النهائية أو الخصومات أو الحوافز تحتاج ورقة مبيعات معتمدة أو تأكيداً من المدير.",
+    expiresAt: null,
+    factId: "55555555-5555-4555-8555-555555555555",
+    kind: "pricing",
+    locale: "ar",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "حزمة السياسات التجارية المعتمدة",
+    sourceReference: "commercial-policy/pricing-boundary-v1",
+    title: "حدود ردود التسعير",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "يبقى نقاش خطة الدفع في مستوى التأهيل حتى يؤكد فريق المبيعات الوحدة النشطة والتوفر ومبلغ الحجز وجدول الدفعات وأي شروط اعتماد.",
+    expiresAt: null,
+    factId: "66666666-6666-4666-8666-666666666666",
+    kind: "payment_plan",
+    locale: "ar",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "حزمة السياسات التجارية المعتمدة",
+    sourceReference: "commercial-policy/payment-plan-boundary-v1",
+    title: "حدود نقاش خطة الدفع",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "يمكن مناقشة التوفر كفحص مباشر لدى فريق المبيعات فقط. يمكن للأتمتة طلب نوع الوحدة والمساحة والتوقيت، لكنها لا تؤكد التوفر النهائي من دون مصدر مخزون حالي.",
+    expiresAt: null,
+    factId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    kind: "availability",
+    locale: "ar",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "حزمة السياسات التجارية المعتمدة",
+    sourceReference: "commercial-policy/availability-boundary-v1",
+    title: "حدود ردود التوفر",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "لا يجوز للأتمتة وعد العميل بخصم أو موافقة استثنائية أو ضمان قانوني أو تاريخ تسليم أو توفر نهائي. تحول هذه الطلبات إلى مالك بشري.",
+    expiresAt: null,
+    factId: "77777777-7777-4777-8777-777777777777",
+    kind: "policy",
+    locale: "ar",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "حزمة السياسات التجارية المعتمدة",
+    sourceReference: "commercial-policy/promise-boundary-v1",
+    title: "حدود الوعود غير الآمنة",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  },
+  {
+    approvedAt: "2026-04-19T00:00:00.000Z",
+    content:
+      "يمكن طلب الهوية وإثبات القدرة المالية وخطاب العمل ضمن متابعة المستندات. الملفات الغامضة أو غير المطابقة تبقى تحت المراجعة اليدوية.",
+    expiresAt: null,
+    factId: "88888888-8888-4888-8888-888888888888",
+    kind: "document_requirement",
+    locale: "ar",
+    projectInterest: globalCommercialFactProject,
+    sourceLabel: "سياسة جاهزية المستندات المعتمدة",
+    sourceReference: "document-policy/readiness-checklist-v1",
+    title: "حدود جاهزية المستندات",
+    updatedAt: "2026-04-19T00:00:00.000Z"
+  }
+];
 
 const leads = pgTable("leads", {
   budget: text("budget"),
@@ -206,6 +353,10 @@ const caseAgentRuns = pgTable("case_agent_runs", {
   caseId: uuid("case_id")
     .notNull()
     .references(() => cases.id, { onDelete: "cascade" }),
+  commercialFactGroundingStatus: text("commercial_fact_grounding_status").notNull().default("not_required"),
+  commercialFactReferences: jsonb("commercial_fact_references").$type<PersistedCommercialFactReference[]>().notNull().default(sql`'[]'::jsonb`),
+  commercialFactRequiredKinds: jsonb("commercial_fact_required_kinds").$type<CommercialFactKind[]>().notNull().default(sql`'[]'::jsonb`),
+  commercialFactWarnings: jsonb("commercial_fact_warnings").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   confidencePercent: integer("confidence_percent").notNull(),
   createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
   escalationReason: text("escalation_reason"),
@@ -221,6 +372,22 @@ const caseAgentRuns = pgTable("case_agent_runs", {
   status: text("status").notNull(),
   toolExecutionStatus: text("tool_execution_status"),
   triggerType: text("trigger_type").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
+const approvedCommercialFacts = pgTable("approved_commercial_facts", {
+  approvedAt: timestamp("approved_at", { mode: "string", withTimezone: true }).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "string", withTimezone: true }),
+  id: uuid("id").primaryKey(),
+  kind: text("kind").notNull(),
+  locale: text("locale").notNull(),
+  projectInterest: text("project_interest").notNull(),
+  sourceLabel: text("source_label").notNull(),
+  sourceReference: text("source_reference").notNull(),
+  status: text("status").notNull(),
+  title: text("title").notNull(),
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
@@ -594,6 +761,10 @@ export interface LeadCaptureStore {
       actionType: CaseAgentActionType | null;
       agentRunId: string;
       blockedReason: string | null;
+      commercialFactGroundingStatus: CommercialFactGroundingStatus;
+      commercialFactReferences: PersistedCommercialFactReference[];
+      commercialFactRequiredKinds: CommercialFactKind[];
+      commercialFactWarnings: string[];
       confidence: number;
       escalationReason: string | null;
       finishedAt: string;
@@ -615,6 +786,12 @@ export interface LeadCaptureStore {
     limit: number;
     runAt: string;
   }): Promise<DueAutomationJob[]>;
+  listApprovedCommercialFacts(input: {
+    kinds?: CommercialFactKind[];
+    locale: SupportedLocale;
+    now: string;
+    projectInterest: string;
+  }): Promise<ApprovedCommercialFact[]>;
   getDocumentUploadRecord(
     caseId: string,
     documentRequestId: string,
@@ -979,6 +1156,7 @@ export async function createAlphaLeadCaptureStore(options?: {
   const client = options?.inMemory ? new PGlite() : new PGlite(options?.dataPath ?? ".data/phase2-alpha");
   const db = drizzle(client, {
     schema: {
+      approvedCommercialFacts,
       auditEvents,
       automationJobs,
       caseAgentMemories,
@@ -1100,6 +1278,10 @@ export async function createAlphaLeadCaptureStore(options?: {
     alter table case_agent_runs add column if not exists action_type text;
     alter table case_agent_runs add column if not exists tool_execution_status text;
     alter table case_agent_runs add column if not exists blocked_reason text;
+    alter table case_agent_runs add column if not exists commercial_fact_grounding_status text not null default 'not_required';
+    alter table case_agent_runs add column if not exists commercial_fact_required_kinds jsonb not null default '[]'::jsonb;
+    alter table case_agent_runs add column if not exists commercial_fact_references jsonb not null default '[]'::jsonb;
+    alter table case_agent_runs add column if not exists commercial_fact_warnings jsonb not null default '[]'::jsonb;
     alter table case_agent_runs add column if not exists escalation_reason text;
     alter table case_agent_runs add column if not exists rationale_summary text not null default '';
     alter table case_agent_runs add column if not exists proposed_message text;
@@ -1110,6 +1292,22 @@ export async function createAlphaLeadCaptureStore(options?: {
     alter table case_agent_runs add column if not exists finished_at timestamptz not null default now();
     alter table case_agent_runs add column if not exists created_at timestamptz not null default now();
     alter table case_agent_runs add column if not exists updated_at timestamptz not null default now();
+
+    create table if not exists approved_commercial_facts (
+      id uuid primary key,
+      project_interest text not null,
+      locale text not null,
+      kind text not null,
+      title text not null,
+      content text not null,
+      source_label text not null,
+      source_reference text not null,
+      status text not null,
+      approved_at timestamptz not null,
+      expires_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
 
     create table if not exists qualification_snapshots (
       id uuid primary key,
@@ -1444,9 +1642,42 @@ export async function createAlphaLeadCaptureStore(options?: {
     create index if not exists manager_interventions_open_case_idx on manager_interventions (case_id, status);
     create index if not exists case_qa_reviews_case_id_idx on case_qa_reviews (case_id, created_at desc);
     create index if not exists automation_jobs_due_idx on automation_jobs (status, run_after asc);
+    create index if not exists approved_commercial_facts_lookup_idx on approved_commercial_facts (status, locale, kind, project_interest);
   `);
 
   type AlphaTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+  await db
+    .insert(approvedCommercialFacts)
+    .values(
+      defaultApprovedCommercialFacts.map((fact) => ({
+        approvedAt: fact.approvedAt,
+        content: fact.content,
+        createdAt: fact.updatedAt,
+        expiresAt: fact.expiresAt,
+        id: fact.factId,
+        kind: fact.kind,
+        locale: fact.locale,
+        projectInterest: fact.projectInterest,
+        sourceLabel: fact.sourceLabel,
+        sourceReference: fact.sourceReference,
+        status: "active",
+        title: fact.title,
+        updatedAt: fact.updatedAt
+      }))
+    )
+    .onConflictDoUpdate({
+      set: {
+        content: sql`excluded.content`,
+        expiresAt: sql`excluded.expires_at`,
+        sourceLabel: sql`excluded.source_label`,
+        sourceReference: sql`excluded.source_reference`,
+        status: sql`excluded.status`,
+        title: sql`excluded.title`,
+        updatedAt: sql`excluded.updated_at`
+      },
+      target: approvedCommercialFacts.id
+    });
 
   const getHandoverCaseDetail = async (handoverCaseId: string): Promise<PersistedHandoverCaseDetail | null> => {
     const handoverRecord = await db
@@ -1939,6 +2170,10 @@ export async function createAlphaLeadCaptureStore(options?: {
         actionType: caseAgentRuns.actionType,
         blockedReason: caseAgentRuns.blockedReason,
         caseId: caseAgentRuns.caseId,
+        commercialFactGroundingStatus: caseAgentRuns.commercialFactGroundingStatus,
+        commercialFactReferences: caseAgentRuns.commercialFactReferences,
+        commercialFactRequiredKinds: caseAgentRuns.commercialFactRequiredKinds,
+        commercialFactWarnings: caseAgentRuns.commercialFactWarnings,
         confidencePercent: caseAgentRuns.confidencePercent,
         createdAt: caseAgentRuns.createdAt,
         escalationReason: caseAgentRuns.escalationReason,
@@ -2544,6 +2779,10 @@ export async function createAlphaLeadCaptureStore(options?: {
           .select({
             actionType: caseAgentRuns.actionType,
             blockedReason: caseAgentRuns.blockedReason,
+            commercialFactGroundingStatus: caseAgentRuns.commercialFactGroundingStatus,
+            commercialFactReferences: caseAgentRuns.commercialFactReferences,
+            commercialFactRequiredKinds: caseAgentRuns.commercialFactRequiredKinds,
+            commercialFactWarnings: caseAgentRuns.commercialFactWarnings,
             confidencePercent: caseAgentRuns.confidencePercent,
             createdAt: caseAgentRuns.createdAt,
             escalationReason: caseAgentRuns.escalationReason,
@@ -3179,6 +3418,35 @@ export async function createAlphaLeadCaptureStore(options?: {
     },
     async close() {
       await client.close();
+    },
+    async listApprovedCommercialFacts(input) {
+      const records = await db
+        .select({
+          approvedAt: approvedCommercialFacts.approvedAt,
+          content: approvedCommercialFacts.content,
+          expiresAt: approvedCommercialFacts.expiresAt,
+          factId: approvedCommercialFacts.id,
+          kind: approvedCommercialFacts.kind,
+          locale: approvedCommercialFacts.locale,
+          projectInterest: approvedCommercialFacts.projectInterest,
+          sourceLabel: approvedCommercialFacts.sourceLabel,
+          sourceReference: approvedCommercialFacts.sourceReference,
+          title: approvedCommercialFacts.title,
+          updatedAt: approvedCommercialFacts.updatedAt
+        })
+        .from(approvedCommercialFacts)
+        .where(and(eq(approvedCommercialFacts.status, "active"), eq(approvedCommercialFacts.locale, input.locale)))
+        .orderBy(desc(approvedCommercialFacts.updatedAt), asc(approvedCommercialFacts.title));
+
+      const allowedKinds = new Set(input.kinds ?? []);
+      const normalizedProject = normalizeProjectInterest(input.projectInterest);
+      const nowTime = new Date(input.now).getTime();
+
+      return records
+        .filter((record) => allowedKinds.size === 0 || allowedKinds.has(toCommercialFactKind(record.kind)))
+        .filter((record) => record.projectInterest === globalCommercialFactProject || normalizeProjectInterest(record.projectInterest) === normalizedProject)
+        .filter((record) => !record.expiresAt || new Date(record.expiresAt).getTime() > nowTime)
+        .map((record) => hydrateApprovedCommercialFact(record));
     },
     async createWebsiteLeadCase(input) {
       const createdLeadId = randomUUID();
@@ -3895,6 +4163,10 @@ export async function createAlphaLeadCaptureStore(options?: {
           actionType: input.actionType,
           blockedReason: input.blockedReason,
           caseId,
+          commercialFactGroundingStatus: input.commercialFactGroundingStatus,
+          commercialFactReferences: input.commercialFactReferences,
+          commercialFactRequiredKinds: input.commercialFactRequiredKinds,
+          commercialFactWarnings: input.commercialFactWarnings,
           confidencePercent: Math.max(0, Math.min(100, Math.round(input.confidence * 100))),
           createdAt: input.updatedAt,
           escalationReason: input.escalationReason,
@@ -7399,9 +7671,56 @@ function hydrateCaseAgentMemory(value: {
   };
 }
 
+function hydrateApprovedCommercialFact(value: {
+  approvedAt: string;
+  content: string;
+  expiresAt: string | null;
+  factId: string;
+  kind: string;
+  locale: string;
+  projectInterest: string;
+  sourceLabel: string;
+  sourceReference: string;
+  title: string;
+  updatedAt: string;
+}): ApprovedCommercialFact {
+  return {
+    approvedAt: value.approvedAt,
+    content: value.content,
+    expiresAt: value.expiresAt,
+    factId: value.factId,
+    kind: toCommercialFactKind(value.kind),
+    locale: toSupportedLocale(value.locale),
+    projectInterest: value.projectInterest,
+    sourceLabel: value.sourceLabel,
+    sourceReference: value.sourceReference,
+    title: value.title,
+    updatedAt: value.updatedAt
+  };
+}
+
+function hydratePersistedCommercialFactReference(value: PersistedCommercialFactReference): PersistedCommercialFactReference {
+  return {
+    approvedAt: value.approvedAt,
+    content: value.content,
+    expiresAt: value.expiresAt,
+    factId: value.factId,
+    kind: toCommercialFactKind(value.kind),
+    locale: toSupportedLocale(value.locale),
+    projectInterest: value.projectInterest,
+    sourceLabel: value.sourceLabel,
+    sourceReference: value.sourceReference,
+    title: value.title
+  };
+}
+
 function hydrateCaseAgentRun(value: {
   actionType: string | null;
   blockedReason: string | null;
+  commercialFactGroundingStatus: string | null;
+  commercialFactReferences: PersistedCommercialFactReference[] | null;
+  commercialFactRequiredKinds: string[] | null;
+  commercialFactWarnings: string[] | null;
   confidencePercent: number;
   createdAt: string;
   escalationReason: string | null;
@@ -7423,6 +7742,10 @@ function hydrateCaseAgentRun(value: {
     actionType: value.actionType ? toCaseAgentActionType(value.actionType) : null,
     agentRunId: value.runId,
     blockedReason: value.blockedReason ? toCaseAgentBlockedReason(value.blockedReason) : null,
+    commercialFactGroundingStatus: toCommercialFactGroundingStatus(value.commercialFactGroundingStatus ?? "not_required"),
+    commercialFactReferences: (value.commercialFactReferences ?? []).map((fact) => hydratePersistedCommercialFactReference(fact)),
+    commercialFactRequiredKinds: (value.commercialFactRequiredKinds ?? []).map((kind) => toCommercialFactKind(kind)),
+    commercialFactWarnings: value.commercialFactWarnings ?? [],
     confidence: Math.max(0, Math.min(1, value.confidencePercent / 100)),
     createdAt: value.createdAt,
     escalationReason: value.escalationReason,
@@ -7932,6 +8255,28 @@ function toCaseAgentToolExecutionStatus(value: string): CaseAgentToolExecutionSt
   throw new Error(`unsupported_case_agent_tool_execution_status:${value}`);
 }
 
+function toCommercialFactKind(value: string): CommercialFactKind {
+  if (
+    value === "pricing" ||
+    value === "payment_plan" ||
+    value === "availability" ||
+    value === "policy" ||
+    value === "document_requirement"
+  ) {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_fact_kind:${value}`);
+}
+
+function toCommercialFactGroundingStatus(value: string): CommercialFactGroundingStatus {
+  if (value === "not_required" || value === "grounded" || value === "missing_required_evidence") {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_fact_grounding_status:${value}`);
+}
+
 function toCaseAgentTriggerType(value: string): CaseAgentTriggerType {
   if (
     value === "new_lead" ||
@@ -7943,6 +8288,10 @@ function toCaseAgentTriggerType(value: string): CaseAgentTriggerType {
   }
 
   throw new Error(`unsupported_case_agent_trigger_type:${value}`);
+}
+
+function normalizeProjectInterest(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function inferSupportedLocaleFromText(value: string): SupportedLocale {

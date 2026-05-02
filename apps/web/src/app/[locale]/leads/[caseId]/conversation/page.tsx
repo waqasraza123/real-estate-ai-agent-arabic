@@ -30,6 +30,8 @@ import {
   buildCaseReferenceCode,
   buildPersistedConversation,
   getPersistedAgentActionLabel,
+  getPersistedAgentGroundingLabel,
+  getPersistedAgentGroundingNote,
   getPersistedAgentIntentLabel,
   getPersistedAgentNextStepLabel,
   getPersistedAgentObjectionLabels,
@@ -127,6 +129,9 @@ export default async function ConversationPage(props: PageProps) {
     const agentUrgencyLabel = getPersistedAgentUrgencyLabel(locale, persistedCase.agentMemory);
     const agentSentimentLabel = getPersistedAgentSentimentLabel(locale, persistedCase.agentMemory);
     const agentObjectionLabels = getPersistedAgentObjectionLabels(locale, persistedCase.agentMemory);
+    const latestAgentRun = persistedCase.agentRuns?.[0] ?? null;
+    const agentGroundingLabel = getPersistedAgentGroundingLabel(locale, latestAgentRun);
+    const agentGroundingNote = getPersistedAgentGroundingNote(locale, latestAgentRun);
 
     return (
       <div className={pageStackClassName}>
@@ -184,7 +189,9 @@ export default async function ConversationPage(props: PageProps) {
                 </p>
               ) : null}
               {agentObjectionLabels.length > 0 ? <p className={caseMetaClassName}>{agentObjectionLabels.join(" · ")}</p> : null}
+              {agentGroundingLabel ? <p className={caseMetaClassName}>{agentGroundingLabel}</p> : null}
               {agentStateNote ? <p className={caseMetaClassName}>{agentStateNote}</p> : null}
+              {agentGroundingNote ? <p className={caseMetaClassName}>{agentGroundingNote}</p> : null}
               {persistedCase.agentState?.nextWakeUpAt ? (
                 <p className={caseMetaClassName}>
                   {locale === "ar" ? "الاستيقاظ التالي" : "Next wake-up"}

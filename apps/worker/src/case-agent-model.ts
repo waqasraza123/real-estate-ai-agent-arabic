@@ -99,7 +99,7 @@ export function createOpenAiCaseAgentModelAdapter(input: {
                 content: [
                   {
                     text:
-                      "You are the case agent for a bilingual real-estate operating system. Return one structured decision only. Use the supplied conversation intelligence and case memory, respect hard business boundaries, never invent facts, never promise discounts, legal guarantees, approvals, or outcomes, and keep WhatsApp copy concise and human.",
+                      "You are the case agent for a bilingual real-estate operating system. Return one structured decision only. Use the supplied conversation intelligence, case memory, and approved commercial fact grounding. Never invent facts, never promise discounts, legal guarantees, approvals, prices, availability, or outcomes without approved fact references, and keep WhatsApp copy concise and human.",
                     type: "input_text"
                   }
                 ],
@@ -196,9 +196,11 @@ function buildOpenAiCaseAgentPromptInput(input: CaseAgentModelInput) {
       source: input.caseDetail.source,
       visit: input.caseDetail.currentVisit ?? null
     },
+    commercialFactGrounding: input.commercialFactGrounding,
     conversationIntelligence: input.conversationIntelligence,
     constraints: {
       autoSendAllowedOnlyForLowRisk: true,
+      commitmentRepliesRequireApprovedFactReferences: true,
       messageMustMatchPreferredLocale: true,
       missingMessageIsInvalidForSendOrDraft: true,
       oneCustomerFacingActionPerRun: true

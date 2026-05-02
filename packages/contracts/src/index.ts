@@ -97,6 +97,18 @@ export const caseAgentBlockedReasonSchema = z.enum([
   "model_provider_error",
   "invalid_model_output"
 ]);
+export const commercialFactKindSchema = z.enum([
+  "pricing",
+  "payment_plan",
+  "availability",
+  "policy",
+  "document_requirement"
+]);
+export const commercialFactGroundingStatusSchema = z.enum([
+  "not_required",
+  "grounded",
+  "missing_required_evidence"
+]);
 export const caseQaReviewStatusSchema = z.enum(["pending_review", "approved", "follow_up_required"]);
 export const caseQaReviewTriggerSourceSchema = z.enum(["manual_request", "policy_rule"]);
 export const caseQaReviewSubjectTypeSchema = z.enum(["case_message", "prepared_reply_draft"]);
@@ -453,6 +465,33 @@ export const persistedCaseAgentMemorySchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const approvedCommercialFactSchema = z.object({
+  approvedAt: z.iso.datetime(),
+  content: z.string().trim().min(10).max(2000),
+  expiresAt: z.iso.datetime().nullable(),
+  factId: z.uuid(),
+  kind: commercialFactKindSchema,
+  locale: supportedLocaleSchema,
+  projectInterest: z.string().trim().min(1),
+  sourceLabel: z.string().trim().min(2).max(160),
+  sourceReference: z.string().trim().min(2).max(200),
+  title: z.string().trim().min(2).max(160),
+  updatedAt: z.iso.datetime()
+});
+
+export const persistedCommercialFactReferenceSchema = approvedCommercialFactSchema.pick({
+  approvedAt: true,
+  content: true,
+  expiresAt: true,
+  factId: true,
+  kind: true,
+  locale: true,
+  projectInterest: true,
+  sourceLabel: true,
+  sourceReference: true,
+  title: true
+});
+
 export const caseAgentDecisionSchema = z.object({
   actionType: caseAgentActionTypeSchema,
   blockedReason: caseAgentBlockedReasonSchema.nullable(),
@@ -472,6 +511,10 @@ export const persistedCaseAgentRunSchema = z.object({
   actionType: caseAgentActionTypeSchema.nullable(),
   agentRunId: z.uuid(),
   blockedReason: caseAgentBlockedReasonSchema.nullable(),
+  commercialFactGroundingStatus: commercialFactGroundingStatusSchema,
+  commercialFactReferences: z.array(persistedCommercialFactReferenceSchema),
+  commercialFactRequiredKinds: z.array(commercialFactKindSchema),
+  commercialFactWarnings: z.array(z.string()),
   confidence: z.number().min(0).max(1),
   createdAt: z.iso.datetime(),
   escalationReason: z.string().nullable(),
@@ -846,6 +889,10 @@ export type CaseAgentSentiment = z.infer<typeof caseAgentSentimentSchema>;
 export type CaseAgentToolExecutionStatus = z.infer<typeof caseAgentToolExecutionStatusSchema>;
 export type CaseAgentTriggerType = z.infer<typeof caseAgentTriggerTypeSchema>;
 export type CaseAgentUrgencyLevel = z.infer<typeof caseAgentUrgencyLevelSchema>;
+export type ApprovedCommercialFact = z.infer<typeof approvedCommercialFactSchema>;
+export type CommercialFactGroundingStatus = z.infer<typeof commercialFactGroundingStatusSchema>;
+export type CommercialFactKind = z.infer<typeof commercialFactKindSchema>;
+export type PersistedCommercialFactReference = z.infer<typeof persistedCommercialFactReferenceSchema>;
 export type CaseAutomationHoldReason = z.infer<typeof caseAutomationHoldReasonSchema>;
 export type CaseContactChannel = z.infer<typeof caseContactChannelSchema>;
 export type CaseStage = z.infer<typeof caseStageSchema>;

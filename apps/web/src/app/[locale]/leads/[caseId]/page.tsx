@@ -44,6 +44,8 @@ import {
   formatLatestManagerFollowUpSavedAt,
   formatLatestHumanReplySentAt,
   getPersistedAgentActionLabel,
+  getPersistedAgentGroundingLabel,
+  getPersistedAgentGroundingNote,
   getPersistedAgentIntentLabel,
   getPersistedAgentNextStepLabel,
   getPersistedAgentObjectionLabels,
@@ -160,6 +162,9 @@ export default async function LeadProfilePage(props: PageProps) {
     const agentUrgencyLabel = getPersistedAgentUrgencyLabel(locale, persistedCase.agentMemory);
     const agentSentimentLabel = getPersistedAgentSentimentLabel(locale, persistedCase.agentMemory);
     const agentObjectionLabels = getPersistedAgentObjectionLabels(locale, persistedCase.agentMemory);
+    const latestAgentRun = persistedCase.agentRuns?.[0] ?? null;
+    const agentGroundingLabel = getPersistedAgentGroundingLabel(locale, latestAgentRun);
+    const agentGroundingNote = getPersistedAgentGroundingNote(locale, latestAgentRun);
     const bookingStatusLabel =
       persistedCase.currentVisit?.booking?.status === "confirmed"
         ? locale === "ar"
@@ -282,6 +287,7 @@ export default async function LeadProfilePage(props: PageProps) {
                 <DetailItem label={locale === "ar" ? "الخطوة المطلوبة" : "Requested next step"} value={agentNextStepLabel ?? "—"} />
                 <DetailItem label={locale === "ar" ? "الإلحاح" : "Urgency"} value={agentUrgencyLabel ?? "—"} />
                 <DetailItem label={locale === "ar" ? "نبرة العميل" : "Customer sentiment"} value={agentSentimentLabel ?? "—"} />
+                <DetailItem label={locale === "ar" ? "توثيق الحقائق" : "Fact grounding"} value={agentGroundingLabel ?? "—"} />
                 <DetailItem
                   label={locale === "ar" ? "الاستيقاظ التالي" : "Next wake-up"}
                   value={persistedCase.agentState?.nextWakeUpAt ? formatDateTime(persistedCase.agentState.nextWakeUpAt, locale) : "—"}
@@ -298,6 +304,14 @@ export default async function LeadProfilePage(props: PageProps) {
                 </div>
               ) : null}
               {agentStateNote ? <p className={caseMetaClassName}>{agentStateNote}</p> : null}
+              {agentGroundingNote ? <p className={caseMetaClassName}>{agentGroundingNote}</p> : null}
+              {latestAgentRun?.commercialFactReferences.length ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {latestAgentRun.commercialFactReferences.slice(0, 3).map((fact) => (
+                    <StatusBadge key={fact.factId}>{fact.title}</StatusBadge>
+                  ))}
+                </div>
+              ) : null}
             </WorkflowPanelBody>
           </Panel>
 
