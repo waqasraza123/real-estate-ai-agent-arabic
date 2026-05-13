@@ -122,6 +122,8 @@ export const commercialFactUsageScopeSchema = z.enum(["whatsapp_reply", "manager
 export const commercialFactFreshnessStatusSchema = z.enum(["active", "expiring_soon", "stale", "expired"]);
 export const commercialFactExpiryReviewOutcomeSchema = z.enum(["renewed", "archived", "source_refresh_required", "left_expired"]);
 export const commercialSourceRefreshTaskStatusSchema = z.enum(["open", "completed", "dismissed"]);
+export const commercialEvidenceGapStatusSchema = z.enum(["open", "resolved", "dismissed"]);
+export const commercialEvidenceGapSubjectTypeSchema = z.enum(["prepared_reply_draft", "case_agent_run"]);
 export const inventoryUnitStatusSchema = z.enum(["available", "reserved", "sold", "blocked", "unknown"]);
 export const commercialGroundingDecisionResultSchema = z.enum([
   "not_required",
@@ -315,10 +317,23 @@ export const listCommercialSourceRefreshTasksQuerySchema = z.object({
   tenantId: z.string().trim().min(2).max(80).default("local-alpha")
 });
 
+export const listCommercialEvidenceGapsQuerySchema = z.object({
+  kind: commercialFactKindSchema.optional(),
+  projectCode: z.string().trim().min(2).max(80).optional(),
+  status: commercialEvidenceGapStatusSchema.optional(),
+  tenantId: z.string().trim().min(2).max(80).default("local-alpha")
+});
+
 export const resolveCommercialSourceRefreshTaskInputSchema = z.object({
   resolutionSummary: z.string().trim().min(10).max(1000),
   resolvedByName: z.string().trim().min(2).max(120).optional(),
   status: z.enum(["completed", "dismissed"])
+});
+
+export const resolveCommercialEvidenceGapInputSchema = z.object({
+  resolutionSummary: z.string().trim().min(10).max(1000),
+  resolvedByName: z.string().trim().min(2).max(120).optional(),
+  status: z.enum(["resolved", "dismissed"])
 });
 
 export const createHandoverIntakeInputSchema = z.object({
@@ -736,6 +751,25 @@ export const commercialSourceRefreshTaskSchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const commercialEvidenceGapSchema = z.object({
+  caseId: z.uuid().nullable(),
+  createdAt: z.iso.datetime(),
+  draftMessage: z.string().nullable(),
+  gapId: z.uuid(),
+  kind: commercialFactKindSchema,
+  projectCode: z.string(),
+  requestedByName: z.string().nullable(),
+  resolvedAt: z.iso.datetime().nullable(),
+  resolvedByName: z.string().nullable(),
+  resolutionSummary: z.string().nullable(),
+  status: commercialEvidenceGapStatusSchema,
+  subjectType: commercialEvidenceGapSubjectTypeSchema,
+  summary: z.string(),
+  tenantId: z.string(),
+  updatedAt: z.iso.datetime(),
+  warnings: z.array(z.string())
+});
+
 export const inventoryUnitSnapshotSchema = z.object({
   areaSqm: z.number().nullable(),
   availabilityStatus: inventoryUnitStatusSchema,
@@ -759,6 +793,7 @@ export const projectCommercialReadinessSummarySchema = z.object({
   blockedAgentRepliesCount: z.number().int().nonnegative(),
   expiringSoonFactsCount: z.number().int().nonnegative(),
   latestInventorySourceVersion: commercialSourceVersionSchema.nullable(),
+  openEvidenceGapsCount: z.number().int().nonnegative(),
   pendingApprovalsCount: z.number().int().nonnegative(),
   projectCode: z.string(),
   staleFactsCount: z.number().int().nonnegative(),
@@ -801,10 +836,15 @@ export const commercialSourceRefreshTaskListSchema = z.object({
   tasks: z.array(commercialSourceRefreshTaskSchema)
 });
 
+export const commercialEvidenceGapListSchema = z.object({
+  gaps: z.array(commercialEvidenceGapSchema)
+});
+
 export const caseReplyGroundingPreviewSchema = z.object({
   caseId: z.uuid(),
   checkedAt: z.iso.datetime(),
   draftMessage: z.string(),
+  missingKinds: z.array(commercialFactKindSchema),
   references: z.array(persistedCommercialFactReferenceSchema),
   requiredKinds: z.array(commercialFactKindSchema),
   status: commercialFactGroundingStatusSchema,
@@ -1214,6 +1254,10 @@ export type CaseAgentUrgencyLevel = z.infer<typeof caseAgentUrgencyLevelSchema>;
 export type ApprovedCommercialFact = z.infer<typeof approvedCommercialFactSchema>;
 export type ApproveCommercialFactProposalInput = z.infer<typeof approveCommercialFactProposalInputSchema>;
 export type CommercialFact = z.infer<typeof commercialFactSchema>;
+export type CommercialEvidenceGap = z.infer<typeof commercialEvidenceGapSchema>;
+export type CommercialEvidenceGapList = z.infer<typeof commercialEvidenceGapListSchema>;
+export type CommercialEvidenceGapStatus = z.infer<typeof commercialEvidenceGapStatusSchema>;
+export type CommercialEvidenceGapSubjectType = z.infer<typeof commercialEvidenceGapSubjectTypeSchema>;
 export type CommercialFactEvidenceReference = z.infer<typeof commercialFactEvidenceReferenceSchema>;
 export type CommercialFactExpiryReview = z.infer<typeof commercialFactExpiryReviewSchema>;
 export type CommercialFactExpiryReviewList = z.infer<typeof commercialFactExpiryReviewListSchema>;
@@ -1292,6 +1336,7 @@ export type InventoryUnitStatus = z.infer<typeof inventoryUnitStatusSchema>;
 export type ListActiveCommercialFactsQuery = z.infer<typeof listActiveCommercialFactsQuerySchema>;
 export type ListCommercialFactExpiryReviewsQuery = z.infer<typeof listCommercialFactExpiryReviewsQuerySchema>;
 export type ListCommercialFactProposalsQuery = z.infer<typeof listCommercialFactProposalsQuerySchema>;
+export type ListCommercialEvidenceGapsQuery = z.infer<typeof listCommercialEvidenceGapsQuerySchema>;
 export type ListCommercialSourceRefreshTasksQuery = z.infer<typeof listCommercialSourceRefreshTasksQuerySchema>;
 export type ManageCaseFollowUpInput = z.infer<typeof manageCaseFollowUpInputSchema>;
 export type ManageBulkCaseFollowUpInput = z.infer<typeof manageBulkCaseFollowUpInputSchema>;
@@ -1311,6 +1356,7 @@ export type ProjectCommercialReadinessSummary = z.infer<typeof projectCommercial
 export type RejectCommercialFactProposalInput = z.infer<typeof rejectCommercialFactProposalInputSchema>;
 export type ReviewCommercialFactExpiryInput = z.infer<typeof reviewCommercialFactExpiryInputSchema>;
 export type ResolveCommercialSourceRefreshTaskInput = z.infer<typeof resolveCommercialSourceRefreshTaskInputSchema>;
+export type ResolveCommercialEvidenceGapInput = z.infer<typeof resolveCommercialEvidenceGapInputSchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseQaReview = z.infer<typeof persistedCaseQaReviewSchema>;
 export type PersistedBulkManagerFollowUp = z.infer<typeof persistedBulkManagerFollowUpSchema>;

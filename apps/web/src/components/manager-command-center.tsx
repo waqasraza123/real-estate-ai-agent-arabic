@@ -783,6 +783,7 @@ export function RevenueManagerCommandCenter(props: {
     blockedAgentRepliesCount: number;
     expiringSoonFactsCount: number;
     latestInventorySourceVersion: string | null;
+    openEvidenceGapsCount: number;
     pendingApprovalsCount: number;
     staleFactsCount: number;
   };
@@ -1081,6 +1082,13 @@ export function RevenueManagerCommandCenter(props: {
                 label={props.locale === "ar" ? "محظورة" : "Blocked"}
                 tone="mint"
                 value={String(props.commercialReadiness.blockedAgentRepliesCount)}
+              />
+              <MetricTile
+                density="compact"
+                detail={props.locale === "ar" ? "تحتاج مصدر أو اعتماد" : "Need source or approval"}
+                label={props.locale === "ar" ? "فجوات أدلة" : "Evidence gaps"}
+                tone="rose"
+                value={String(props.commercialReadiness.openEvidenceGapsCount)}
               />
             </div>
             <div className={statusRowWrapClassName}>

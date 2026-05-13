@@ -132,6 +132,19 @@ Prepared reply drafts now fail closed before QA when they make commercial commit
 - The draft request form now states the rule directly: commercial promises must be backed by approved facts before the draft can enter QA.
 - This keeps QA from becoming a workaround around missing source governance. Operators must add, renew, or approve the relevant commercial facts before asking QA to approve customer-facing wording.
 
+## Evidence Gap Queue
+
+Missing evidence now creates a manager-visible readiness item instead of only returning a blocked form error.
+
+- `commercial_evidence_gaps` records project, case, required fact kind, warnings, draft context, requester, and resolution metadata.
+- Prepared reply draft submission opens or updates one open evidence gap per missing fact kind before returning the conflict response.
+- Evidence gaps are separate from source-refresh tasks:
+  - refresh tasks are tied to a known source or fact that needs renewal
+  - evidence gaps are tied to a missing project/kind boundary where no usable source may exist yet
+- The Commercial Source Control Center now shows open evidence gaps with the blocked draft context and missing-kind warnings.
+- Revenue manager commercial-readiness metrics now include open evidence-gap pressure alongside stale facts, pending approvals, and blocked commercial replies.
+- Managers can resolve or dismiss a gap with a summary after adding, renewing, or approving the required commercial fact.
+
 ## API Boundaries
 
 The source center is exposed only through trusted manager-session routes.
@@ -142,6 +155,8 @@ The source center is exposed only through trusted manager-session routes.
 - `POST /v1/commercial-facts/:factId/expiry-review`
 - `GET /v1/commercial-source-refresh-tasks`
 - `POST /v1/commercial-source-refresh-tasks/:taskId/resolve`
+- `GET /v1/commercial-evidence-gaps`
+- `POST /v1/commercial-evidence-gaps/:gapId/resolve`
 - `POST /v1/cases/:caseId/reply-grounding-preview`
 
 These routes require the same `manage_commercial_sources` or revenue-manager workspace boundary as the existing commercial-source APIs.

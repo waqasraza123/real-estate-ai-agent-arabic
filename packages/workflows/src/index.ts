@@ -33,6 +33,7 @@ import type {
   DocumentUploadAnalysisStatus,
   ImportInventoryCsvInput,
   ListActiveCommercialFactsQuery,
+  ListCommercialEvidenceGapsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
   ListCommercialSourceRefreshTasksQuery,
@@ -57,6 +58,7 @@ import type {
   SupportedLocale,
   QualifyCaseInput,
   ResolveCaseQaReviewInput,
+  ResolveCommercialEvidenceGapInput,
   ResolveCommercialSourceRefreshTaskInput,
   ResolveHandoverCustomerUpdateQaReviewInput,
   ResolveHandoverPostCompletionFollowUpInput,
@@ -191,12 +193,27 @@ export async function listPersistedCommercialSourceRefreshTasks(
   return store.listCommercialSourceRefreshTasks(input);
 }
 
+export async function listPersistedCommercialEvidenceGaps(
+  store: LeadCaptureStore,
+  input: ListCommercialEvidenceGapsQuery
+) {
+  return store.listCommercialEvidenceGaps(input);
+}
+
 export async function resolvePersistedCommercialSourceRefreshTask(
   store: LeadCaptureStore,
   taskId: string,
   input: ResolveCommercialSourceRefreshTaskInput
 ) {
   return store.resolveCommercialSourceRefreshTask(taskId, input);
+}
+
+export async function resolvePersistedCommercialEvidenceGap(
+  store: LeadCaptureStore,
+  gapId: string,
+  input: ResolveCommercialEvidenceGapInput
+) {
+  return store.resolveCommercialEvidenceGap(gapId, input);
 }
 
 export async function reviewPersistedCommercialFactExpiry(
@@ -650,8 +667,25 @@ export async function preparePersistedCaseReplyDraftQaReview(
   }
 
   if (commercialFactPreview.status === "missing_required_evidence") {
+    const evidenceGaps = await Promise.all(
+      commercialFactPreview.missingKinds.map((kind) =>
+        store.recordCommercialEvidenceGap({
+          caseId,
+          draftMessage: input.draftMessage,
+          kind,
+          projectCode: caseDetail.projectInterest,
+          requestedByName: input.requestedByName ?? null,
+          subjectType: "prepared_reply_draft",
+          summary: buildPreparedReplyEvidenceGapSummary(caseDetail.preferredLocale, kind),
+          warnings: commercialFactPreview.warnings
+        })
+      )
+    );
+
     throw new WorkflowRuleError("reply_draft_missing_commercial_evidence", {
       checkedAt: commercialFactPreview.checkedAt,
+      evidenceGapIds: evidenceGaps.map((gap) => gap.gapId),
+      missingKinds: commercialFactPreview.missingKinds,
       requiredKinds: commercialFactPreview.requiredKinds,
       warnings: commercialFactPreview.warnings
     });
@@ -686,6 +720,7 @@ export async function previewPersistedCaseReplyGrounding(
       caseId,
       checkedAt,
       draftMessage: input.draftMessage,
+      missingKinds: [],
       references: [],
       requiredKinds,
       status: "not_required",
@@ -706,6 +741,7 @@ export async function previewPersistedCaseReplyGrounding(
     caseId,
     checkedAt,
     draftMessage: input.draftMessage,
+    missingKinds,
     references: references.map(toPersistedCommercialFactReference).slice(0, 8),
     requiredKinds,
     status: missingKinds.length === 0 ? "grounded" : "missing_required_evidence",
@@ -3800,6 +3836,12 @@ function buildMissingCommercialFactWarning(locale: SupportedLocale, kind: Commer
   } as const;
 
   return labels[locale][kind];
+}
+
+function buildPreparedReplyEvidenceGapSummary(locale: SupportedLocale, kind: CommercialFactKind) {
+  return locale === "ar"
+    ? `مسودة رد تجاري لم تدخل اعتماد الجودة لأن ${buildMissingCommercialFactWarning(locale, kind)}. أضف أو اعتمد حقيقة تجارية مناسبة لهذا المشروع قبل إعادة إرسال المسودة.`
+    : `A commercial reply draft could not enter QA because ${buildMissingCommercialFactWarning(locale, kind)}. Add or approve an appropriate commercial fact for this project before resubmitting the draft.`;
 }
 
 function analyzeOutboundCommitmentRisk(message: string) {

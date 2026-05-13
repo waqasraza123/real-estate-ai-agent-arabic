@@ -32,6 +32,7 @@ import {
   rejectCommercialFactProposalInputSchema,
   reviewCommercialFactExpiryInputSchema,
   resolveCaseQaReviewInputSchema,
+  resolveCommercialEvidenceGapInputSchema,
   resolveCommercialSourceRefreshTaskInputSchema,
   resolveHandoverCustomerUpdateQaReviewInputSchema,
   resolveHandoverPostCompletionFollowUpInputSchema,
@@ -85,6 +86,7 @@ import {
   rejectCommercialFactProposal,
   reviewCommercialFactExpiry,
   resolveCaseQaReview,
+  resolveCommercialEvidenceGap,
   resolveCommercialSourceRefreshTask,
   resolveHandoverCustomerUpdateQaReview,
   resolveHandoverPostCompletionFollowUp,
@@ -402,6 +404,37 @@ export async function resolveCommercialSourceRefreshTaskAction(_: FormActionStat
     revalidatePath(`/${locale}/commercial-sources`);
     return {
       message: locale === "ar" ? "تم تحديث مهمة تحديث المصدر." : "Source refresh task updated.",
+      status: "success"
+    };
+  } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function resolveCommercialEvidenceGapAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const gapId = formData.get("gapId");
+  const returnPath = normalizeReturnPath(formData.get("returnPath"), locale);
+  const result = resolveCommercialEvidenceGapInputSchema.safeParse({
+    resolutionSummary: formData.get("resolutionSummary"),
+    resolvedByName: normalizeOptionalString(formData.get("resolvedByName")),
+    status: formData.get("status")
+  });
+
+  if (typeof gapId !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  if (!result.success) {
+    return { message: getValidationMessage(locale), status: "error" };
+  }
+
+  try {
+    await resolveCommercialEvidenceGap(gapId, result.data, await getOperatorRole());
+    revalidatePath(returnPath);
+    revalidatePath(`/${locale}/commercial-sources`);
+    return {
+      message: locale === "ar" ? "تم تحديث فجوة الأدلة التجارية." : "Commercial evidence gap updated.",
       status: "success"
     };
   } catch (error) {

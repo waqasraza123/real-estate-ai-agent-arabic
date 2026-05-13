@@ -5,6 +5,7 @@ import {
   tryGetPersistedCaseDetail,
   tryGetPersistedGovernanceSummary,
   tryListActiveCommercialFacts,
+  tryListCommercialEvidenceGaps,
   tryListCommercialFactProposals,
   tryListCommercialSources,
   tryListPersistedCases
@@ -34,12 +35,13 @@ export default async function RevenueManagerPage(props: PageProps) {
   }
 
   const filters = parseRevenueManagerFilters(rawSearchParams);
-  const [persistedCases, governanceReport, commercialSources, commercialProposals, commercialFacts] = await Promise.all([
+  const [persistedCases, governanceReport, commercialSources, commercialProposals, commercialFacts, commercialEvidenceGaps] = await Promise.all([
     tryListPersistedCases(),
     tryGetPersistedGovernanceSummary(),
     tryListCommercialSources(currentOperatorRole),
     tryListCommercialFactProposals(currentOperatorRole),
-    tryListActiveCommercialFacts(currentOperatorRole)
+    tryListActiveCommercialFacts(currentOperatorRole),
+    tryListCommercialEvidenceGaps(currentOperatorRole)
   ]);
   const baseRevenueScope = buildRevenueManagerScope(persistedCases, filters);
   const batchCaseDetails =
@@ -74,6 +76,7 @@ export default async function RevenueManagerPage(props: PageProps) {
         blockedAgentRepliesCount: persistedCases.filter((caseItem) => caseItem.agentState?.latestBlockedReason === "commercial_facts_missing").length,
         expiringSoonFactsCount: commercialFacts.filter((fact) => fact.freshnessStatus === "expiring_soon").length,
         latestInventorySourceVersion: commercialSources.find((source) => source.sourceType === "inventory_csv")?.latestVersion?.versionLabel ?? null,
+        openEvidenceGapsCount: commercialEvidenceGaps.filter((gap) => gap.status === "open").length,
         pendingApprovalsCount: commercialProposals.filter((proposal) => proposal.state === "pending_review").length,
         staleFactsCount: commercialFacts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired").length
       }}

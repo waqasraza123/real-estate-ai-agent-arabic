@@ -15,6 +15,7 @@ import {
   createWebsiteLeadInputSchema,
   importInventoryCsvInputSchema,
   listActiveCommercialFactsQuerySchema,
+  listCommercialEvidenceGapsQuerySchema,
   listCommercialFactExpiryReviewsQuerySchema,
   listCommercialFactProposalsQuerySchema,
   listCommercialSourceRefreshTasksQuerySchema,
@@ -26,6 +27,7 @@ import {
   rejectCommercialFactProposalInputSchema,
   reviewCommercialFactExpiryInputSchema,
   resolveCaseQaReviewInputSchema,
+  resolveCommercialEvidenceGapInputSchema,
   resolveCommercialSourceRefreshTaskInputSchema,
   resolveHandoverCustomerUpdateQaReviewInputSchema,
   sendCaseReplyInputSchema,
@@ -69,11 +71,13 @@ import {
   getPersistedProjectCommercialReadinessSummary,
   importPersistedInventoryCsv,
   listPersistedActiveCommercialFacts,
+  listPersistedCommercialEvidenceGaps,
   listPersistedCommercialFactExpiryReviews,
   listPersistedCommercialFactProposals,
   listPersistedCommercialSourceRefreshTasks,
   listPersistedCommercialSources,
   resolvePersistedCaseQaReview,
+  resolvePersistedCommercialEvidenceGap,
   resolvePersistedHandoverPostCompletionFollowUp,
   requestPersistedCaseQaReview,
   rejectPersistedCommercialFactProposal,
@@ -594,6 +598,25 @@ export function buildApiApp(dependencies: {
     };
   });
 
+  app.get("/v1/commercial-evidence-gaps", async (request, reply) => {
+    if (!requireAnyOperatorWorkspace(request, reply, ["manager_revenue"])) {
+      return reply;
+    }
+
+    const result = listCommercialEvidenceGapsQuerySchema.safeParse(request.query);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    return {
+      gaps: await listPersistedCommercialEvidenceGaps(dependencies.store, result.data)
+    };
+  });
+
   app.post<{
     Params: {
       taskId: string;
@@ -623,6 +646,37 @@ export function buildApiApp(dependencies: {
     }
 
     return task;
+  });
+
+  app.post<{
+    Params: {
+      gapId: string;
+    };
+  }>("/v1/commercial-evidence-gaps/:gapId/resolve", async (request, reply) => {
+    const permission = "manage_commercial_sources";
+
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
+    }
+
+    const result = resolveCommercialEvidenceGapInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    const gap = await resolvePersistedCommercialEvidenceGap(dependencies.store, request.params.gapId, result.data);
+
+    if (!gap) {
+      return reply.status(404).send({
+        error: "commercial_evidence_gap_not_found"
+      });
+    }
+
+    return gap;
   });
 
   app.get<{

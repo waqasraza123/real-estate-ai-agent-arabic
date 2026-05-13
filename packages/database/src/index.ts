@@ -27,6 +27,9 @@ import type {
   CaseQaReviewSubjectType,
   CaseQaReviewTriggerSource,
   CompleteHandoverInput,
+  CommercialEvidenceGap,
+  CommercialEvidenceGapStatus,
+  CommercialEvidenceGapSubjectType,
   CommercialFact,
   CommercialFactEvidenceReference,
   CommercialFactExpiryReview,
@@ -89,6 +92,7 @@ import type {
   MessageProvider,
   ListGovernanceEventsQuery,
   ListActiveCommercialFactsQuery,
+  ListCommercialEvidenceGapsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
   ListCommercialSourceRefreshTasksQuery,
@@ -142,6 +146,7 @@ import type {
   RejectCommercialFactProposalInput,
   ApproveCommercialFactProposalInput,
   ReviewCommercialFactExpiryInput,
+  ResolveCommercialEvidenceGapInput,
   ResolveCommercialSourceRefreshTaskInput,
   InventoryUnitStatus,
   UpdateHandoverArchiveStatusInput,
@@ -539,6 +544,25 @@ const commercialSourceRefreshTasks = pgTable("commercial_source_refresh_tasks", 
   status: text("status").notNull(),
   tenantId: text("tenant_id").notNull(),
   updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
+});
+
+const commercialEvidenceGaps = pgTable("commercial_evidence_gaps", {
+  caseId: uuid("case_id").references(() => cases.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  draftMessage: text("draft_message"),
+  id: uuid("id").primaryKey(),
+  kind: text("kind").notNull(),
+  projectCode: text("project_code").notNull(),
+  requestedByName: text("requested_by_name"),
+  resolvedAt: timestamp("resolved_at", { mode: "string", withTimezone: true }),
+  resolvedByName: text("resolved_by_name"),
+  resolutionSummary: text("resolution_summary"),
+  status: text("status").notNull(),
+  subjectType: text("subject_type").notNull(),
+  summary: text("summary").notNull(),
+  tenantId: text("tenant_id").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  warnings: jsonb("warnings").$type<string[]>().notNull().default(sql`'[]'::jsonb`)
 });
 
 const inventoryUnits = pgTable("inventory_units", {
@@ -1009,6 +1033,7 @@ export interface LeadCaptureStore {
     projectCode: string;
     tenantId?: string;
   }): Promise<ProjectCommercialReadinessSummary>;
+  listCommercialEvidenceGaps(input: ListCommercialEvidenceGapsQuery): Promise<CommercialEvidenceGap[]>;
   listActiveCommercialFacts(input: Partial<ListActiveCommercialFactsQuery> & {
     now?: string;
   }): Promise<CommercialFact[]>;
@@ -1053,7 +1078,19 @@ export interface LeadCaptureStore {
     }
   ): Promise<CommercialSourceDetail | null>;
   rejectCommercialFactProposal(proposalId: string, input: RejectCommercialFactProposalInput): Promise<CommercialFactProposal | null>;
+  recordCommercialEvidenceGap(input: {
+    caseId: string | null;
+    draftMessage: string | null;
+    kind: CommercialFactKind;
+    projectCode: string;
+    requestedByName: string | null;
+    subjectType: CommercialEvidenceGapSubjectType;
+    summary: string;
+    tenantId?: string;
+    warnings: string[];
+  }): Promise<CommercialEvidenceGap>;
   reviewCommercialFactExpiry(factId: string, input: ReviewCommercialFactExpiryInput): Promise<CommercialFactExpiryReview | null>;
+  resolveCommercialEvidenceGap(gapId: string, input: ResolveCommercialEvidenceGapInput): Promise<CommercialEvidenceGap | null>;
   resolveCommercialSourceRefreshTask(taskId: string, input: ResolveCommercialSourceRefreshTaskInput): Promise<CommercialSourceRefreshTask | null>;
   getDocumentUploadRecord(
     caseId: string,
@@ -1441,6 +1478,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       commercialFactExpiryReviews,
       commercialFactProposals,
       commercialFacts,
+      commercialEvidenceGaps,
       commercialSourceRefreshTasks,
       commercialSources,
       commercialSourceVersions,
@@ -1695,6 +1733,25 @@ export async function createAlphaLeadCaptureStore(options?: {
       reason text not null,
       requested_by_name text,
       due_at timestamptz,
+      resolved_at timestamptz,
+      resolved_by_name text,
+      resolution_summary text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create table if not exists commercial_evidence_gaps (
+      id uuid primary key,
+      tenant_id text not null,
+      project_code text not null,
+      case_id uuid references cases(id) on delete set null,
+      kind text not null,
+      subject_type text not null,
+      status text not null,
+      summary text not null,
+      warnings jsonb not null default '[]'::jsonb,
+      draft_message text,
+      requested_by_name text,
       resolved_at timestamptz,
       resolved_by_name text,
       resolution_summary text,
@@ -4017,6 +4074,90 @@ export async function createAlphaLeadCaptureStore(options?: {
       );
   };
 
+  const listCommercialEvidenceGapsLocal = async (input: ListCommercialEvidenceGapsQuery): Promise<CommercialEvidenceGap[]> => {
+    const tenantId = input.tenantId ?? "local-alpha";
+    const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
+    const gapRecords = await db.select().from(commercialEvidenceGaps).orderBy(desc(commercialEvidenceGaps.updatedAt));
+
+    return gapRecords
+      .filter((gap) => gap.tenantId === tenantId)
+      .filter((gap) => !projectCode || normalizeProjectCode(gap.projectCode) === projectCode)
+      .filter((gap) => !input.kind || gap.kind === input.kind)
+      .filter((gap) => !input.status || gap.status === input.status)
+      .map(hydrateCommercialEvidenceGap);
+  };
+
+  const recordCommercialEvidenceGapLocal = async (input: {
+    caseId: string | null;
+    draftMessage: string | null;
+    kind: CommercialFactKind;
+    projectCode: string;
+    requestedByName: string | null;
+    subjectType: CommercialEvidenceGapSubjectType;
+    summary: string;
+    tenantId?: string;
+    warnings: string[];
+  }): Promise<CommercialEvidenceGap> => {
+    const now = new Date().toISOString();
+    const tenantId = input.tenantId ?? "local-alpha";
+    const projectCode = normalizeProjectCode(input.projectCode);
+    const openGaps = await db.select().from(commercialEvidenceGaps).where(eq(commercialEvidenceGaps.status, "open"));
+    const existingGap = openGaps.find(
+      (gap) =>
+        gap.tenantId === tenantId &&
+        normalizeProjectCode(gap.projectCode) === projectCode &&
+        gap.kind === input.kind &&
+        gap.subjectType === input.subjectType &&
+        gap.caseId === input.caseId
+    );
+
+    if (existingGap) {
+      await db
+        .update(commercialEvidenceGaps)
+        .set({
+          draftMessage: input.draftMessage,
+          requestedByName: input.requestedByName,
+          summary: input.summary,
+          updatedAt: now,
+          warnings: input.warnings
+        })
+        .where(eq(commercialEvidenceGaps.id, existingGap.id));
+
+      return hydrateCommercialEvidenceGap({
+        ...existingGap,
+        draftMessage: input.draftMessage,
+        requestedByName: input.requestedByName,
+        summary: input.summary,
+        updatedAt: now,
+        warnings: input.warnings
+      });
+    }
+
+    const gapId = randomUUID();
+    const gapRecord = {
+      caseId: input.caseId,
+      createdAt: now,
+      draftMessage: input.draftMessage,
+      id: gapId,
+      kind: input.kind,
+      projectCode,
+      requestedByName: input.requestedByName,
+      resolvedAt: null,
+      resolvedByName: null,
+      resolutionSummary: null,
+      status: "open",
+      subjectType: input.subjectType,
+      summary: input.summary,
+      tenantId,
+      updatedAt: now,
+      warnings: input.warnings
+    };
+
+    await db.insert(commercialEvidenceGaps).values(gapRecord);
+
+    return hydrateCommercialEvidenceGap(gapRecord);
+  };
+
   const getCommercialSourceDetailLocal = async (sourceId: string): Promise<CommercialSourceDetail | null> => {
     const sourceRecord = (await db.select().from(commercialSources).where(eq(commercialSources.id, sourceId))).at(0);
 
@@ -4708,8 +4849,14 @@ export async function createAlphaLeadCaptureStore(options?: {
     async listCommercialFactExpiryReviews(input) {
       return listCommercialFactExpiryReviewsLocal(input);
     },
+    async listCommercialEvidenceGaps(input) {
+      return listCommercialEvidenceGapsLocal(input);
+    },
     async listCommercialSourceRefreshTasks(input) {
       return listCommercialSourceRefreshTasksLocal(input);
+    },
+    async recordCommercialEvidenceGap(input) {
+      return recordCommercialEvidenceGapLocal(input);
     },
     async reviewCommercialFactExpiry(factId, input) {
       const fact = (await db.select().from(commercialFacts).where(eq(commercialFacts.id, factId))).at(0);
@@ -4826,6 +4973,28 @@ export async function createAlphaLeadCaptureStore(options?: {
 
       return (await listCommercialFactExpiryReviewsLocal({ factId, tenantId: fact.tenantId })).find((review) => review.reviewId === reviewId) ?? null;
     },
+    async resolveCommercialEvidenceGap(gapId, input) {
+      const gap = (await db.select().from(commercialEvidenceGaps).where(eq(commercialEvidenceGaps.id, gapId))).at(0);
+
+      if (!gap) {
+        return null;
+      }
+
+      const now = new Date().toISOString();
+
+      await db
+        .update(commercialEvidenceGaps)
+        .set({
+          resolutionSummary: input.resolutionSummary,
+          resolvedAt: now,
+          resolvedByName: input.resolvedByName ?? null,
+          status: input.status,
+          updatedAt: now
+        })
+        .where(eq(commercialEvidenceGaps.id, gapId));
+
+      return (await listCommercialEvidenceGapsLocal({ projectCode: gap.projectCode, tenantId: gap.tenantId })).find((item) => item.gapId === gapId) ?? null;
+    },
     async resolveCommercialSourceRefreshTask(taskId, input) {
       const task = (await db.select().from(commercialSourceRefreshTasks).where(eq(commercialSourceRefreshTasks.id, taskId))).at(0);
 
@@ -4851,11 +5020,12 @@ export async function createAlphaLeadCaptureStore(options?: {
     async getProjectCommercialReadinessSummary(input) {
       const tenantId = input.tenantId ?? "local-alpha";
       const projectCode = normalizeProjectCode(input.projectCode);
-      const [facts, proposals, sources, runs] = await Promise.all([
+      const [facts, proposals, sources, runs, evidenceGaps] = await Promise.all([
         listActiveCommercialFactsLocal({ now: new Date().toISOString(), projectCode, tenantId }),
         listCommercialFactProposalsLocal({ projectCode, tenantId }),
         listCommercialSourcesLocal({ projectCode, tenantId }),
-        db.select().from(caseAgentRuns).orderBy(desc(caseAgentRuns.createdAt))
+        db.select().from(caseAgentRuns).orderBy(desc(caseAgentRuns.createdAt)),
+        listCommercialEvidenceGapsLocal({ projectCode, status: "open", tenantId })
       ]);
       const staleFacts = facts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
       const expiringSoonFacts = facts.filter((fact) => fact.freshnessStatus === "expiring_soon");
@@ -4867,6 +5037,7 @@ export async function createAlphaLeadCaptureStore(options?: {
         ).length,
         expiringSoonFactsCount: expiringSoonFacts.length,
         latestInventorySourceVersion: sources.find((source) => source.sourceType === "inventory_csv")?.latestVersion ?? null,
+        openEvidenceGapsCount: evidenceGaps.length,
         pendingApprovalsCount: proposals.filter((proposal) => proposal.state === "pending_review").length,
         projectCode,
         staleFactsCount: staleFacts.length,
@@ -9773,6 +9944,22 @@ function toCommercialSourceRefreshTaskStatus(value: string): CommercialSourceRef
   throw new Error(`unsupported_commercial_source_refresh_task_status:${value}`);
 }
 
+function toCommercialEvidenceGapStatus(value: string): CommercialEvidenceGapStatus {
+  if (value === "open" || value === "resolved" || value === "dismissed") {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_evidence_gap_status:${value}`);
+}
+
+function toCommercialEvidenceGapSubjectType(value: string): CommercialEvidenceGapSubjectType {
+  if (value === "prepared_reply_draft" || value === "case_agent_run") {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_evidence_gap_subject_type:${value}`);
+}
+
 function toInventoryUnitStatus(value: string): InventoryUnitStatus {
   if (value === "available" || value === "reserved" || value === "sold" || value === "blocked" || value === "unknown") {
     return value;
@@ -9998,6 +10185,44 @@ function hydrateCommercialSourceRefreshTask(
     taskId: value.id,
     tenantId: value.tenantId,
     updatedAt: value.updatedAt
+  };
+}
+
+function hydrateCommercialEvidenceGap(value: {
+  caseId: string | null;
+  createdAt: string;
+  draftMessage: string | null;
+  id: string;
+  kind: string;
+  projectCode: string;
+  requestedByName: string | null;
+  resolvedAt: string | null;
+  resolvedByName: string | null;
+  resolutionSummary: string | null;
+  status: string;
+  subjectType: string;
+  summary: string;
+  tenantId: string;
+  updatedAt: string;
+  warnings: string[] | null;
+}): CommercialEvidenceGap {
+  return {
+    caseId: value.caseId,
+    createdAt: value.createdAt,
+    draftMessage: value.draftMessage,
+    gapId: value.id,
+    kind: toCommercialFactKind(value.kind),
+    projectCode: value.projectCode,
+    requestedByName: value.requestedByName,
+    resolvedAt: value.resolvedAt,
+    resolvedByName: value.resolvedByName,
+    resolutionSummary: value.resolutionSummary,
+    status: toCommercialEvidenceGapStatus(value.status),
+    subjectType: toCommercialEvidenceGapSubjectType(value.subjectType),
+    summary: value.summary,
+    tenantId: value.tenantId,
+    updatedAt: value.updatedAt,
+    warnings: value.warnings ?? []
   };
 }
 

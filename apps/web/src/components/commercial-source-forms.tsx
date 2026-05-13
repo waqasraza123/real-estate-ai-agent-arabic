@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import type {
+  CommercialEvidenceGap,
   CommercialFact,
   CommercialFactExpiryReviewOutcome,
   CommercialFactKind,
@@ -34,6 +35,7 @@ import {
   importCommercialInventoryAction,
   initialFormActionState,
   rejectCommercialFactProposalAction,
+  resolveCommercialEvidenceGapAction,
   reviewCommercialFactExpiryAction,
   resolveCommercialSourceRefreshTaskAction
 } from "@/app/actions";
@@ -403,6 +405,63 @@ export function SourceRefreshTaskResolutionForm(props: {
           disabled={!props.canManage}
           disabledLabel={props.locale === "ar" ? "يتطلب صلاحية المدير" : "Manager permission required"}
           idleLabel={props.locale === "ar" ? "تحديث المهمة" : "Update task"}
+          pendingLabel={props.locale === "ar" ? "جارٍ التحديث..." : "Updating..."}
+        />
+        <p className={formFeedbackClassName(state.status)}>{state.message}</p>
+      </div>
+    </form>
+  );
+}
+
+export function CommercialEvidenceGapResolutionForm(props: {
+  canManage: boolean;
+  gap: CommercialEvidenceGap;
+  locale: SupportedLocale;
+  returnPath: string;
+}) {
+  const [state, action] = useActionState(resolveCommercialEvidenceGapAction, initialFormActionState);
+
+  if (props.gap.status !== "open") {
+    return null;
+  }
+
+  return (
+    <form action={action} className={formStackClassName}>
+      <input name="gapId" type="hidden" value={props.gap.gapId} />
+      <input name="locale" type="hidden" value={props.locale} />
+      <input name="returnPath" type="hidden" value={props.returnPath} />
+      <div className={fieldGridClassName}>
+        <label className={fieldStackClassName}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "القرار" : "Decision"}</span>
+          <Select disabled={!props.canManage} name="status" required>
+            <option value="resolved">{props.locale === "ar" ? "تم توفير الأدلة" : "Evidence provided"}</option>
+            <option value="dismissed">{props.locale === "ar" ? "إغلاق بدون إجراء" : "Close without action"}</option>
+          </Select>
+        </label>
+        <label className={fieldStackClassName}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "أغلق بواسطة" : "Closed by"}</span>
+          <TextInput disabled={!props.canManage} name="resolvedByName" />
+        </label>
+        <label className={cx(fieldStackClassName, fieldSpanFullClassName)}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "ملخص الإغلاق" : "Resolution summary"}</span>
+          <TextArea
+            disabled={!props.canManage}
+            name="resolutionSummary"
+            placeholder={
+              props.locale === "ar"
+                ? "اذكر الحقيقة أو المصدر الذي أُضيف، أو سبب إغلاق الفجوة."
+                : "Record the fact or source that was added, or explain why the gap is being closed."
+            }
+            required
+            rows={3}
+          />
+        </label>
+      </div>
+      <div className={formActionsRowClassName}>
+        <FormSubmitButton
+          disabled={!props.canManage}
+          disabledLabel={props.locale === "ar" ? "يتطلب صلاحية المدير" : "Manager permission required"}
+          idleLabel={props.locale === "ar" ? "تحديث الفجوة" : "Update gap"}
           pendingLabel={props.locale === "ar" ? "جارٍ التحديث..." : "Updating..."}
         />
         <p className={formFeedbackClassName(state.status)}>{state.message}</p>

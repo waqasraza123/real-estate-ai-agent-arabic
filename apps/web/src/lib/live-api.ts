@@ -6,6 +6,7 @@ import type {
   BulkApproveCommercialFactProposalsInput,
   BulkRejectCommercialFactProposalsInput,
   CaseReplyGroundingPreview,
+  CommercialEvidenceGap,
   CommercialFact,
   CommercialFactExpiryReview,
   CommercialFactProposalBulkDecisionResult,
@@ -41,6 +42,7 @@ import type {
   PreviewCaseReplyGroundingInput,
   RejectCommercialFactProposalInput,
   ReviewCommercialFactExpiryInput,
+  ResolveCommercialEvidenceGapInput,
   ResolveCommercialSourceRefreshTaskInput,
   RequestCaseQaReviewInput,
   ResolveCaseQaReviewInput,
@@ -254,12 +256,35 @@ export async function listCommercialSourceRefreshTasksFromApi(operatorRole?: Ope
   return payload.tasks;
 }
 
+export async function listCommercialEvidenceGapsFromApi(operatorRole?: OperatorRole) {
+  const payload = await requestJson<{
+    gaps: CommercialEvidenceGap[];
+  }>("/v1/commercial-evidence-gaps", {
+    cache: "no-store",
+    headers: await getOperatorSessionHeaders(operatorRole)
+  });
+
+  return payload.gaps;
+}
+
 export async function resolveCommercialSourceRefreshTask(
   taskId: string,
   input: ResolveCommercialSourceRefreshTaskInput,
   operatorRole?: OperatorRole
 ) {
   return requestJson<CommercialSourceRefreshTask>(`/v1/commercial-source-refresh-tasks/${taskId}/resolve`, {
+    headers: await getOperatorSessionHeaders(operatorRole),
+    method: "POST",
+    payload: input
+  });
+}
+
+export async function resolveCommercialEvidenceGap(
+  gapId: string,
+  input: ResolveCommercialEvidenceGapInput,
+  operatorRole?: OperatorRole
+) {
+  return requestJson<CommercialEvidenceGap>(`/v1/commercial-evidence-gaps/${gapId}/resolve`, {
     headers: await getOperatorSessionHeaders(operatorRole),
     method: "POST",
     payload: input
@@ -453,6 +478,14 @@ export async function tryListCommercialFactExpiryReviews(operatorRole?: Operator
 export async function tryListCommercialSourceRefreshTasks(operatorRole?: OperatorRole) {
   try {
     return await listCommercialSourceRefreshTasksFromApi(operatorRole);
+  } catch {
+    return [];
+  }
+}
+
+export async function tryListCommercialEvidenceGaps(operatorRole?: OperatorRole) {
+  try {
+    return await listCommercialEvidenceGapsFromApi(operatorRole);
   } catch {
     return [];
   }

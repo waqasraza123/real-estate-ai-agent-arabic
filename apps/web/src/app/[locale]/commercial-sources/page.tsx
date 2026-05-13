@@ -20,10 +20,10 @@ import {
   twoColumnGridClassName
 } from "@real-estate-ai/ui";
 
-import { CommercialFactExpiryReviewForm, CommercialSourceCreateForm, ManualCommercialFactForm, SourceRefreshTaskResolutionForm } from "@/components/commercial-source-forms";
+import { CommercialEvidenceGapResolutionForm, CommercialFactExpiryReviewForm, CommercialSourceCreateForm, ManualCommercialFactForm, SourceRefreshTaskResolutionForm } from "@/components/commercial-source-forms";
 import { ScreenIntro } from "@/components/screen-intro";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
-import { tryListActiveCommercialFacts, tryListCommercialFactExpiryReviews, tryListCommercialFactProposals, tryListCommercialSourceRefreshTasks, tryListCommercialSources } from "@/lib/live-api";
+import { tryListActiveCommercialFacts, tryListCommercialEvidenceGaps, tryListCommercialFactExpiryReviews, tryListCommercialFactProposals, tryListCommercialSourceRefreshTasks, tryListCommercialSources } from "@/lib/live-api";
 
 export const dynamic = "force-dynamic";
 
@@ -36,17 +36,19 @@ export default async function CommercialSourcesPage(props: PageProps) {
   const messages = getMessages(locale);
   const role = await getCurrentOperatorRole();
   const canManage = canOperatorRolePerform("manage_commercial_sources", role);
-  const [sources, proposals, facts, expiryReviews, refreshTasks] = await Promise.all([
+  const [sources, proposals, facts, expiryReviews, refreshTasks, evidenceGaps] = await Promise.all([
     tryListCommercialSources(role),
     tryListCommercialFactProposals(role),
     tryListActiveCommercialFacts(role),
     tryListCommercialFactExpiryReviews(role),
-    tryListCommercialSourceRefreshTasks(role)
+    tryListCommercialSourceRefreshTasks(role),
+    tryListCommercialEvidenceGaps(role)
   ]);
   const staleFacts = facts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
   const expiringFacts = facts.filter((fact) => fact.freshnessStatus === "expiring_soon");
   const factsNeedingReview = [...expiringFacts, ...staleFacts].slice(0, 12);
   const openRefreshTasks = refreshTasks.filter((task) => task.status === "open");
+  const openEvidenceGaps = evidenceGaps.filter((gap) => gap.status === "open");
 
   return (
     <div className={pageStackClassName}>
@@ -65,6 +67,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
         <MetricTile detail={locale === "ar" ? "تحتاج قرار مدير" : "Need manager decision"} label={locale === "ar" ? "بانتظار الاعتماد" : "Pending approvals"} tone="sand" value={String(proposals.filter((item) => item.state === "pending_review").length)} />
         <MetricTile detail={locale === "ar" ? "نشطة لكن تحتاج مراجعة" : "Active but needs review"} label={locale === "ar" ? "تنتهي قريباً" : "Expiring soon"} tone="rose" value={String(expiringFacts.length)} />
         <MetricTile detail={locale === "ar" ? "تحتاج تحديث مصدر" : "Need source refresh"} label={locale === "ar" ? "مهام مفتوحة" : "Open tasks"} tone="mint" value={String(openRefreshTasks.length)} />
+        <MetricTile detail={locale === "ar" ? "تمنع مسودات الرد" : "Blocking reply drafts"} label={locale === "ar" ? "فجوات أدلة" : "Evidence gaps"} tone="rose" value={String(openEvidenceGaps.length)} />
       </div>
 
       <div className={twoColumnGridClassName}>
@@ -158,6 +161,52 @@ export default async function CommercialSourcesPage(props: PageProps) {
                   title={task.fact?.title ?? task.source.sourceName}
                 >
                   <SourceRefreshTaskResolutionForm canManage={canManage} locale={locale} returnPath={`/${locale}/commercial-sources`} task={task} />
+                </WorkflowListItem>
+              ))}
+            </div>
+          )}
+        </WorkflowPanelBody>
+      </Panel>
+
+      <Panel title={locale === "ar" ? "فجوات الأدلة التجارية" : "Commercial evidence gaps"}>
+        <WorkflowPanelBody
+          className="mt-4"
+          summary={
+            locale === "ar"
+              ? "تظهر هنا مسودات الرد التي مُنعت من دخول الجودة لأن المشروع يفتقد حقيقة تجارية معتمدة."
+              : "Reply drafts blocked before QA appear here when the project is missing an approved commercial fact."
+          }
+        >
+          {openEvidenceGaps.length === 0 ? (
+            <EmptyState
+              summary={locale === "ar" ? "لا توجد فجوات أدلة مفتوحة." : "No commercial evidence gaps are open."}
+              title={locale === "ar" ? "لا توجد فجوات" : "No gaps"}
+            />
+          ) : (
+            <div className="grid gap-4">
+              {openEvidenceGaps.slice(0, 12).map((gap) => (
+                <WorkflowListItem
+                  key={gap.gapId}
+                  badges={
+                    <div className={statusRowWrapClassName}>
+                      <StatusBadge tone="critical">{gap.status}</StatusBadge>
+                      <StatusBadge>{gap.kind}</StatusBadge>
+                      <StatusBadge>{gap.projectCode}</StatusBadge>
+                    </div>
+                  }
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {locale === "ar" ? "آخر تحديث:" : "Updated:"} {gap.updatedAt}
+                    </p>
+                  }
+                  summary={gap.summary}
+                  title={locale === "ar" ? "فجوة أدلة لمسودة رد" : "Reply draft evidence gap"}
+                >
+                  {gap.warnings.length > 0 ? (
+                    <p className={caseMetaClassName}>{gap.warnings.join(locale === "ar" ? "، " : ", ")}</p>
+                  ) : null}
+                  {gap.draftMessage ? <p className="text-sm leading-7 text-ink-soft">{gap.draftMessage}</p> : null}
+                  <CommercialEvidenceGapResolutionForm canManage={canManage} gap={gap} locale={locale} returnPath={`/${locale}/commercial-sources`} />
                 </WorkflowListItem>
               ))}
             </div>
