@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   canOperatorRoleAccessWorkspace,
+  type CommercialFactKind,
   type OperatorRole,
   type PersistedCaseSummary,
   type PersistedGovernanceSummary,
@@ -782,6 +783,15 @@ export function RevenueManagerCommandCenter(props: {
     activeApprovedFactsCount: number;
     blockedAgentRepliesCount: number;
     expiringSoonFactsCount: number;
+    kindBreakdown: Array<{
+      activeApprovedFactsCount: number;
+      expiringSoonFactsCount: number;
+      kind: CommercialFactKind;
+      openEvidenceGapsCount: number;
+      pendingApprovalsCount: number;
+      projectCode: string;
+      staleFactsCount: number;
+    }>;
     latestInventorySourceVersion: string | null;
     openEvidenceGapsCount: number;
     pendingApprovalsCount: number;
@@ -1106,6 +1116,38 @@ export function RevenueManagerCommandCenter(props: {
                 {props.locale === "ar" ? "فتح مركز المصادر" : "Open source center"}
               </Link>
             </div>
+            {props.commercialReadiness.kindBreakdown.length > 0 ? (
+              <div className="grid gap-3">
+                {props.commercialReadiness.kindBreakdown.slice(0, 8).map((item) => (
+                  <WorkflowCard
+                    key={`${item.projectCode}-${item.kind}`}
+                    badges={
+                      <div className={statusRowWrapClassName}>
+                        <StatusBadge tone={item.openEvidenceGapsCount > 0 ? "critical" : item.pendingApprovalsCount > 0 ? "warning" : "success"}>
+                          {item.kind}
+                        </StatusBadge>
+                        <StatusBadge>{item.projectCode}</StatusBadge>
+                      </div>
+                    }
+                    summary={
+                      props.locale === "ar"
+                        ? `${item.openEvidenceGapsCount} فجوات، ${item.pendingApprovalsCount} اعتماد، ${item.activeApprovedFactsCount} حقائق نشطة`
+                        : `${item.openEvidenceGapsCount} gaps, ${item.pendingApprovalsCount} approvals, ${item.activeApprovedFactsCount} active facts`
+                    }
+                    title={props.locale === "ar" ? "ضغط جاهزية حسب النوع" : "Readiness pressure by kind"}
+                  >
+                    <div className={statusRowWrapClassName}>
+                      <StatusBadge tone={item.staleFactsCount > 0 ? "warning" : "success"}>
+                        {props.locale === "ar" ? `${item.staleFactsCount} قديمة` : `${item.staleFactsCount} stale`}
+                      </StatusBadge>
+                      <StatusBadge tone={item.expiringSoonFactsCount > 0 ? "warning" : "neutral"}>
+                        {props.locale === "ar" ? `${item.expiringSoonFactsCount} قريبة الانتهاء` : `${item.expiringSoonFactsCount} expiring`}
+                      </StatusBadge>
+                    </div>
+                  </WorkflowCard>
+                ))}
+              </div>
+            ) : null}
           </WorkflowPanelBody>
         </Panel>
       ) : null}

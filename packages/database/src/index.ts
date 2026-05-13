@@ -5090,6 +5090,40 @@ export async function createAlphaLeadCaptureStore(options?: {
       ]);
       const staleFacts = facts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
       const expiringSoonFacts = facts.filter((fact) => fact.freshnessStatus === "expiring_soon");
+      const commercialFactKinds: CommercialFactKind[] = [
+        "pricing",
+        "payment_plan",
+        "availability",
+        "policy",
+        "document_requirement",
+        "fees",
+        "handover_date",
+        "unit_status",
+        "visit_terms"
+      ];
+      const kindBreakdown = commercialFactKinds
+        .map((kind) => {
+          const factsForKind = facts.filter((fact) => fact.kind === kind);
+          const pendingProposalsForKind = proposals.filter((proposal) => proposal.kind === kind && proposal.state === "pending_review");
+          const evidenceGapsForKind = evidenceGaps.filter((gap) => gap.kind === kind);
+
+          return {
+            activeApprovedFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "active" || fact.freshnessStatus === "expiring_soon").length,
+            expiringSoonFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "expiring_soon").length,
+            kind,
+            openEvidenceGapsCount: evidenceGapsForKind.length,
+            pendingApprovalsCount: pendingProposalsForKind.length,
+            staleFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired").length
+          };
+        })
+        .filter(
+          (item) =>
+            item.activeApprovedFactsCount > 0 ||
+            item.expiringSoonFactsCount > 0 ||
+            item.openEvidenceGapsCount > 0 ||
+            item.pendingApprovalsCount > 0 ||
+            item.staleFactsCount > 0
+        );
 
       return {
         activeApprovedFactsCount: facts.filter((fact) => fact.freshnessStatus === "active" || fact.freshnessStatus === "expiring_soon").length,
@@ -5097,6 +5131,7 @@ export async function createAlphaLeadCaptureStore(options?: {
           (run) => run.commercialFactGroundingStatus === "missing_required_evidence" && run.status === "escalated"
         ).length,
         expiringSoonFactsCount: expiringSoonFacts.length,
+        kindBreakdown,
         latestInventorySourceVersion: sources.find((source) => source.sourceType === "inventory_csv")?.latestVersion ?? null,
         openEvidenceGapsCount: evidenceGaps.length,
         pendingApprovalsCount: proposals.filter((proposal) => proposal.state === "pending_review").length,

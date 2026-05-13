@@ -150,6 +150,20 @@ Missing evidence now creates a manager-visible readiness item instead of only re
   - renewing an existing active fact closes gaps for the same tenant, project, and fact kind
 - Automatic resolution records who approved or renewed the fact when that actor is available, plus the fact title that satisfied the gap.
 
+## Readiness Analytics By Fact Kind
+
+Commercial readiness now breaks pressure down by fact kind so managers can see what kind of source work is blocking replies.
+
+- `ProjectCommercialReadinessSummary` now includes `kindBreakdown` with counts for each active project fact kind:
+  - active approved facts
+  - pending approvals
+  - open evidence gaps
+  - expiring-soon facts
+  - stale or expired facts
+- The revenue manager command center aggregates the same breakdown across project and kind, sorted by open evidence gaps first, then pending approvals, then stale facts.
+- The readiness panel now shows the top project/kind pressure rows beside the existing high-level commercial-readiness counters.
+- This keeps readiness reviews operational: managers can tell whether pricing, payment-plan, availability, policy, fee, handover-date, unit-status, visit-term, or document-requirement sources need attention before more replies are blocked.
+
 ## API Boundaries
 
 The source center is exposed only through trusted manager-session routes.

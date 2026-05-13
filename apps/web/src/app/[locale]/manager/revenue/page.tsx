@@ -1,4 +1,4 @@
-import { canOperatorRoleAccessWorkspace, type PersistedCaseDetail, type SupportedLocale } from "@real-estate-ai/contracts";
+import { canOperatorRoleAccessWorkspace, type CommercialFactKind, type PersistedCaseDetail, type SupportedLocale } from "@real-estate-ai/contracts";
 
 import { ManagerWorkspaceUnavailable, RevenueManagerCommandCenter } from "@/components/manager-command-center";
 import {
@@ -44,6 +44,60 @@ export default async function RevenueManagerPage(props: PageProps) {
     tryListCommercialEvidenceGaps(currentOperatorRole)
   ]);
   const baseRevenueScope = buildRevenueManagerScope(persistedCases, filters);
+  const commercialFactKinds: CommercialFactKind[] = [
+    "pricing",
+    "payment_plan",
+    "availability",
+    "policy",
+    "document_requirement",
+    "fees",
+    "handover_date",
+    "unit_status",
+    "visit_terms"
+  ];
+  const readinessProjects = Array.from(
+    new Set([
+      ...commercialFacts.map((fact) => fact.projectCode),
+      ...commercialProposals.map((proposal) => proposal.projectCode),
+      ...commercialEvidenceGaps.map((gap) => gap.projectCode)
+    ])
+  ).sort();
+  const commercialReadinessKindBreakdown = readinessProjects
+    .flatMap((projectCode) =>
+      commercialFactKinds.map((kind) => {
+        const factsForKind = commercialFacts.filter((fact) => fact.projectCode === projectCode && fact.kind === kind);
+        const pendingProposalsForKind = commercialProposals.filter(
+          (proposal) => proposal.projectCode === projectCode && proposal.kind === kind && proposal.state === "pending_review"
+        );
+        const evidenceGapsForKind = commercialEvidenceGaps.filter((gap) => gap.projectCode === projectCode && gap.kind === kind && gap.status === "open");
+
+        return {
+          activeApprovedFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "active" || fact.freshnessStatus === "expiring_soon").length,
+          expiringSoonFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "expiring_soon").length,
+          kind,
+          openEvidenceGapsCount: evidenceGapsForKind.length,
+          pendingApprovalsCount: pendingProposalsForKind.length,
+          projectCode,
+          staleFactsCount: factsForKind.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired").length
+        };
+      })
+    )
+    .filter(
+      (item) =>
+        item.activeApprovedFactsCount > 0 ||
+        item.expiringSoonFactsCount > 0 ||
+        item.openEvidenceGapsCount > 0 ||
+        item.pendingApprovalsCount > 0 ||
+        item.staleFactsCount > 0
+    )
+    .sort(
+      (a, b) =>
+        b.openEvidenceGapsCount - a.openEvidenceGapsCount ||
+        b.pendingApprovalsCount - a.pendingApprovalsCount ||
+        b.staleFactsCount - a.staleFactsCount ||
+        a.projectCode.localeCompare(b.projectCode) ||
+        a.kind.localeCompare(b.kind)
+    );
   const batchCaseDetails =
     filters.bulkBatchId && baseRevenueScope.focusedCases.length > 0
       ? await Promise.all(baseRevenueScope.focusedCases.map((caseItem) => tryGetPersistedCaseDetail(caseItem.caseId)))
@@ -75,6 +129,7 @@ export default async function RevenueManagerPage(props: PageProps) {
         activeApprovedFactsCount: commercialFacts.filter((fact) => fact.freshnessStatus === "active" || fact.freshnessStatus === "expiring_soon").length,
         blockedAgentRepliesCount: persistedCases.filter((caseItem) => caseItem.agentState?.latestBlockedReason === "commercial_facts_missing").length,
         expiringSoonFactsCount: commercialFacts.filter((fact) => fact.freshnessStatus === "expiring_soon").length,
+        kindBreakdown: commercialReadinessKindBreakdown,
         latestInventorySourceVersion: commercialSources.find((source) => source.sourceType === "inventory_csv")?.latestVersion?.versionLabel ?? null,
         openEvidenceGapsCount: commercialEvidenceGaps.filter((gap) => gap.status === "open").length,
         pendingApprovalsCount: commercialProposals.filter((proposal) => proposal.state === "pending_review").length,

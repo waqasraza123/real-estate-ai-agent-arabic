@@ -788,10 +788,20 @@ export const inventoryUnitSnapshotSchema = z.object({
   view: z.string().nullable()
 });
 
+export const projectCommercialReadinessKindSummarySchema = z.object({
+  activeApprovedFactsCount: z.number().int().nonnegative(),
+  expiringSoonFactsCount: z.number().int().nonnegative(),
+  kind: commercialFactKindSchema,
+  openEvidenceGapsCount: z.number().int().nonnegative(),
+  pendingApprovalsCount: z.number().int().nonnegative(),
+  staleFactsCount: z.number().int().nonnegative()
+});
+
 export const projectCommercialReadinessSummarySchema = z.object({
   activeApprovedFactsCount: z.number().int().nonnegative(),
   blockedAgentRepliesCount: z.number().int().nonnegative(),
   expiringSoonFactsCount: z.number().int().nonnegative(),
+  kindBreakdown: z.array(projectCommercialReadinessKindSummarySchema),
   latestInventorySourceVersion: commercialSourceVersionSchema.nullable(),
   openEvidenceGapsCount: z.number().int().nonnegative(),
   pendingApprovalsCount: z.number().int().nonnegative(),
@@ -1353,6 +1363,7 @@ export type PrepareCaseReplyDraftQaReviewInput = z.infer<typeof prepareCaseReply
 export type PreviewCaseReplyGroundingInput = z.infer<typeof previewCaseReplyGroundingInputSchema>;
 export type ListGovernanceEventsQuery = z.infer<typeof listGovernanceEventsQuerySchema>;
 export type ProjectCommercialReadinessSummary = z.infer<typeof projectCommercialReadinessSummarySchema>;
+export type ProjectCommercialReadinessKindSummary = z.infer<typeof projectCommercialReadinessKindSummarySchema>;
 export type RejectCommercialFactProposalInput = z.infer<typeof rejectCommercialFactProposalInputSchema>;
 export type ReviewCommercialFactExpiryInput = z.infer<typeof reviewCommercialFactExpiryInputSchema>;
 export type ResolveCommercialSourceRefreshTaskInput = z.infer<typeof resolveCommercialSourceRefreshTaskInputSchema>;
