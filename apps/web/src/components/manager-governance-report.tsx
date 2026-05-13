@@ -33,6 +33,7 @@ import {
 
 import { SegmentedLinkTabs } from "@/components/segmented-link-tabs";
 import { ScreenIntro } from "@/components/screen-intro";
+import type { CommercialEvidenceGapPressureGroup, CommercialEvidenceGapPressureSummary } from "@/lib/commercial-readiness-report";
 import type { ExportRecipient } from "@/lib/export-summary";
 import { formatDateTime } from "@/lib/format";
 import type {
@@ -47,6 +48,7 @@ import { buildGovernanceReportHref } from "@/lib/governance-report";
 import { buildRevenueManagerExportHref, buildRevenueManagerHref, revenueManagerFocusedQueueId } from "@/lib/revenue-manager";
 
 export function ManagerGovernanceReport(props: {
+  commercialEvidenceGapPressure: CommercialEvidenceGapPressureSummary;
   currentOperatorRole: OperatorRole;
   exportRecipient: ExportRecipient;
   filters: ListGovernanceEventsQuery;
@@ -224,7 +226,74 @@ export function ManagerGovernanceReport(props: {
             value={props.operationalRiskSummary.mixedReasonDriftCaseCount}
           />
         ) : null}
+        <MetricTile
+          detail={
+            props.locale === "ar"
+              ? "فجوات تجارية مفتوحة تمنع مسودات الرد قبل دخولها الجودة."
+              : "Open commercial evidence gaps blocking reply drafts before QA intake."
+          }
+          label={props.locale === "ar" ? "فجوات أدلة تجارية" : "Commercial evidence gaps"}
+          tone="rose"
+          value={String(props.commercialEvidenceGapPressure.openGapCount)}
+        />
+        <MetricTile
+          detail={
+            props.locale === "ar"
+              ? "مشاريع لديها فجوات أدلة تجارية مفتوحة في مركز المصادر."
+              : "Projects with open commercial evidence gaps in the source center."
+          }
+          label={props.locale === "ar" ? "مشاريع متأثرة" : "Affected projects"}
+          tone="sand"
+          value={String(props.commercialEvidenceGapPressure.openGapProjectCount)}
+        />
       </div>
+
+      <Panel title={props.locale === "ar" ? "ضغط الأدلة التجارية للتصدير" : "Commercial evidence pressure for export"}>
+        <WorkflowPanelBody
+          className="mt-4"
+          summary={
+            props.locale === "ar"
+              ? "يعرض هذا الملخص فجوات الأدلة التي تمنع مسودات الرد التجاري، ويُضاف نفس الضغط إلى مقدمة CSV حتى لا ينفصل سجل الجودة عن نقص المصادر."
+              : "This summary shows commercial evidence gaps that block reply drafts, and the same pressure is included in the CSV preamble so QA history stays tied to source readiness."
+          }
+        >
+          <div className={statusRowWrapClassName}>
+            <StatusBadge tone={props.commercialEvidenceGapPressure.openGapCount > 0 ? "warning" : "success"}>
+              {props.locale === "ar"
+                ? `${props.commercialEvidenceGapPressure.openGapCount} فجوات مفتوحة`
+                : `${props.commercialEvidenceGapPressure.openGapCount} open gaps`}
+            </StatusBadge>
+            <StatusBadge>
+              {props.locale === "ar"
+                ? `${props.commercialEvidenceGapPressure.sourceOwnerCount} ملاك مصادر`
+                : `${props.commercialEvidenceGapPressure.sourceOwnerCount} source owners`}
+            </StatusBadge>
+            {props.commercialEvidenceGapPressure.unassignedGapCount > 0 ? (
+              <StatusBadge tone="critical">
+                {props.locale === "ar"
+                  ? `${props.commercialEvidenceGapPressure.unassignedGapCount} غير معينة`
+                  : `${props.commercialEvidenceGapPressure.unassignedGapCount} unassigned`}
+              </StatusBadge>
+            ) : null}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CommercialEvidenceGapPressureCard
+              emptyLabel={props.locale === "ar" ? "لا توجد فجوات حسب المشروع." : "No project gap pressure."}
+              groups={props.commercialEvidenceGapPressure.projectGroups.slice(0, 5)}
+              locale={props.locale}
+              title={props.locale === "ar" ? "أعلى المشاريع" : "Top projects"}
+              type="project"
+            />
+            <CommercialEvidenceGapPressureCard
+              emptyLabel={props.locale === "ar" ? "لا توجد فجوات حسب المالك." : "No owner gap pressure."}
+              groups={props.commercialEvidenceGapPressure.ownerGroups.slice(0, 5)}
+              locale={props.locale}
+              title={props.locale === "ar" ? "أعلى الملاك" : "Top owners"}
+              type="owner"
+            />
+          </div>
+        </WorkflowPanelBody>
+      </Panel>
 
       <div className={twoColumnGridClassName}>
         <Panel title={props.locale === "ar" ? "فلاتر سريعة" : "Quick filters"}>
@@ -1365,6 +1434,48 @@ function getKindLabel(locale: SupportedLocale, kind: PersistedGovernanceEventRec
   }
 
   return locale === "ar" ? "محادثة إيرادات" : "Revenue conversation";
+}
+
+function CommercialEvidenceGapPressureCard(props: {
+  emptyLabel: string;
+  groups: CommercialEvidenceGapPressureGroup[];
+  locale: SupportedLocale;
+  title: string;
+  type: "owner" | "project";
+}) {
+  if (props.groups.length === 0) {
+    return (
+      <div className={stackTightClassName}>
+        <strong className={tableLinkTitleClassName}>{props.title}</strong>
+        <span className={fieldNoteClassName}>{props.emptyLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={stackTightClassName}>
+      <strong className={tableLinkTitleClassName}>{props.title}</strong>
+      {props.groups.map((group) => (
+        <div key={`${props.type}:${group.label}`} className={tableLinkClassName}>
+          <Link
+            className={tableLinkTitleClassName}
+            href={
+              props.type === "project"
+                ? `/${props.locale}/commercial-sources?projectCode=${encodeURIComponent(group.label)}`
+                : `/${props.locale}/commercial-sources?ownerName=${encodeURIComponent(group.label === "Unassigned" ? "__unassigned" : group.label)}`
+            }
+          >
+            {group.label === "Unassigned" ? (props.locale === "ar" ? "غير معين" : "Unassigned") : group.label}
+          </Link>
+          <span className={tableLinkMetaClassName}>
+            {props.locale === "ar"
+              ? `${group.gapCount} فجوات، ${group.pendingApprovalsCount} اعتماد، ${group.openRefreshTasksCount} مهام تحديث`
+              : `${group.gapCount} gaps, ${group.pendingApprovalsCount} approvals, ${group.openRefreshTasksCount} refresh tasks`}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function getStatusLabel(locale: SupportedLocale, status: PersistedGovernanceEventRecord["status"]) {

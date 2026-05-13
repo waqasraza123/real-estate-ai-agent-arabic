@@ -3,6 +3,7 @@ import { Panel, pageStackClassName, panelSummaryClassName } from "@real-estate-a
 
 import { ManagerGovernanceReport } from "@/components/manager-governance-report";
 import { ScreenIntro } from "@/components/screen-intro";
+import { buildCommercialEvidenceGapPressureSummary } from "@/lib/commercial-readiness-report";
 import { buildGovernanceOperationalRiskSummary } from "@/lib/governance-workspace";
 import {
   parseGovernanceReportExportRecipient,
@@ -13,6 +14,8 @@ import {
   tryGetPersistedCaseDetail,
   tryGetPersistedGovernanceEvents,
   tryGetPersistedGovernanceSummary,
+  tryListCommercialEvidenceGaps,
+  tryListCommercialSources,
   tryListPersistedCases
 } from "@/lib/live-api";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
@@ -60,11 +63,17 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
   const filters = parseGovernanceReportSearchParams(rawSearchParams);
   const exportRecipient = parseGovernanceReportExportRecipient(rawSearchParams);
   const view = parseGovernanceReportView(rawSearchParams);
-  const [governanceSummary, governanceEvents, persistedCases] = await Promise.all([
+  const [governanceSummary, governanceEvents, persistedCases, commercialSources, commercialEvidenceGaps] = await Promise.all([
     tryGetPersistedGovernanceSummary(),
     tryGetPersistedGovernanceEvents(filters),
-    tryListPersistedCases()
+    tryListPersistedCases(),
+    tryListCommercialSources(currentOperatorRole),
+    tryListCommercialEvidenceGaps(currentOperatorRole)
   ]);
+  const commercialEvidenceGapPressure = buildCommercialEvidenceGapPressureSummary({
+    gaps: commercialEvidenceGaps,
+    sources: commercialSources
+  });
   const baseOperationalRiskSummary = buildGovernanceOperationalRiskSummary(persistedCases ?? []);
   const recentBatchScopes = baseOperationalRiskSummary.bulkBatches.map((batch) => ({
     batchId: batch.batchId,
@@ -110,6 +119,7 @@ export default async function ManagerGovernanceReportPage(props: PageProps) {
   return (
     <ManagerGovernanceReport
       currentOperatorRole={currentOperatorRole}
+      commercialEvidenceGapPressure={commercialEvidenceGapPressure}
       filters={filters}
       governanceEvents={governanceEvents}
       governanceSummary={governanceSummary}

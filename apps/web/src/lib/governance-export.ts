@@ -1,9 +1,11 @@
 import type { ListGovernanceEventsQuery, SupportedLocale } from "@real-estate-ai/contracts";
 
+import type { CommercialEvidenceGapPressureSummary } from "./commercial-readiness-report";
 import { buildCsvDocument, buildExportSummaryCsvRows, escapeCsvValue } from "./export-summary";
 import type { ExportRecipient } from "./export-summary";
 
 interface GovernanceExportOptions {
+  commercialEvidenceGapPressure?: CommercialEvidenceGapPressureSummary;
   filters: ListGovernanceEventsQuery;
   generatedAt?: string;
   locale: SupportedLocale;
@@ -68,6 +70,18 @@ function buildGovernanceExportSummaryRows(items: Array<Record<string, unknown>>,
     { field: "selected_scope", value: getGovernanceExportScopeLabel(options.locale, options.filters) },
     { field: "filter_summary", value: getGovernanceExportFilterSummary(options.locale, options.filters) },
     {
+      field: "commercial_evidence_gap_summary",
+      value: getCommercialEvidenceGapExportSummary(options.locale, options.commercialEvidenceGapPressure)
+    },
+    {
+      field: "commercial_evidence_top_project",
+      value: getCommercialEvidenceGapTopGroupLabel(options.locale, options.commercialEvidenceGapPressure?.topProjectGroup ?? null)
+    },
+    {
+      field: "commercial_evidence_top_owner",
+      value: getCommercialEvidenceGapTopGroupLabel(options.locale, options.commercialEvidenceGapPressure?.topOwnerGroup ?? null)
+    },
+    {
       field: "activity_summary",
       value: getGovernanceExportActivitySummary(options.locale, matchingRows, uniqueCaseCount, openedCount, resolvedCount)
     },
@@ -77,6 +91,40 @@ function buildGovernanceExportSummaryRows(items: Array<Record<string, unknown>>,
     { field: "opened_event_count", value: String(openedCount) },
     { field: "resolved_event_count", value: String(resolvedCount) }
   ]);
+}
+
+function getCommercialEvidenceGapExportSummary(
+  locale: SupportedLocale,
+  pressure: CommercialEvidenceGapPressureSummary | undefined
+) {
+  if (!pressure) {
+    return locale === "ar"
+      ? "لم يتم تحميل ضغط فجوات الأدلة التجارية لهذا التصدير."
+      : "Commercial evidence-gap pressure was not loaded for this export.";
+  }
+
+  if (locale === "ar") {
+    return `${pressure.openGapCount} فجوات أدلة تجارية مفتوحة عبر ${pressure.openGapProjectCount} مشاريع، منها ${pressure.unassignedGapCount} بلا مالك مصدر واضح.`;
+  }
+
+  return `${pressure.openGapCount} open commercial evidence gaps across ${pressure.openGapProjectCount} projects, including ${pressure.unassignedGapCount} without a clear source owner.`;
+}
+
+function getCommercialEvidenceGapTopGroupLabel(
+  locale: SupportedLocale,
+  group: CommercialEvidenceGapPressureSummary["topOwnerGroup"]
+) {
+  if (!group) {
+    return locale === "ar" ? "لا توجد فجوات مفتوحة." : "No open gaps.";
+  }
+
+  const label = group.label === "Unassigned" ? (locale === "ar" ? "غير معين" : "Unassigned") : group.label;
+
+  if (locale === "ar") {
+    return `${label}: ${group.gapCount} فجوات، ${group.pendingApprovalsCount} اعتماد، ${group.openRefreshTasksCount} مهام تحديث.`;
+  }
+
+  return `${label}: ${group.gapCount} gaps, ${group.pendingApprovalsCount} approvals, ${group.openRefreshTasksCount} refresh tasks.`;
 }
 
 function getGovernanceExportAudience(

@@ -172,6 +172,25 @@ Commercial readiness now breaks pressure down by fact kind so managers can see w
 - Evidence gaps are still project/kind records, but the source center now displays the current project owner set beside each open gap; gaps without any source owner stay explicitly unassigned instead of implying a hidden owner.
 - This keeps readiness reviews operational: managers can tell whether pricing, payment-plan, availability, policy, fee, handover-date, unit-status, visit-term, or document-requirement sources need attention before more replies are blocked.
 
+## Governance Export Carryover
+
+Commercial evidence-gap pressure now travels with manager governance reporting instead of staying isolated in the source center.
+
+- The governance report page shows a commercial evidence-pressure panel beside QA history and operational-risk reporting.
+- The panel summarizes:
+  - total open commercial evidence gaps
+  - affected project count
+  - source-owner count
+  - unassigned gap count
+  - top project pressure
+  - top source-owner pressure
+- Historical governance CSV exports now include commercial evidence-gap summary rows in the preamble:
+  - open gap count and project count
+  - unassigned gap count
+  - top project by gap pressure
+  - top owner by gap pressure
+- This is intentionally summary-level export carryover. QA event rows remain historical QA events; commercial source pressure is exported as contextual readiness pressure so recipients understand when blocked or missing-evidence draft governance is caused by source gaps rather than reviewer delay.
+
 ## API Boundaries
 
 The source center is exposed only through trusted manager-session routes.
