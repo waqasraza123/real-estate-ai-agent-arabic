@@ -19,6 +19,7 @@ import {
   listCommercialEvidenceGapsQuerySchema,
   listCommercialFactExpiryReviewsQuerySchema,
   listCommercialFactProposalsQuerySchema,
+  listCommercialSourcesQuerySchema,
   listCommercialSourceRefreshTasksQuerySchema,
   listGovernanceEventsQuerySchema,
   manageBulkCaseFollowUpInputSchema,
@@ -265,21 +266,22 @@ export function buildApiApp(dependencies: {
     cases: await listPersistedCases(dependencies.store)
   }));
 
-  app.get<{
-    Querystring: {
-      projectCode?: string;
-      tenantId?: string;
-    };
-  }>("/v1/commercial-sources", async (request, reply) => {
+  app.get("/v1/commercial-sources", async (request, reply) => {
     if (!requireAnyOperatorWorkspace(request, reply, ["manager_revenue"])) {
       return reply;
     }
 
+    const result = listCommercialSourcesQuerySchema.safeParse(request.query);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
     return {
-      sources: await listPersistedCommercialSources(dependencies.store, {
-        ...(request.query.projectCode ? { projectCode: request.query.projectCode } : {}),
-        ...(request.query.tenantId ? { tenantId: request.query.tenantId } : {})
-      })
+      sources: await listPersistedCommercialSources(dependencies.store, result.data)
     };
   });
 

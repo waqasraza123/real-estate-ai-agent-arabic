@@ -1152,6 +1152,14 @@ export function RevenueManagerCommandCenter(props: {
                         {props.locale === "ar" ? `${item.expiringSoonFactsCount} قريبة الانتهاء` : `${item.expiringSoonFactsCount} expiring`}
                       </StatusBadge>
                     </div>
+                    <Link
+                      className={inlineLinkClassName}
+                      href={`/${props.locale}/commercial-sources?projectCode=${encodeURIComponent(item.projectCode)}${
+                        item.ownerNames.length === 1 ? `&ownerName=${encodeURIComponent(item.ownerNames[0])}` : ""
+                      }`}
+                    >
+                      {props.locale === "ar" ? "فتح قائمة الجاهزية" : "Open readiness queue"}
+                    </Link>
                   </WorkflowCard>
                 ))}
               </div>

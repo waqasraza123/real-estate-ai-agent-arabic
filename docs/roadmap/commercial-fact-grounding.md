@@ -79,6 +79,11 @@ Source-refresh-required is now an operational task, not only a review note.
 
 - Commercial sources carry an optional source owner, captured when the source is created or later assigned from the source detail page.
 - The owner is intentionally source-level rather than task-level for now: refresh tasks, source cards, source detail, and readiness rows all inherit the same accountable desk so one stale price sheet does not create several competing ownership records.
+- The source center now supports owner/project-scoped readiness queues:
+  - owner queues group sources by assigned owner, including an explicit unassigned queue
+  - each queue summarizes open evidence gaps, open refresh tasks, pending approvals, active facts, expiring facts, and stale facts
+  - opening a queue scopes source cards, refresh tasks, evidence gaps, expiry review, and headline metrics to that owner or project
+  - revenue readiness rows deep-link into the matching project queue, and into an owner queue when exactly one source owner is known for the row
 - Choosing `source_refresh_required` during an expiry review opens or updates one open source-refresh task for the affected fact.
 - The task is linked to the commercial source, affected fact, reason, requester, and optional due timestamp.
 - The source center lists open refresh tasks across projects with the inherited source owner so managers can see source-owner workload before reply grounding starts failing.
@@ -173,6 +178,7 @@ The source center is exposed only through trusted manager-session routes.
 
 - `POST /v1/commercial-fact-proposals/bulk-approve`
 - `POST /v1/commercial-fact-proposals/bulk-reject`
+- `GET /v1/commercial-sources?ownerName=...&projectCode=...`
 - `PATCH /v1/commercial-sources/:sourceId/owner`
 - `GET /v1/commercial-facts/expiry-reviews`
 - `POST /v1/commercial-facts/:factId/expiry-review`

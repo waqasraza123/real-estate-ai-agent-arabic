@@ -246,6 +246,12 @@ export const assignCommercialSourceOwnerInputSchema = z.object({
   ownerName: z.string().trim().min(2).max(120).nullable()
 });
 
+export const listCommercialSourcesQuerySchema = z.object({
+  ownerName: z.string().trim().min(2).max(120).optional(),
+  projectCode: z.string().trim().min(2).max(80).optional(),
+  tenantId: z.string().trim().min(2).max(80).default("local-alpha")
+});
+
 export const importInventoryCsvInputSchema = z.object({
   csvText: z.string().trim().min(10).max(500_000),
   importedByName: z.string().trim().min(2).max(120).optional(),
@@ -1354,6 +1360,7 @@ export type ListActiveCommercialFactsQuery = z.infer<typeof listActiveCommercial
 export type ListCommercialFactExpiryReviewsQuery = z.infer<typeof listCommercialFactExpiryReviewsQuerySchema>;
 export type ListCommercialFactProposalsQuery = z.infer<typeof listCommercialFactProposalsQuerySchema>;
 export type ListCommercialEvidenceGapsQuery = z.infer<typeof listCommercialEvidenceGapsQuerySchema>;
+export type ListCommercialSourcesQuery = z.infer<typeof listCommercialSourcesQuerySchema>;
 export type ListCommercialSourceRefreshTasksQuery = z.infer<typeof listCommercialSourceRefreshTasksQuerySchema>;
 export type ManageCaseFollowUpInput = z.infer<typeof manageCaseFollowUpInputSchema>;
 export type ManageBulkCaseFollowUpInput = z.infer<typeof manageBulkCaseFollowUpInputSchema>;

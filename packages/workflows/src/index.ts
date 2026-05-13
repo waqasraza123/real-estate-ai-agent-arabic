@@ -37,6 +37,7 @@ import type {
   ListCommercialEvidenceGapsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
+  ListCommercialSourcesQuery,
   ListCommercialSourceRefreshTasksQuery,
   ListGovernanceEventsQuery,
   ManageBulkCaseFollowUpInput,
@@ -118,10 +119,7 @@ export async function assignPersistedCommercialSourceOwner(
   return store.assignCommercialSourceOwner(sourceId, input);
 }
 
-export async function listPersistedCommercialSources(store: LeadCaptureStore, input?: {
-  projectCode?: string;
-  tenantId?: string;
-}) {
+export async function listPersistedCommercialSources(store: LeadCaptureStore, input?: ListCommercialSourcesQuery) {
   return store.listCommercialSources(input);
 }
 

@@ -96,6 +96,7 @@ import type {
   ListCommercialEvidenceGapsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
+  ListCommercialSourcesQuery,
   ListCommercialSourceRefreshTasksQuery,
   PersistedCaseAgentMemory,
   PersistedCaseAgentRun,
@@ -1041,10 +1042,7 @@ export interface LeadCaptureStore {
     now?: string;
   }): Promise<CommercialFact[]>;
   listCommercialFactProposals(input: ListCommercialFactProposalsQuery): Promise<CommercialFactProposal[]>;
-  listCommercialSources(input?: {
-    projectCode?: string;
-    tenantId?: string;
-  }): Promise<CommercialSourceSummary[]>;
+  listCommercialSources(input?: ListCommercialSourcesQuery): Promise<CommercialSourceSummary[]>;
   listCommercialFactExpiryReviews(input: ListCommercialFactExpiryReviewsQuery): Promise<CommercialFactExpiryReview[]>;
   listCommercialSourceRefreshTasks(input: ListCommercialSourceRefreshTasksQuery): Promise<CommercialSourceRefreshTask[]>;
   recordCommercialInventoryImport(
@@ -3880,8 +3878,9 @@ export async function createAlphaLeadCaptureStore(options?: {
     return null;
   };
 
-  const listCommercialSourcesLocal = async (input: { projectCode?: string; tenantId?: string } = {}): Promise<CommercialSourceSummary[]> => {
+  const listCommercialSourcesLocal = async (input: Partial<ListCommercialSourcesQuery> = {}): Promise<CommercialSourceSummary[]> => {
     const tenantId = input.tenantId ?? "local-alpha";
+    const ownerName = input.ownerName?.trim() ?? null;
     const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
     const [sourceRecords, versionRecords, proposalRecords, factRecords, refreshTaskRecords] = await Promise.all([
       db.select().from(commercialSources).orderBy(desc(commercialSources.updatedAt), asc(commercialSources.sourceName)),
@@ -3894,6 +3893,7 @@ export async function createAlphaLeadCaptureStore(options?: {
     return sourceRecords
       .filter((source) => source.tenantId === tenantId)
       .filter((source) => !projectCode || normalizeProjectCode(source.projectCode) === projectCode)
+      .filter((source) => !ownerName || source.ownerName === ownerName)
       .map((source) => {
         const latestVersion = versionRecords.find((version) => version.sourceId === source.id) ?? null;
 

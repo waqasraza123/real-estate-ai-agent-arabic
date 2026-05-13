@@ -29,14 +29,37 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ locale: SupportedLocale }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function getSingleSearchValue(value: string | string[] | undefined) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function buildCommercialSourcesHref(locale: SupportedLocale, filters: { ownerName?: string | null; projectCode?: string | null }) {
+  const searchParams = new URLSearchParams();
+
+  if (filters.ownerName) {
+    searchParams.set("ownerName", filters.ownerName);
+  }
+
+  if (filters.projectCode) {
+    searchParams.set("projectCode", filters.projectCode);
+  }
+
+  const serialized = searchParams.toString();
+
+  return `/${locale}/commercial-sources${serialized ? `?${serialized}` : ""}`;
 }
 
 export default async function CommercialSourcesPage(props: PageProps) {
-  const { locale } = await props.params;
+  const [{ locale }, rawSearchParams] = await Promise.all([props.params, props.searchParams]);
   const messages = getMessages(locale);
+  const ownerNameFilter = getSingleSearchValue(rawSearchParams.ownerName);
+  const projectCodeFilter = getSingleSearchValue(rawSearchParams.projectCode);
   const role = await getCurrentOperatorRole();
   const canManage = canOperatorRolePerform("manage_commercial_sources", role);
-  const [sources, proposals, facts, expiryReviews, refreshTasks, evidenceGaps] = await Promise.all([
+  const [allSources, proposals, facts, expiryReviews, refreshTasks, evidenceGaps] = await Promise.all([
     tryListCommercialSources(role),
     tryListCommercialFactProposals(role),
     tryListActiveCommercialFacts(role),
@@ -44,14 +67,36 @@ export default async function CommercialSourcesPage(props: PageProps) {
     tryListCommercialSourceRefreshTasks(role),
     tryListCommercialEvidenceGaps(role)
   ]);
-  const staleFacts = facts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
-  const expiringFacts = facts.filter((fact) => fact.freshnessStatus === "expiring_soon");
+  const isUnassignedOwnerFilter = ownerNameFilter === "__unassigned";
+  const scopedSources = allSources
+    .filter((source) => !projectCodeFilter || source.projectCode === projectCodeFilter)
+    .filter((source) => {
+      if (!ownerNameFilter) {
+        return true;
+      }
+
+      return isUnassignedOwnerFilter ? source.ownerName === null : source.ownerName === ownerNameFilter;
+    });
+  const scopedSourceIds = new Set(scopedSources.map((source) => source.sourceId));
+  const scopedProjectCodes = new Set([...scopedSources.map((source) => source.projectCode), ...(projectCodeFilter ? [projectCodeFilter] : [])]);
+  const hasScopedQueue = Boolean(ownerNameFilter || projectCodeFilter);
+  const scopedFacts = facts.filter((fact) => !hasScopedQueue || (fact.sourceId ? scopedSourceIds.has(fact.sourceId) : scopedProjectCodes.has(fact.projectCode)));
+  const scopedProposals = proposals.filter(
+    (proposal) => !hasScopedQueue || (proposal.sourceId ? scopedSourceIds.has(proposal.sourceId) : scopedProjectCodes.has(proposal.projectCode))
+  );
+  const scopedExpiryReviews = expiryReviews.filter(
+    (review) => !hasScopedQueue || (review.fact ? (review.fact.sourceId ? scopedSourceIds.has(review.fact.sourceId) : scopedProjectCodes.has(review.fact.projectCode)) : false)
+  );
+  const staleFacts = scopedFacts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
+  const expiringFacts = scopedFacts.filter((fact) => fact.freshnessStatus === "expiring_soon");
   const factsNeedingReview = [...expiringFacts, ...staleFacts].slice(0, 12);
-  const openRefreshTasks = refreshTasks.filter((task) => task.status === "open");
-  const openEvidenceGaps = evidenceGaps.filter((gap) => gap.status === "open");
+  const scopedRefreshTasks = refreshTasks.filter((task) => !hasScopedQueue || scopedSourceIds.has(task.sourceId));
+  const openRefreshTasks = scopedRefreshTasks.filter((task) => task.status === "open");
+  const scopedEvidenceGaps = evidenceGaps.filter((gap) => !hasScopedQueue || scopedProjectCodes.has(gap.projectCode));
+  const openEvidenceGaps = scopedEvidenceGaps.filter((gap) => gap.status === "open");
   const ownersByProject = new Map<string, string[]>();
 
-  for (const source of sources) {
+  for (const source of allSources) {
     if (!source.ownerName) {
       continue;
     }
@@ -63,6 +108,41 @@ export default async function CommercialSourcesPage(props: PageProps) {
       ownersByProject.set(source.projectCode, owners);
     }
   }
+  const queueSources = allSources.filter((source) => !projectCodeFilter || source.projectCode === projectCodeFilter);
+  const ownerQueueKeys = Array.from(new Set(queueSources.map((source) => source.ownerName ?? "__unassigned")));
+  const ownerQueueSummaries = ownerQueueKeys
+    .map((ownerKey) => {
+      const ownerSources = queueSources.filter((source) => (ownerKey === "__unassigned" ? source.ownerName === null : source.ownerName === ownerKey));
+      const ownerSourceIds = new Set(ownerSources.map((source) => source.sourceId));
+      const ownerProjectCodes = new Set(ownerSources.map((source) => source.projectCode));
+      const ownerFacts = facts.filter((fact) => (fact.sourceId ? ownerSourceIds.has(fact.sourceId) : ownerProjectCodes.has(fact.projectCode)));
+
+      return {
+        activeFactsCount: ownerFacts.filter((fact) => fact.freshnessStatus === "active" || fact.freshnessStatus === "expiring_soon").length,
+        expiringSoonFactsCount: ownerFacts.filter((fact) => fact.freshnessStatus === "expiring_soon").length,
+        href: buildCommercialSourcesHref(locale, { ownerName: ownerKey, projectCode: projectCodeFilter }),
+        isActive: ownerNameFilter === ownerKey,
+        openEvidenceGapsCount: evidenceGaps.filter((gap) => gap.status === "open" && ownerProjectCodes.has(gap.projectCode)).length,
+        openRefreshTasksCount: refreshTasks.filter((task) => task.status === "open" && ownerSourceIds.has(task.sourceId)).length,
+        ownerLabel: ownerKey === "__unassigned" ? (locale === "ar" ? "غير معين" : "Unassigned") : ownerKey,
+        ownerName: ownerKey,
+        pendingApprovalsCount: proposals.filter(
+          (proposal) => proposal.state === "pending_review" && (proposal.sourceId ? ownerSourceIds.has(proposal.sourceId) : ownerProjectCodes.has(proposal.projectCode))
+        ).length,
+        projectCount: ownerProjectCodes.size,
+        sourceCount: ownerSources.length,
+        staleFactsCount: ownerFacts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired").length
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.isActive) - Number(a.isActive) ||
+        b.openEvidenceGapsCount - a.openEvidenceGapsCount ||
+        b.openRefreshTasksCount - a.openRefreshTasksCount ||
+        b.pendingApprovalsCount - a.pendingApprovalsCount ||
+        a.ownerLabel.localeCompare(b.ownerLabel)
+    );
+  const currentReturnPath = buildCommercialSourcesHref(locale, { ownerName: ownerNameFilter, projectCode: projectCodeFilter });
 
   return (
     <div className={pageStackClassName}>
@@ -77,23 +157,104 @@ export default async function CommercialSourcesPage(props: PageProps) {
       />
 
       <div className={metricGridClassName}>
-        <MetricTile detail={locale === "ar" ? "مسموح بها للردود التجارية" : "Allowed for commercial replies"} label={locale === "ar" ? "حقائق نشطة" : "Active facts"} tone="ocean" value={String(facts.length)} />
-        <MetricTile detail={locale === "ar" ? "تحتاج قرار مدير" : "Need manager decision"} label={locale === "ar" ? "بانتظار الاعتماد" : "Pending approvals"} tone="sand" value={String(proposals.filter((item) => item.state === "pending_review").length)} />
+        <MetricTile detail={locale === "ar" ? "مسموح بها للردود التجارية" : "Allowed for commercial replies"} label={locale === "ar" ? "حقائق نشطة" : "Active facts"} tone="ocean" value={String(scopedFacts.length)} />
+        <MetricTile detail={locale === "ar" ? "تحتاج قرار مدير" : "Need manager decision"} label={locale === "ar" ? "بانتظار الاعتماد" : "Pending approvals"} tone="sand" value={String(scopedProposals.filter((item) => item.state === "pending_review").length)} />
         <MetricTile detail={locale === "ar" ? "نشطة لكن تحتاج مراجعة" : "Active but needs review"} label={locale === "ar" ? "تنتهي قريباً" : "Expiring soon"} tone="rose" value={String(expiringFacts.length)} />
         <MetricTile detail={locale === "ar" ? "تحتاج تحديث مصدر" : "Need source refresh"} label={locale === "ar" ? "مهام مفتوحة" : "Open tasks"} tone="mint" value={String(openRefreshTasks.length)} />
         <MetricTile detail={locale === "ar" ? "تمنع مسودات الرد" : "Blocking reply drafts"} label={locale === "ar" ? "فجوات أدلة" : "Evidence gaps"} tone="rose" value={String(openEvidenceGaps.length)} />
       </div>
 
+      {hasScopedQueue ? (
+        <Panel title={locale === "ar" ? "نطاق قائمة العمل" : "Queue scope"}>
+          <WorkflowPanelBody
+            className="mt-4"
+            summary={
+              locale === "ar"
+                ? "تعرض هذه الصفحة الآن ضغط المصادر التجارية ضمن المالك أو المشروع المحدد فقط."
+                : "This page is scoped to the selected commercial source owner or project."
+            }
+          >
+            <div className={statusRowWrapClassName}>
+              {ownerNameFilter ? (
+                <StatusBadge tone="warning">
+                  {locale === "ar" ? "المالك" : "Owner"}
+                  {": "}
+                  {isUnassignedOwnerFilter ? (locale === "ar" ? "غير معين" : "Unassigned") : ownerNameFilter}
+                </StatusBadge>
+              ) : null}
+              {projectCodeFilter ? (
+                <StatusBadge>
+                  {locale === "ar" ? "المشروع" : "Project"}
+                  {": "}
+                  {projectCodeFilter}
+                </StatusBadge>
+              ) : null}
+              <Link className={inlineLinkClassName} href={`/${locale}/commercial-sources`}>
+                {locale === "ar" ? "عرض كل القوائم" : "View all queues"}
+              </Link>
+            </div>
+          </WorkflowPanelBody>
+        </Panel>
+      ) : null}
+
+      <Panel title={locale === "ar" ? "قوائم جاهزية حسب المالك" : "Owner readiness queues"}>
+        <WorkflowPanelBody
+          className="mt-4"
+          summary={
+            locale === "ar"
+              ? "افتح قائمة عمل مركزة لكل مالك مصدر لمراجعة مهام التحديث وفجوات الأدلة والاعتمادات المرتبطة بمصادره."
+              : "Open a focused work queue for each source owner across refresh tasks, evidence gaps, and pending approvals tied to their sources."
+          }
+        >
+          {ownerQueueSummaries.length === 0 ? (
+            <EmptyState
+              summary={locale === "ar" ? "لا توجد مصادر ضمن هذا النطاق." : "No sources exist inside this scope."}
+              title={locale === "ar" ? "لا توجد قوائم" : "No queues"}
+            />
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {ownerQueueSummaries.map((queue) => (
+                <WorkflowCard
+                  key={queue.ownerName}
+                  badges={
+                    <div className={statusRowWrapClassName}>
+                      <StatusBadge tone={queue.isActive ? "warning" : "neutral"}>{queue.isActive ? (locale === "ar" ? "محدد" : "Scoped") : queue.ownerLabel}</StatusBadge>
+                      <StatusBadge>{locale === "ar" ? `${queue.sourceCount} مصادر` : `${queue.sourceCount} sources`}</StatusBadge>
+                      <StatusBadge>{locale === "ar" ? `${queue.projectCount} مشاريع` : `${queue.projectCount} projects`}</StatusBadge>
+                    </div>
+                  }
+                  summary={
+                    locale === "ar"
+                      ? `${queue.openEvidenceGapsCount} فجوات أدلة، ${queue.openRefreshTasksCount} مهام تحديث، ${queue.pendingApprovalsCount} اعتمادات معلقة`
+                      : `${queue.openEvidenceGapsCount} evidence gaps, ${queue.openRefreshTasksCount} refresh tasks, ${queue.pendingApprovalsCount} pending approvals`
+                  }
+                  title={queue.ownerLabel}
+                >
+                  <DetailGrid>
+                    <DetailItem label={locale === "ar" ? "حقائق نشطة" : "Active facts"} value={String(queue.activeFactsCount)} />
+                    <DetailItem label={locale === "ar" ? "قريبة الانتهاء" : "Expiring"} value={String(queue.expiringSoonFactsCount)} />
+                    <DetailItem label={locale === "ar" ? "قديمة" : "Stale"} value={String(queue.staleFactsCount)} />
+                  </DetailGrid>
+                  <Link className={inlineLinkClassName} href={queue.href}>
+                    {locale === "ar" ? "فتح قائمة المالك" : "Open owner queue"}
+                  </Link>
+                </WorkflowCard>
+              ))}
+            </div>
+          )}
+        </WorkflowPanelBody>
+      </Panel>
+
       <div className={twoColumnGridClassName}>
         <Panel title={locale === "ar" ? "إضافة مصدر" : "Add source"}>
           <WorkflowPanelBody className="mt-4" summary={locale === "ar" ? "ابدأ مصدر مخزون أو سياسة أو ملف مبيعات للعميل." : "Start an inventory, policy, or sales-sheet source for the client."}>
-            <CommercialSourceCreateForm canManage={canManage} locale={locale} returnPath={`/${locale}/commercial-sources`} />
+            <CommercialSourceCreateForm canManage={canManage} locale={locale} returnPath={currentReturnPath} />
           </WorkflowPanelBody>
         </Panel>
 
         <Panel title={locale === "ar" ? "حقيقة يدوية" : "Manual fact"}>
           <WorkflowPanelBody className="mt-4" summary={locale === "ar" ? "استخدمها للسياسات والرسوم وشروط الزيارة التي لا تأتي من CSV." : "Use this for policies, fees, and visit terms that do not come from CSV."}>
-            <ManualCommercialFactForm canManage={canManage} locale={locale} returnPath={`/${locale}/commercial-sources`} />
+            <ManualCommercialFactForm canManage={canManage} locale={locale} returnPath={currentReturnPath} />
           </WorkflowPanelBody>
         </Panel>
       </div>
@@ -132,7 +293,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
                   summary={fact.content}
                   title={fact.title}
                 >
-                  <CommercialFactExpiryReviewForm canManage={canManage} fact={fact} locale={locale} returnPath={`/${locale}/commercial-sources`} />
+                  <CommercialFactExpiryReviewForm canManage={canManage} fact={fact} locale={locale} returnPath={currentReturnPath} />
                 </WorkflowListItem>
               ))}
             </div>
@@ -176,7 +337,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
                   summary={task.reason}
                   title={task.fact?.title ?? task.source.sourceName}
                 >
-                  <SourceRefreshTaskResolutionForm canManage={canManage} locale={locale} returnPath={`/${locale}/commercial-sources`} task={task} />
+                  <SourceRefreshTaskResolutionForm canManage={canManage} locale={locale} returnPath={currentReturnPath} task={task} />
                 </WorkflowListItem>
               ))}
             </div>
@@ -225,7 +386,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
                     <p className={caseMetaClassName}>{gap.warnings.join(locale === "ar" ? "، " : ", ")}</p>
                   ) : null}
                   {gap.draftMessage ? <p className="text-sm leading-7 text-ink-soft">{gap.draftMessage}</p> : null}
-                  <CommercialEvidenceGapResolutionForm canManage={canManage} gap={gap} locale={locale} returnPath={`/${locale}/commercial-sources`} />
+                  <CommercialEvidenceGapResolutionForm canManage={canManage} gap={gap} locale={locale} returnPath={currentReturnPath} />
                 </WorkflowListItem>
               ))}
             </div>
@@ -235,14 +396,22 @@ export default async function CommercialSourcesPage(props: PageProps) {
 
       <Panel title={locale === "ar" ? "المصادر" : "Sources"}>
         <WorkflowPanelBody className="mt-4">
-          {sources.length === 0 ? (
+          {scopedSources.length === 0 ? (
             <EmptyState
-              summary={locale === "ar" ? "لا توجد مصادر تجارية حيّة بعد." : "No live commercial sources exist yet."}
+              summary={
+                hasScopedQueue
+                  ? locale === "ar"
+                    ? "لا توجد مصادر تجارية ضمن هذا النطاق."
+                    : "No commercial sources match this queue scope."
+                  : locale === "ar"
+                    ? "لا توجد مصادر تجارية حيّة بعد."
+                    : "No live commercial sources exist yet."
+              }
               title={locale === "ar" ? "لا توجد مصادر" : "No sources"}
             />
           ) : (
             <div className="grid gap-4">
-              {sources.map((source) => (
+              {scopedSources.map((source) => (
                 <WorkflowCard
                   key={source.sourceId}
                   badges={
@@ -274,14 +443,14 @@ export default async function CommercialSourcesPage(props: PageProps) {
 
       <Panel title={locale === "ar" ? "سجل مراجعات الصلاحية" : "Expiry review history"}>
         <WorkflowPanelBody className="mt-4">
-          {expiryReviews.length === 0 ? (
+          {scopedExpiryReviews.length === 0 ? (
             <EmptyState
               summary={locale === "ar" ? "ستظهر قرارات التجديد والأرشفة هنا." : "Renewal and archive decisions will appear here."}
               title={locale === "ar" ? "لا توجد مراجعات" : "No reviews"}
             />
           ) : (
             <div className="grid gap-4">
-              {expiryReviews.slice(0, 12).map((review) => (
+              {scopedExpiryReviews.slice(0, 12).map((review) => (
                 <WorkflowCard
                   key={review.reviewId}
                   badges={<StatusBadge tone={review.outcome === "renewed" ? "success" : review.outcome === "archived" ? "critical" : "warning"}>{review.outcome}</StatusBadge>}

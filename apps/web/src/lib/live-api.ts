@@ -25,6 +25,7 @@ import type {
   CreateWebsiteLeadInput,
   CreateWebsiteLeadResult,
   ImportInventoryCsvInput,
+  ListCommercialSourcesQuery,
   ListGovernanceEventsQuery,
   ManageBulkCaseFollowUpInput,
   ManageBulkCaseFollowUpResult,
@@ -121,10 +122,25 @@ export async function listPersistedCasesFromApi() {
   return payload.cases;
 }
 
-export async function listCommercialSourcesFromApi(operatorRole?: OperatorRole) {
+export async function listCommercialSourcesFromApi(operatorRole?: OperatorRole, query: Partial<ListCommercialSourcesQuery> = {}) {
+  const searchParams = new URLSearchParams();
+
+  if (query.ownerName) {
+    searchParams.set("ownerName", query.ownerName);
+  }
+
+  if (query.projectCode) {
+    searchParams.set("projectCode", query.projectCode);
+  }
+
+  if (query.tenantId) {
+    searchParams.set("tenantId", query.tenantId);
+  }
+
+  const serialized = searchParams.toString();
   const payload = await requestJson<{
     sources: CommercialSourceSummary[];
-  }>("/v1/commercial-sources", {
+  }>(`/v1/commercial-sources${serialized ? `?${serialized}` : ""}`, {
     cache: "no-store",
     headers: await getOperatorSessionHeaders(operatorRole)
   });
@@ -448,9 +464,9 @@ export async function tryListPersistedCases() {
   }
 }
 
-export async function tryListCommercialSources(operatorRole?: OperatorRole) {
+export async function tryListCommercialSources(operatorRole?: OperatorRole, query: Partial<ListCommercialSourcesQuery> = {}) {
   try {
-    return await listCommercialSourcesFromApi(operatorRole);
+    return await listCommercialSourcesFromApi(operatorRole, query);
   } catch {
     return [];
   }
