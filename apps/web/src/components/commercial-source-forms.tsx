@@ -7,6 +7,7 @@ import type {
   CommercialFactExpiryReviewOutcome,
   CommercialFactKind,
   CommercialFactProposal,
+  CommercialSourceRefreshTask,
   CommercialSourceType,
   SupportedLocale
 } from "@real-estate-ai/contracts";
@@ -33,7 +34,8 @@ import {
   importCommercialInventoryAction,
   initialFormActionState,
   rejectCommercialFactProposalAction,
-  reviewCommercialFactExpiryAction
+  reviewCommercialFactExpiryAction,
+  resolveCommercialSourceRefreshTaskAction
 } from "@/app/actions";
 import { FormSubmitButton } from "@/components/form-submit-button";
 
@@ -317,7 +319,7 @@ export function CommercialFactExpiryReviewForm(props: {
           </Select>
         </label>
         <label className={fieldStackClassName}>
-          <span className={fieldLabelClassName}>{props.locale === "ar" ? "صلاحية جديدة" : "New expiry"}</span>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "صلاحية جديدة أو موعد تحديث" : "New expiry or refresh due"}</span>
           <TextInput disabled={!props.canManage} name="nextExpiresAt" type="datetime-local" />
         </label>
         <label className={fieldStackClassName}>
@@ -345,6 +347,63 @@ export function CommercialFactExpiryReviewForm(props: {
           disabledLabel={props.locale === "ar" ? "يتطلب صلاحية المدير" : "Manager permission required"}
           idleLabel={props.locale === "ar" ? "حفظ المراجعة" : "Save review"}
           pendingLabel={props.locale === "ar" ? "جارٍ الحفظ..." : "Saving..."}
+        />
+        <p className={formFeedbackClassName(state.status)}>{state.message}</p>
+      </div>
+    </form>
+  );
+}
+
+export function SourceRefreshTaskResolutionForm(props: {
+  canManage: boolean;
+  locale: SupportedLocale;
+  returnPath: string;
+  task: CommercialSourceRefreshTask;
+}) {
+  const [state, action] = useActionState(resolveCommercialSourceRefreshTaskAction, initialFormActionState);
+
+  if (props.task.status !== "open") {
+    return null;
+  }
+
+  return (
+    <form action={action} className={formStackClassName}>
+      <input name="locale" type="hidden" value={props.locale} />
+      <input name="returnPath" type="hidden" value={props.returnPath} />
+      <input name="taskId" type="hidden" value={props.task.taskId} />
+      <div className={fieldGridClassName}>
+        <label className={fieldStackClassName}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "القرار" : "Decision"}</span>
+          <Select disabled={!props.canManage} name="status" required>
+            <option value="completed">{props.locale === "ar" ? "اكتمل تحديث المصدر" : "Source refreshed"}</option>
+            <option value="dismissed">{props.locale === "ar" ? "إغلاق بدون تحديث" : "Close without refresh"}</option>
+          </Select>
+        </label>
+        <label className={fieldStackClassName}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "أغلق بواسطة" : "Closed by"}</span>
+          <TextInput disabled={!props.canManage} name="resolvedByName" />
+        </label>
+        <label className={cx(fieldStackClassName, fieldSpanFullClassName)}>
+          <span className={fieldLabelClassName}>{props.locale === "ar" ? "ملخص الإغلاق" : "Resolution summary"}</span>
+          <TextArea
+            disabled={!props.canManage}
+            name="resolutionSummary"
+            placeholder={
+              props.locale === "ar"
+                ? "اذكر نسخة المصدر الجديدة أو سبب الإغلاق بدون تحديث."
+                : "Record the new source version, or explain why this is closed without a refresh."
+            }
+            required
+            rows={3}
+          />
+        </label>
+      </div>
+      <div className={formActionsRowClassName}>
+        <FormSubmitButton
+          disabled={!props.canManage}
+          disabledLabel={props.locale === "ar" ? "يتطلب صلاحية المدير" : "Manager permission required"}
+          idleLabel={props.locale === "ar" ? "تحديث المهمة" : "Update task"}
+          pendingLabel={props.locale === "ar" ? "جارٍ التحديث..." : "Updating..."}
         />
         <p className={formFeedbackClassName(state.status)}>{state.message}</p>
       </div>

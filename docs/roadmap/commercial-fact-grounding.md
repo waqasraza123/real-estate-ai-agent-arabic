@@ -73,6 +73,21 @@ Commercial-source hardening now includes production-style manager ergonomics aro
   - `left_expired`: records an explicit decision to let the fact age out.
 - Expiry-review history is visible from the source center so operators can inspect who made the freshness decision and why.
 
+## Source Refresh Tasks
+
+Source-refresh-required is now an operational task, not only a review note.
+
+- Choosing `source_refresh_required` during an expiry review opens or updates one open source-refresh task for the affected fact.
+- The task is linked to the commercial source, affected fact, reason, requester, and optional due timestamp.
+- The source center lists open refresh tasks across projects so managers can see source-owner workload before reply grounding starts failing.
+- The source detail page lists all refresh tasks for that source, including completed and dismissed history.
+- Managers can resolve a task as:
+  - `completed`: a refreshed source was imported or otherwise reviewed, and the refresh work is closed.
+  - `dismissed`: the task is intentionally closed without a source refresh.
+- Renewing a fact automatically completes any open refresh task for that fact.
+- Archiving a fact automatically dismisses any open refresh task for that fact.
+- Source summaries expose `openRefreshTasksCount`, so commercial source lists can show refresh pressure next to proposal and active-fact counts.
+
 ## API Boundaries
 
 The source center is exposed only through trusted manager-session routes.
@@ -81,8 +96,10 @@ The source center is exposed only through trusted manager-session routes.
 - `POST /v1/commercial-fact-proposals/bulk-reject`
 - `GET /v1/commercial-facts/expiry-reviews`
 - `POST /v1/commercial-facts/:factId/expiry-review`
+- `GET /v1/commercial-source-refresh-tasks`
+- `POST /v1/commercial-source-refresh-tasks/:taskId/resolve`
 
-All four routes require the same `manage_commercial_sources` or revenue-manager workspace boundary as the existing commercial-source APIs.
+These routes require the same `manage_commercial_sources` or revenue-manager workspace boundary as the existing commercial-source APIs.
 
 ## Production Notes
 
@@ -90,6 +107,7 @@ All four routes require the same `manage_commercial_sources` or revenue-manager 
 - Do not treat a global pricing policy as a live price sheet.
 - Exact prices, discounts, incentives, legal guarantees, possession dates, and final availability still require a source-backed fact or human approval.
 - Source lifecycle, approval ownership, expiry, and per-project source uploads now exist locally, but production deployment still needs client-owned source governance, user identity, remote storage, and provider credential setup.
+- Source-refresh tasks currently close as manager-recorded workflow evidence; a later deployment should connect completion to a specific imported source version when external source storage is live.
 - A future retrieval adapter can replace the simple database lookup while preserving the existing `CaseAgentFactGrounding` contract.
 
 ## Verification Guidance

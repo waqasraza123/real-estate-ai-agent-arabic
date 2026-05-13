@@ -31,6 +31,7 @@ import {
   rejectCommercialFactProposalInputSchema,
   reviewCommercialFactExpiryInputSchema,
   resolveCaseQaReviewInputSchema,
+  resolveCommercialSourceRefreshTaskInputSchema,
   resolveHandoverCustomerUpdateQaReviewInputSchema,
   resolveHandoverPostCompletionFollowUpInputSchema,
   saveHandoverArchiveReviewInputSchema,
@@ -82,6 +83,7 @@ import {
   rejectCommercialFactProposal,
   reviewCommercialFactExpiry,
   resolveCaseQaReview,
+  resolveCommercialSourceRefreshTask,
   resolveHandoverCustomerUpdateQaReview,
   resolveHandoverPostCompletionFollowUp,
   saveHandoverArchiveReview,
@@ -367,6 +369,37 @@ export async function reviewCommercialFactExpiryAction(_: FormActionState, formD
     revalidatePath(`/${locale}/commercial-facts/review`);
     return {
       message: locale === "ar" ? "تم حفظ مراجعة صلاحية الحقيقة التجارية." : "Commercial fact expiry review saved.",
+      status: "success"
+    };
+  } catch (error) {
+    return getActionError(locale, error);
+  }
+}
+
+export async function resolveCommercialSourceRefreshTaskAction(_: FormActionState, formData: FormData): Promise<FormActionState> {
+  const locale = getLocale(formData.get("locale"));
+  const taskId = formData.get("taskId");
+  const returnPath = normalizeReturnPath(formData.get("returnPath"), locale);
+  const result = resolveCommercialSourceRefreshTaskInputSchema.safeParse({
+    resolutionSummary: formData.get("resolutionSummary"),
+    resolvedByName: normalizeOptionalString(formData.get("resolvedByName")),
+    status: formData.get("status")
+  });
+
+  if (typeof taskId !== "string") {
+    return getLocalizedError(locale);
+  }
+
+  if (!result.success) {
+    return { message: getValidationMessage(locale), status: "error" };
+  }
+
+  try {
+    await resolveCommercialSourceRefreshTask(taskId, result.data, await getOperatorRole());
+    revalidatePath(returnPath);
+    revalidatePath(`/${locale}/commercial-sources`);
+    return {
+      message: locale === "ar" ? "تم تحديث مهمة تحديث المصدر." : "Source refresh task updated.",
       status: "success"
     };
   } catch (error) {

@@ -20,10 +20,10 @@ import {
   twoColumnGridClassName
 } from "@real-estate-ai/ui";
 
-import { CommercialFactExpiryReviewForm, CommercialSourceCreateForm, ManualCommercialFactForm } from "@/components/commercial-source-forms";
+import { CommercialFactExpiryReviewForm, CommercialSourceCreateForm, ManualCommercialFactForm, SourceRefreshTaskResolutionForm } from "@/components/commercial-source-forms";
 import { ScreenIntro } from "@/components/screen-intro";
 import { getCurrentOperatorRole } from "@/lib/operator-session";
-import { tryListActiveCommercialFacts, tryListCommercialFactExpiryReviews, tryListCommercialFactProposals, tryListCommercialSources } from "@/lib/live-api";
+import { tryListActiveCommercialFacts, tryListCommercialFactExpiryReviews, tryListCommercialFactProposals, tryListCommercialSourceRefreshTasks, tryListCommercialSources } from "@/lib/live-api";
 
 export const dynamic = "force-dynamic";
 
@@ -36,15 +36,17 @@ export default async function CommercialSourcesPage(props: PageProps) {
   const messages = getMessages(locale);
   const role = await getCurrentOperatorRole();
   const canManage = canOperatorRolePerform("manage_commercial_sources", role);
-  const [sources, proposals, facts, expiryReviews] = await Promise.all([
+  const [sources, proposals, facts, expiryReviews, refreshTasks] = await Promise.all([
     tryListCommercialSources(role),
     tryListCommercialFactProposals(role),
     tryListActiveCommercialFacts(role),
-    tryListCommercialFactExpiryReviews(role)
+    tryListCommercialFactExpiryReviews(role),
+    tryListCommercialSourceRefreshTasks(role)
   ]);
   const staleFacts = facts.filter((fact) => fact.freshnessStatus === "stale" || fact.freshnessStatus === "expired");
   const expiringFacts = facts.filter((fact) => fact.freshnessStatus === "expiring_soon");
   const factsNeedingReview = [...expiringFacts, ...staleFacts].slice(0, 12);
+  const openRefreshTasks = refreshTasks.filter((task) => task.status === "open");
 
   return (
     <div className={pageStackClassName}>
@@ -62,7 +64,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
         <MetricTile detail={locale === "ar" ? "مسموح بها للردود التجارية" : "Allowed for commercial replies"} label={locale === "ar" ? "حقائق نشطة" : "Active facts"} tone="ocean" value={String(facts.length)} />
         <MetricTile detail={locale === "ar" ? "تحتاج قرار مدير" : "Need manager decision"} label={locale === "ar" ? "بانتظار الاعتماد" : "Pending approvals"} tone="sand" value={String(proposals.filter((item) => item.state === "pending_review").length)} />
         <MetricTile detail={locale === "ar" ? "نشطة لكن تحتاج مراجعة" : "Active but needs review"} label={locale === "ar" ? "تنتهي قريباً" : "Expiring soon"} tone="rose" value={String(expiringFacts.length)} />
-        <MetricTile detail={locale === "ar" ? "لا تؤسس ردود الوكيل" : "Cannot ground agent replies"} label={locale === "ar" ? "قديمة أو منتهية" : "Stale or expired"} tone="mint" value={String(staleFacts.length)} />
+        <MetricTile detail={locale === "ar" ? "تحتاج تحديث مصدر" : "Need source refresh"} label={locale === "ar" ? "مهام مفتوحة" : "Open tasks"} tone="mint" value={String(openRefreshTasks.length)} />
       </div>
 
       <div className={twoColumnGridClassName}>
@@ -121,6 +123,48 @@ export default async function CommercialSourcesPage(props: PageProps) {
         </WorkflowPanelBody>
       </Panel>
 
+      <Panel title={locale === "ar" ? "مهام تحديث المصدر" : "Source refresh tasks"}>
+        <WorkflowPanelBody
+          className="mt-4"
+          summary={
+            locale === "ar"
+              ? "أي مراجعة صلاحية تنتهي بقرار تحديث المصدر تفتح مهمة هنا حتى لا يبقى القرار في السجل فقط."
+              : "Any expiry review marked source refresh required opens a task here so the decision does not stay buried in history."
+          }
+        >
+          {openRefreshTasks.length === 0 ? (
+            <EmptyState
+              summary={locale === "ar" ? "لا توجد مهام تحديث مصدر مفتوحة." : "No source refresh tasks are open."}
+              title={locale === "ar" ? "لا توجد مهام" : "No tasks"}
+            />
+          ) : (
+            <div className="grid gap-4">
+              {openRefreshTasks.slice(0, 12).map((task) => (
+                <WorkflowListItem
+                  key={task.taskId}
+                  badges={
+                    <div className={statusRowWrapClassName}>
+                      <StatusBadge tone="warning">{task.status}</StatusBadge>
+                      <StatusBadge>{task.source.sourceType}</StatusBadge>
+                      <StatusBadge>{task.source.projectCode}</StatusBadge>
+                    </div>
+                  }
+                  meta={
+                    <p className={caseMetaClassName}>
+                      {locale === "ar" ? "مطلوبة قبل:" : "Due:"} {task.dueAt ?? "-"}
+                    </p>
+                  }
+                  summary={task.reason}
+                  title={task.fact?.title ?? task.source.sourceName}
+                >
+                  <SourceRefreshTaskResolutionForm canManage={canManage} locale={locale} returnPath={`/${locale}/commercial-sources`} task={task} />
+                </WorkflowListItem>
+              ))}
+            </div>
+          )}
+        </WorkflowPanelBody>
+      </Panel>
+
       <Panel title={locale === "ar" ? "المصادر" : "Sources"}>
         <WorkflowPanelBody className="mt-4">
           {sources.length === 0 ? (
@@ -146,6 +190,7 @@ export default async function CommercialSourcesPage(props: PageProps) {
                     <DetailItem label={locale === "ar" ? "المشروع" : "Project"} value={source.projectCode} />
                     <DetailItem label={locale === "ar" ? "الحقائق النشطة" : "Active facts"} value={String(source.activeFactsCount)} />
                     <DetailItem label={locale === "ar" ? "مقترحات معلقة" : "Pending proposals"} value={String(source.pendingProposalsCount)} />
+                    <DetailItem label={locale === "ar" ? "مهام تحديث" : "Refresh tasks"} value={String(source.openRefreshTasksCount)} />
                     <DetailItem label={locale === "ar" ? "آخر نسخة" : "Latest version"} value={source.latestVersion?.versionLabel ?? "-"} />
                   </DetailGrid>
                   <Link className={inlineLinkClassName} href={`/${locale}/commercial-sources/${source.sourceId}`}>

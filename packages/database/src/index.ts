@@ -39,6 +39,8 @@ import type {
   CommercialFactUsageScope,
   CommercialSourceDetail,
   CommercialSourceLifecycleState,
+  CommercialSourceRefreshTask,
+  CommercialSourceRefreshTaskStatus,
   CommercialSourceSummary,
   CommercialSourceType,
   CommercialSourceVersion,
@@ -89,6 +91,7 @@ import type {
   ListActiveCommercialFactsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
+  ListCommercialSourceRefreshTasksQuery,
   PersistedCaseAgentMemory,
   PersistedCaseAgentRun,
   PersistedCaseAgentState,
@@ -139,6 +142,7 @@ import type {
   RejectCommercialFactProposalInput,
   ApproveCommercialFactProposalInput,
   ReviewCommercialFactExpiryInput,
+  ResolveCommercialSourceRefreshTaskInput,
   InventoryUnitStatus,
   UpdateHandoverArchiveStatusInput,
   UpdateHandoverMilestoneInput,
@@ -517,6 +521,24 @@ const commercialFactExpiryReviews = pgTable("commercial_fact_expiry_reviews", {
   outcome: text("outcome").notNull(),
   reviewedByName: text("reviewed_by_name"),
   summary: text("summary").notNull()
+});
+
+const commercialSourceRefreshTasks = pgTable("commercial_source_refresh_tasks", {
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).defaultNow().notNull(),
+  dueAt: timestamp("due_at", { mode: "string", withTimezone: true }),
+  factId: uuid("fact_id").references(() => commercialFacts.id, { onDelete: "set null" }),
+  id: uuid("id").primaryKey(),
+  reason: text("reason").notNull(),
+  requestedByName: text("requested_by_name"),
+  resolutionSummary: text("resolution_summary"),
+  resolvedAt: timestamp("resolved_at", { mode: "string", withTimezone: true }),
+  resolvedByName: text("resolved_by_name"),
+  sourceId: uuid("source_id")
+    .notNull()
+    .references(() => commercialSources.id, { onDelete: "cascade" }),
+  status: text("status").notNull(),
+  tenantId: text("tenant_id").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).defaultNow().notNull()
 });
 
 const inventoryUnits = pgTable("inventory_units", {
@@ -991,6 +1013,7 @@ export interface LeadCaptureStore {
     tenantId?: string;
   }): Promise<CommercialSourceSummary[]>;
   listCommercialFactExpiryReviews(input: ListCommercialFactExpiryReviewsQuery): Promise<CommercialFactExpiryReview[]>;
+  listCommercialSourceRefreshTasks(input: ListCommercialSourceRefreshTasksQuery): Promise<CommercialSourceRefreshTask[]>;
   recordCommercialInventoryImport(
     sourceId: string,
     input: {
@@ -1026,6 +1049,7 @@ export interface LeadCaptureStore {
   ): Promise<CommercialSourceDetail | null>;
   rejectCommercialFactProposal(proposalId: string, input: RejectCommercialFactProposalInput): Promise<CommercialFactProposal | null>;
   reviewCommercialFactExpiry(factId: string, input: ReviewCommercialFactExpiryInput): Promise<CommercialFactExpiryReview | null>;
+  resolveCommercialSourceRefreshTask(taskId: string, input: ResolveCommercialSourceRefreshTaskInput): Promise<CommercialSourceRefreshTask | null>;
   getDocumentUploadRecord(
     caseId: string,
     documentRequestId: string,
@@ -1403,6 +1427,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       commercialFactExpiryReviews,
       commercialFactProposals,
       commercialFacts,
+      commercialSourceRefreshTasks,
       commercialSources,
       commercialSourceVersions,
       documentRequests,
@@ -1645,6 +1670,22 @@ export async function createAlphaLeadCaptureStore(options?: {
       summary text not null,
       reviewed_by_name text,
       created_at timestamptz not null default now()
+    );
+
+    create table if not exists commercial_source_refresh_tasks (
+      id uuid primary key,
+      tenant_id text not null,
+      source_id uuid not null references commercial_sources(id) on delete cascade,
+      fact_id uuid references commercial_facts(id) on delete set null,
+      status text not null,
+      reason text not null,
+      requested_by_name text,
+      due_at timestamptz,
+      resolved_at timestamptz,
+      resolved_by_name text,
+      resolution_summary text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
     );
 
     create table if not exists inventory_units (
@@ -3735,11 +3776,12 @@ export async function createAlphaLeadCaptureStore(options?: {
   const listCommercialSourcesLocal = async (input: { projectCode?: string; tenantId?: string } = {}): Promise<CommercialSourceSummary[]> => {
     const tenantId = input.tenantId ?? "local-alpha";
     const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
-    const [sourceRecords, versionRecords, proposalRecords, factRecords] = await Promise.all([
+    const [sourceRecords, versionRecords, proposalRecords, factRecords, refreshTaskRecords] = await Promise.all([
       db.select().from(commercialSources).orderBy(desc(commercialSources.updatedAt), asc(commercialSources.sourceName)),
       db.select().from(commercialSourceVersions).orderBy(desc(commercialSourceVersions.createdAt)),
       db.select().from(commercialFactProposals),
-      db.select().from(commercialFacts)
+      db.select().from(commercialFacts),
+      db.select().from(commercialSourceRefreshTasks)
     ]);
 
     return sourceRecords
@@ -3753,6 +3795,7 @@ export async function createAlphaLeadCaptureStore(options?: {
           createdAt: source.createdAt,
           description: source.description,
           latestVersion: latestVersion ? hydrateCommercialSourceVersion(latestVersion) : null,
+          openRefreshTasksCount: refreshTaskRecords.filter((task) => task.sourceId === source.id && task.status === "open").length,
           pendingProposalsCount: proposalRecords.filter((proposal) => proposal.sourceId === source.id && proposal.state === "pending_review").length,
           projectCode: source.projectCode,
           sourceId: source.id,
@@ -3859,6 +3902,77 @@ export async function createAlphaLeadCaptureStore(options?: {
       .map((review) => hydrateCommercialFactExpiryReview(review, factLookup.get(review.factId) ?? null));
   };
 
+  const listCommercialSourceRefreshTasksLocal = async (
+    input: ListCommercialSourceRefreshTasksQuery
+  ): Promise<CommercialSourceRefreshTask[]> => {
+    const tenantId = input.tenantId ?? "local-alpha";
+    const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
+    const now = new Date().toISOString();
+    const [taskRecords, sourceRecords, versionRecords, proposalRecords, factRecords, evidenceRecords] = await Promise.all([
+      db.select().from(commercialSourceRefreshTasks).orderBy(desc(commercialSourceRefreshTasks.updatedAt)),
+      db.select().from(commercialSources),
+      db.select().from(commercialSourceVersions).orderBy(desc(commercialSourceVersions.createdAt)),
+      db.select().from(commercialFactProposals),
+      db.select().from(commercialFacts),
+      db.select().from(commercialFactEvidence)
+    ]);
+    const sourceLookup = new Map(sourceRecords.map((source) => [source.id, source]));
+    const versionLookup = new Map(versionRecords.map((version) => [version.id, version]));
+    const commercialSourceSummaries = new Map(
+      sourceRecords
+        .filter((source) => source.tenantId === tenantId)
+        .map((source) => {
+          const latestVersion = versionRecords.find((version) => version.sourceId === source.id) ?? null;
+          const summary: CommercialSourceSummary = {
+            activeFactsCount: factRecords.filter((fact) => fact.sourceId === source.id && fact.status === "active").length,
+            createdAt: source.createdAt,
+            description: source.description,
+            latestVersion: latestVersion ? hydrateCommercialSourceVersion(latestVersion) : null,
+            openRefreshTasksCount: taskRecords.filter((task) => task.sourceId === source.id && task.status === "open").length,
+            pendingProposalsCount: proposalRecords.filter((proposal) => proposal.sourceId === source.id && proposal.state === "pending_review").length,
+            projectCode: source.projectCode,
+            sourceId: source.id,
+            sourceName: source.sourceName,
+            sourceType: toCommercialSourceType(source.sourceType),
+            state: toCommercialSourceLifecycleState(source.state),
+            tenantId: source.tenantId,
+            updatedAt: source.updatedAt
+          };
+
+          return [source.id, summary] as const;
+        })
+    );
+    const factLookup = new Map(
+      factRecords.map((fact) => [
+        fact.id,
+        hydrateCommercialFact(
+          fact,
+          evidenceRecords.filter((evidence) => evidence.factId === fact.id),
+          sourceLookup,
+          versionLookup,
+          now
+        )
+      ])
+    );
+
+    return taskRecords
+      .filter((task) => task.tenantId === tenantId)
+      .filter((task) => !input.status || task.status === input.status)
+      .filter((task) => !input.sourceId || task.sourceId === input.sourceId)
+      .filter((task) => {
+        const source = commercialSourceSummaries.get(task.sourceId);
+
+        return Boolean(source && (!projectCode || normalizeProjectCode(source.projectCode) === projectCode));
+      })
+      .map((task) =>
+        hydrateCommercialSourceRefreshTask(
+          task,
+          commercialSourceSummaries.get(task.sourceId)!,
+          task.factId ? factLookup.get(task.factId) ?? null : null
+        )
+      );
+  };
+
   const getCommercialSourceDetailLocal = async (sourceId: string): Promise<CommercialSourceDetail | null> => {
     const sourceRecord = (await db.select().from(commercialSources).where(eq(commercialSources.id, sourceId))).at(0);
 
@@ -3866,13 +3980,14 @@ export async function createAlphaLeadCaptureStore(options?: {
       return null;
     }
 
-    const [versionRecords, proposalRecords, factRecords, evidenceRecords, inventoryRecords, unitRecords] = await Promise.all([
+    const [versionRecords, proposalRecords, factRecords, evidenceRecords, inventoryRecords, unitRecords, refreshTaskRecords] = await Promise.all([
       db.select().from(commercialSourceVersions).where(eq(commercialSourceVersions.sourceId, sourceId)).orderBy(desc(commercialSourceVersions.createdAt)),
       db.select().from(commercialFactProposals).where(eq(commercialFactProposals.sourceId, sourceId)).orderBy(desc(commercialFactProposals.updatedAt)),
       db.select().from(commercialFacts).where(eq(commercialFacts.sourceId, sourceId)).orderBy(desc(commercialFacts.updatedAt)),
       db.select().from(commercialFactEvidence).where(eq(commercialFactEvidence.sourceId, sourceId)),
       db.select().from(inventoryUnitSnapshots).orderBy(desc(inventoryUnitSnapshots.createdAt)),
-      db.select().from(inventoryUnits)
+      db.select().from(inventoryUnits),
+      db.select().from(commercialSourceRefreshTasks).where(eq(commercialSourceRefreshTasks.sourceId, sourceId))
     ]);
     const sourceLookup = new Map([[sourceRecord.id, sourceRecord]]);
     const versionLookup = new Map(versionRecords.map((version) => [version.id, version]));
@@ -3925,8 +4040,9 @@ export async function createAlphaLeadCaptureStore(options?: {
             unitType: snapshot.unitType,
             view: snapshot.view
           };
-        }),
+      }),
       latestVersion: versions[0] ?? null,
+      openRefreshTasksCount: refreshTaskRecords.filter((task) => task.status === "open").length,
       pendingProposalsCount: proposals.filter((proposal) => proposal.state === "pending_review").length,
       projectCode: sourceRecord.projectCode,
       proposals,
@@ -4143,36 +4259,7 @@ export async function createAlphaLeadCaptureStore(options?: {
       return detail;
     },
     async listCommercialSources(input = {}) {
-      const tenantId = input.tenantId ?? "local-alpha";
-      const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
-      const [sourceRecords, versionRecords, proposalRecords, factRecords] = await Promise.all([
-        db.select().from(commercialSources).orderBy(desc(commercialSources.updatedAt), asc(commercialSources.sourceName)),
-        db.select().from(commercialSourceVersions).orderBy(desc(commercialSourceVersions.createdAt)),
-        db.select().from(commercialFactProposals),
-        db.select().from(commercialFacts)
-      ]);
-
-      return sourceRecords
-        .filter((source) => source.tenantId === tenantId)
-        .filter((source) => !projectCode || normalizeProjectCode(source.projectCode) === projectCode)
-        .map((source) => {
-          const latestVersion = versionRecords.find((version) => version.sourceId === source.id) ?? null;
-
-          return {
-            activeFactsCount: factRecords.filter((fact) => fact.sourceId === source.id && fact.status === "active").length,
-            createdAt: source.createdAt,
-            description: source.description,
-            latestVersion: latestVersion ? hydrateCommercialSourceVersion(latestVersion) : null,
-            pendingProposalsCount: proposalRecords.filter((proposal) => proposal.sourceId === source.id && proposal.state === "pending_review").length,
-            projectCode: source.projectCode,
-            sourceId: source.id,
-            sourceName: source.sourceName,
-            sourceType: toCommercialSourceType(source.sourceType),
-            state: toCommercialSourceLifecycleState(source.state),
-            tenantId: source.tenantId,
-            updatedAt: source.updatedAt
-          } satisfies CommercialSourceSummary;
-        });
+      return listCommercialSourcesLocal(input);
     },
     async getCommercialSourceDetail(sourceId) {
       const sourceRecord = (await db.select().from(commercialSources).where(eq(commercialSources.id, sourceId))).at(0);
@@ -4181,13 +4268,14 @@ export async function createAlphaLeadCaptureStore(options?: {
         return null;
       }
 
-      const [versionRecords, proposalRecords, factRecords, evidenceRecords, inventoryRecords, unitRecords] = await Promise.all([
+      const [versionRecords, proposalRecords, factRecords, evidenceRecords, inventoryRecords, unitRecords, refreshTaskRecords] = await Promise.all([
         db.select().from(commercialSourceVersions).where(eq(commercialSourceVersions.sourceId, sourceId)).orderBy(desc(commercialSourceVersions.createdAt)),
         db.select().from(commercialFactProposals).where(eq(commercialFactProposals.sourceId, sourceId)).orderBy(desc(commercialFactProposals.updatedAt)),
         db.select().from(commercialFacts).where(eq(commercialFacts.sourceId, sourceId)).orderBy(desc(commercialFacts.updatedAt)),
         db.select().from(commercialFactEvidence).where(eq(commercialFactEvidence.sourceId, sourceId)),
         db.select().from(inventoryUnitSnapshots).orderBy(desc(inventoryUnitSnapshots.createdAt)),
-        db.select().from(inventoryUnits)
+        db.select().from(inventoryUnits),
+        db.select().from(commercialSourceRefreshTasks).where(eq(commercialSourceRefreshTasks.sourceId, sourceId))
       ]);
       const sourceLookup = new Map([[sourceRecord.id, sourceRecord]]);
       const versionLookup = new Map(versionRecords.map((version) => [version.id, version]));
@@ -4240,8 +4328,9 @@ export async function createAlphaLeadCaptureStore(options?: {
               unitType: snapshot.unitType,
               view: snapshot.view
             };
-          }),
+        }),
         latestVersion: versions[0] ?? null,
+        openRefreshTasksCount: refreshTaskRecords.filter((task) => task.status === "open").length,
         pendingProposalsCount: proposals.filter((proposal) => proposal.state === "pending_review").length,
         projectCode: sourceRecord.projectCode,
         proposals,
@@ -4575,6 +4664,9 @@ export async function createAlphaLeadCaptureStore(options?: {
     async listCommercialFactExpiryReviews(input) {
       return listCommercialFactExpiryReviewsLocal(input);
     },
+    async listCommercialSourceRefreshTasks(input) {
+      return listCommercialSourceRefreshTasksLocal(input);
+    },
     async reviewCommercialFactExpiry(factId, input) {
       const fact = (await db.select().from(commercialFacts).where(eq(commercialFacts.id, factId))).at(0);
 
@@ -4584,6 +4676,12 @@ export async function createAlphaLeadCaptureStore(options?: {
 
       const now = new Date().toISOString();
       const reviewId = randomUUID();
+      const openRefreshTask = (
+        await db
+          .select()
+          .from(commercialSourceRefreshTasks)
+          .where(and(eq(commercialSourceRefreshTasks.factId, factId), eq(commercialSourceRefreshTasks.status, "open")))
+      ).at(0);
 
       await db.transaction(async (transaction) => {
         await transaction.insert(commercialFactExpiryReviews).values({
@@ -4604,6 +4702,19 @@ export async function createAlphaLeadCaptureStore(options?: {
               updatedAt: now
             })
             .where(eq(commercialFacts.id, factId));
+
+          if (openRefreshTask) {
+            await transaction
+              .update(commercialSourceRefreshTasks)
+              .set({
+                resolutionSummary: input.summary,
+                resolvedAt: now,
+                resolvedByName: input.reviewedByName ?? null,
+                status: "completed",
+                updatedAt: now
+              })
+              .where(eq(commercialSourceRefreshTasks.id, openRefreshTask.id));
+          }
         }
 
         if (input.outcome === "archived") {
@@ -4614,6 +4725,19 @@ export async function createAlphaLeadCaptureStore(options?: {
               updatedAt: now
             })
             .where(eq(commercialFacts.id, factId));
+
+          if (openRefreshTask) {
+            await transaction
+              .update(commercialSourceRefreshTasks)
+              .set({
+                resolutionSummary: input.summary,
+                resolvedAt: now,
+                resolvedByName: input.reviewedByName ?? null,
+                status: "dismissed",
+                updatedAt: now
+              })
+              .where(eq(commercialSourceRefreshTasks.id, openRefreshTask.id));
+          }
         }
 
         if (input.outcome === "source_refresh_required" || input.outcome === "left_expired") {
@@ -4624,9 +4748,61 @@ export async function createAlphaLeadCaptureStore(options?: {
             })
             .where(eq(commercialFacts.id, factId));
         }
+
+        if (input.outcome === "source_refresh_required" && fact.sourceId) {
+          if (openRefreshTask) {
+            await transaction
+              .update(commercialSourceRefreshTasks)
+              .set({
+                dueAt: input.nextExpiresAt ?? openRefreshTask.dueAt,
+                reason: input.summary,
+                requestedByName: input.reviewedByName ?? openRefreshTask.requestedByName,
+                updatedAt: now
+              })
+              .where(eq(commercialSourceRefreshTasks.id, openRefreshTask.id));
+          } else {
+            await transaction.insert(commercialSourceRefreshTasks).values({
+              createdAt: now,
+              dueAt: input.nextExpiresAt ?? fact.expiresAt,
+              factId,
+              id: randomUUID(),
+              reason: input.summary,
+              requestedByName: input.reviewedByName ?? null,
+              resolutionSummary: null,
+              resolvedAt: null,
+              resolvedByName: null,
+              sourceId: fact.sourceId,
+              status: "open",
+              tenantId: fact.tenantId,
+              updatedAt: now
+            });
+          }
+        }
       });
 
       return (await listCommercialFactExpiryReviewsLocal({ factId, tenantId: fact.tenantId })).find((review) => review.reviewId === reviewId) ?? null;
+    },
+    async resolveCommercialSourceRefreshTask(taskId, input) {
+      const task = (await db.select().from(commercialSourceRefreshTasks).where(eq(commercialSourceRefreshTasks.id, taskId))).at(0);
+
+      if (!task) {
+        return null;
+      }
+
+      const now = new Date().toISOString();
+
+      await db
+        .update(commercialSourceRefreshTasks)
+        .set({
+          resolutionSummary: input.resolutionSummary,
+          resolvedAt: now,
+          resolvedByName: input.resolvedByName ?? null,
+          status: input.status,
+          updatedAt: now
+        })
+        .where(eq(commercialSourceRefreshTasks.id, taskId));
+
+      return (await listCommercialSourceRefreshTasksLocal({ sourceId: task.sourceId, tenantId: task.tenantId })).find((item) => item.taskId === taskId) ?? null;
     },
     async getProjectCommercialReadinessSummary(input) {
       const tenantId = input.tenantId ?? "local-alpha";
@@ -9505,6 +9681,14 @@ function toCommercialFactExpiryReviewOutcome(value: string): CommercialFactExpir
   throw new Error(`unsupported_commercial_fact_expiry_review_outcome:${value}`);
 }
 
+function toCommercialSourceRefreshTaskStatus(value: string): CommercialSourceRefreshTaskStatus {
+  if (value === "open" || value === "completed" || value === "dismissed") {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_source_refresh_task_status:${value}`);
+}
+
 function toInventoryUnitStatus(value: string): InventoryUnitStatus {
   if (value === "available" || value === "reserved" || value === "sold" || value === "blocked" || value === "unknown") {
     return value;
@@ -9692,6 +9876,44 @@ function hydrateCommercialFactExpiryReview(
     reviewedByName: value.reviewedByName,
     reviewId: value.id,
     summary: value.summary
+  };
+}
+
+function hydrateCommercialSourceRefreshTask(
+  value: {
+    createdAt: string;
+    dueAt: string | null;
+    factId: string | null;
+    id: string;
+    reason: string;
+    requestedByName: string | null;
+    resolvedAt: string | null;
+    resolvedByName: string | null;
+    resolutionSummary: string | null;
+    sourceId: string;
+    status: string;
+    tenantId: string;
+    updatedAt: string;
+  },
+  source: CommercialSourceSummary,
+  fact: CommercialFact | null
+): CommercialSourceRefreshTask {
+  return {
+    createdAt: value.createdAt,
+    dueAt: value.dueAt,
+    fact,
+    factId: value.factId,
+    reason: value.reason,
+    requestedByName: value.requestedByName,
+    resolvedAt: value.resolvedAt,
+    resolvedByName: value.resolvedByName,
+    resolutionSummary: value.resolutionSummary,
+    source,
+    sourceId: value.sourceId,
+    status: toCommercialSourceRefreshTaskStatus(value.status),
+    taskId: value.id,
+    tenantId: value.tenantId,
+    updatedAt: value.updatedAt
   };
 }
 

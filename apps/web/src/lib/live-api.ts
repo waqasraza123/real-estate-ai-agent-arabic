@@ -10,6 +10,7 @@ import type {
   CommercialFactProposalBulkDecisionResult,
   CommercialFactProposal,
   CommercialSourceDetail,
+  CommercialSourceRefreshTask,
   CommercialSourceSummary,
   CompleteHandoverInput,
   ConfirmHandoverAppointmentInput,
@@ -38,6 +39,7 @@ import type {
   QualifyCaseInput,
   RejectCommercialFactProposalInput,
   ReviewCommercialFactExpiryInput,
+  ResolveCommercialSourceRefreshTaskInput,
   RequestCaseQaReviewInput,
   ResolveCaseQaReviewInput,
   ResolveHandoverCustomerUpdateQaReviewInput,
@@ -239,6 +241,29 @@ export async function reviewCommercialFactExpiry(
   });
 }
 
+export async function listCommercialSourceRefreshTasksFromApi(operatorRole?: OperatorRole) {
+  const payload = await requestJson<{
+    tasks: CommercialSourceRefreshTask[];
+  }>("/v1/commercial-source-refresh-tasks", {
+    cache: "no-store",
+    headers: await getOperatorSessionHeaders(operatorRole)
+  });
+
+  return payload.tasks;
+}
+
+export async function resolveCommercialSourceRefreshTask(
+  taskId: string,
+  input: ResolveCommercialSourceRefreshTaskInput,
+  operatorRole?: OperatorRole
+) {
+  return requestJson<CommercialSourceRefreshTask>(`/v1/commercial-source-refresh-tasks/${taskId}/resolve`, {
+    headers: await getOperatorSessionHeaders(operatorRole),
+    method: "POST",
+    payload: input
+  });
+}
+
 export async function createManualCommercialFact(input: CreateManualCommercialFactInput, operatorRole?: OperatorRole) {
   return requestJson<CommercialFact>("/v1/commercial-facts/manual", {
     headers: await getOperatorSessionHeaders(operatorRole),
@@ -406,6 +431,14 @@ export async function tryListActiveCommercialFacts(operatorRole?: OperatorRole) 
 export async function tryListCommercialFactExpiryReviews(operatorRole?: OperatorRole) {
   try {
     return await listCommercialFactExpiryReviewsFromApi(operatorRole);
+  } catch {
+    return [];
+  }
+}
+
+export async function tryListCommercialSourceRefreshTasks(operatorRole?: OperatorRole) {
+  try {
+    return await listCommercialSourceRefreshTasksFromApi(operatorRole);
   } catch {
     return [];
   }

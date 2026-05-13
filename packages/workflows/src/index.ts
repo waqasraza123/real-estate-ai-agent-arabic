@@ -34,6 +34,7 @@ import type {
   ListActiveCommercialFactsQuery,
   ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
+  ListCommercialSourceRefreshTasksQuery,
   ListGovernanceEventsQuery,
   ManageBulkCaseFollowUpInput,
   MarkHandoverCustomerUpdateDispatchReadyInput,
@@ -54,6 +55,7 @@ import type {
   SupportedLocale,
   QualifyCaseInput,
   ResolveCaseQaReviewInput,
+  ResolveCommercialSourceRefreshTaskInput,
   ResolveHandoverCustomerUpdateQaReviewInput,
   ResolveHandoverPostCompletionFollowUpInput,
   ApproveCommercialFactProposalInput,
@@ -176,6 +178,21 @@ export async function listPersistedCommercialFactExpiryReviews(
   input: ListCommercialFactExpiryReviewsQuery
 ) {
   return store.listCommercialFactExpiryReviews(input);
+}
+
+export async function listPersistedCommercialSourceRefreshTasks(
+  store: LeadCaptureStore,
+  input: ListCommercialSourceRefreshTasksQuery
+) {
+  return store.listCommercialSourceRefreshTasks(input);
+}
+
+export async function resolvePersistedCommercialSourceRefreshTask(
+  store: LeadCaptureStore,
+  taskId: string,
+  input: ResolveCommercialSourceRefreshTaskInput
+) {
+  return store.resolveCommercialSourceRefreshTask(taskId, input);
 }
 
 export async function reviewPersistedCommercialFactExpiry(

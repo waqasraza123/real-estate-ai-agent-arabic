@@ -17,6 +17,7 @@ import {
   listActiveCommercialFactsQuerySchema,
   listCommercialFactExpiryReviewsQuerySchema,
   listCommercialFactProposalsQuerySchema,
+  listCommercialSourceRefreshTasksQuerySchema,
   listGovernanceEventsQuerySchema,
   manageBulkCaseFollowUpInputSchema,
   prepareCaseReplyDraftQaReviewInputSchema,
@@ -24,6 +25,7 @@ import {
   rejectCommercialFactProposalInputSchema,
   reviewCommercialFactExpiryInputSchema,
   resolveCaseQaReviewInputSchema,
+  resolveCommercialSourceRefreshTaskInputSchema,
   resolveHandoverCustomerUpdateQaReviewInputSchema,
   sendCaseReplyInputSchema,
   updateHandoverArchiveStatusInputSchema,
@@ -67,12 +69,14 @@ import {
   listPersistedActiveCommercialFacts,
   listPersistedCommercialFactExpiryReviews,
   listPersistedCommercialFactProposals,
+  listPersistedCommercialSourceRefreshTasks,
   listPersistedCommercialSources,
   resolvePersistedCaseQaReview,
   resolvePersistedHandoverPostCompletionFollowUp,
   requestPersistedCaseQaReview,
   rejectPersistedCommercialFactProposal,
   reviewPersistedCommercialFactExpiry,
+  resolvePersistedCommercialSourceRefreshTask,
   resolvePersistedHandoverCustomerUpdateQaReview,
   sendPersistedCaseReply,
   savePersistedHandoverArchiveReview,
@@ -567,6 +571,56 @@ export function buildApiApp(dependencies: {
     }
 
     return review;
+  });
+
+  app.get("/v1/commercial-source-refresh-tasks", async (request, reply) => {
+    if (!requireAnyOperatorWorkspace(request, reply, ["manager_revenue"])) {
+      return reply;
+    }
+
+    const result = listCommercialSourceRefreshTasksQuerySchema.safeParse(request.query);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    return {
+      tasks: await listPersistedCommercialSourceRefreshTasks(dependencies.store, result.data)
+    };
+  });
+
+  app.post<{
+    Params: {
+      taskId: string;
+    };
+  }>("/v1/commercial-source-refresh-tasks/:taskId/resolve", async (request, reply) => {
+    const permission = "manage_commercial_sources";
+
+    if (!requireOperatorPermission(request, reply, permission)) {
+      return reply;
+    }
+
+    const result = resolveCommercialSourceRefreshTaskInputSchema.safeParse(request.body);
+
+    if (!result.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        issues: result.error.issues
+      });
+    }
+
+    const task = await resolvePersistedCommercialSourceRefreshTask(dependencies.store, request.params.taskId, result.data);
+
+    if (!task) {
+      return reply.status(404).send({
+        error: "commercial_source_refresh_task_not_found"
+      });
+    }
+
+    return task;
   });
 
   app.get<{
