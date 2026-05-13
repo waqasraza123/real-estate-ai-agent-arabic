@@ -120,6 +120,7 @@ export const commercialSourceLifecycleStateSchema = z.enum(["draft", "imported",
 export const commercialFactProposalStateSchema = z.enum(["pending_review", "approved", "rejected"]);
 export const commercialFactUsageScopeSchema = z.enum(["whatsapp_reply", "manager_review", "document_follow_up", "visit_scheduling"]);
 export const commercialFactFreshnessStatusSchema = z.enum(["active", "expiring_soon", "stale", "expired"]);
+export const commercialFactExpiryReviewOutcomeSchema = z.enum(["renewed", "archived", "source_refresh_required", "left_expired"]);
 export const inventoryUnitStatusSchema = z.enum(["available", "reserved", "sold", "blocked", "unknown"]);
 export const commercialGroundingDecisionResultSchema = z.enum([
   "not_required",
@@ -274,11 +275,36 @@ export const rejectCommercialFactProposalInputSchema = z.object({
   rejectionReason: z.string().trim().min(4).max(500)
 });
 
+export const bulkApproveCommercialFactProposalsInputSchema = z.object({
+  approvedByName: z.string().trim().min(2).max(120).optional(),
+  expiresAt: z.iso.datetime().nullable().optional(),
+  proposalIds: z.array(z.uuid()).min(1).max(50)
+});
+
+export const bulkRejectCommercialFactProposalsInputSchema = z.object({
+  proposalIds: z.array(z.uuid()).min(1).max(50),
+  rejectedByName: z.string().trim().min(2).max(120).optional(),
+  rejectionReason: z.string().trim().min(4).max(500)
+});
+
 export const listActiveCommercialFactsQuerySchema = z.object({
   kind: commercialFactKindSchema.optional(),
   locale: supportedLocaleSchema.optional(),
   projectCode: z.string().trim().min(2).max(80).optional(),
   tenantId: z.string().trim().min(2).max(80).default("local-alpha")
+});
+
+export const listCommercialFactExpiryReviewsQuerySchema = z.object({
+  factId: z.uuid().optional(),
+  projectCode: z.string().trim().min(2).max(80).optional(),
+  tenantId: z.string().trim().min(2).max(80).default("local-alpha")
+});
+
+export const reviewCommercialFactExpiryInputSchema = z.object({
+  nextExpiresAt: z.iso.datetime().nullable().optional(),
+  outcome: commercialFactExpiryReviewOutcomeSchema,
+  reviewedByName: z.string().trim().min(2).max(120).optional(),
+  summary: z.string().trim().min(10).max(1000)
 });
 
 export const createHandoverIntakeInputSchema = z.object({
@@ -651,6 +677,23 @@ export const commercialFactSchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const commercialFactExpiryReviewSchema = z.object({
+  createdAt: z.iso.datetime(),
+  fact: commercialFactSchema.nullable(),
+  factId: z.uuid(),
+  outcome: commercialFactExpiryReviewOutcomeSchema,
+  reviewedByName: z.string().nullable(),
+  reviewId: z.uuid(),
+  summary: z.string()
+});
+
+export const commercialFactProposalBulkDecisionResultSchema = z.object({
+  failedProposalIds: z.array(z.uuid()),
+  proposals: z.array(commercialFactProposalSchema),
+  requestedCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative()
+});
+
 export const inventoryUnitSnapshotSchema = z.object({
   areaSqm: z.number().nullable(),
   availabilityStatus: inventoryUnitStatusSchema,
@@ -706,6 +749,10 @@ export const commercialFactProposalListSchema = z.object({
 
 export const commercialFactListSchema = z.object({
   facts: z.array(commercialFactSchema)
+});
+
+export const commercialFactExpiryReviewListSchema = z.object({
+  reviews: z.array(commercialFactExpiryReviewSchema)
 });
 
 export const caseAgentDecisionSchema = z.object({
@@ -1093,6 +1140,8 @@ export const manageBulkCaseFollowUpResultSchema = z.object({
 export type ApproveHandoverCustomerUpdateInput = z.infer<typeof approveHandoverCustomerUpdateInputSchema>;
 export type AutomationStatus = z.infer<typeof automationStatusSchema>;
 export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
+export type BulkApproveCommercialFactProposalsInput = z.infer<typeof bulkApproveCommercialFactProposalsInputSchema>;
+export type BulkRejectCommercialFactProposalsInput = z.infer<typeof bulkRejectCommercialFactProposalsInputSchema>;
 export type CaseAgentActionType = z.infer<typeof caseAgentActionTypeSchema>;
 export type CaseAgentBlockedReason = z.infer<typeof caseAgentBlockedReasonSchema>;
 export type CaseAgentDecision = z.infer<typeof caseAgentDecisionSchema>;
@@ -1109,11 +1158,15 @@ export type ApprovedCommercialFact = z.infer<typeof approvedCommercialFactSchema
 export type ApproveCommercialFactProposalInput = z.infer<typeof approveCommercialFactProposalInputSchema>;
 export type CommercialFact = z.infer<typeof commercialFactSchema>;
 export type CommercialFactEvidenceReference = z.infer<typeof commercialFactEvidenceReferenceSchema>;
+export type CommercialFactExpiryReview = z.infer<typeof commercialFactExpiryReviewSchema>;
+export type CommercialFactExpiryReviewList = z.infer<typeof commercialFactExpiryReviewListSchema>;
+export type CommercialFactExpiryReviewOutcome = z.infer<typeof commercialFactExpiryReviewOutcomeSchema>;
 export type CommercialFactFreshnessStatus = z.infer<typeof commercialFactFreshnessStatusSchema>;
 export type CommercialFactGroundingStatus = z.infer<typeof commercialFactGroundingStatusSchema>;
 export type CommercialFactKind = z.infer<typeof commercialFactKindSchema>;
 export type CommercialFactList = z.infer<typeof commercialFactListSchema>;
 export type CommercialFactProposal = z.infer<typeof commercialFactProposalSchema>;
+export type CommercialFactProposalBulkDecisionResult = z.infer<typeof commercialFactProposalBulkDecisionResultSchema>;
 export type CommercialFactProposalList = z.infer<typeof commercialFactProposalListSchema>;
 export type CommercialFactProposalState = z.infer<typeof commercialFactProposalStateSchema>;
 export type CommercialFactUsageScope = z.infer<typeof commercialFactUsageScopeSchema>;
@@ -1177,6 +1230,7 @@ export type ImportInventoryCsvInput = z.infer<typeof importInventoryCsvInputSche
 export type InventoryUnitSnapshot = z.infer<typeof inventoryUnitSnapshotSchema>;
 export type InventoryUnitStatus = z.infer<typeof inventoryUnitStatusSchema>;
 export type ListActiveCommercialFactsQuery = z.infer<typeof listActiveCommercialFactsQuerySchema>;
+export type ListCommercialFactExpiryReviewsQuery = z.infer<typeof listCommercialFactExpiryReviewsQuerySchema>;
 export type ListCommercialFactProposalsQuery = z.infer<typeof listCommercialFactProposalsQuerySchema>;
 export type ManageCaseFollowUpInput = z.infer<typeof manageCaseFollowUpInputSchema>;
 export type ManageBulkCaseFollowUpInput = z.infer<typeof manageBulkCaseFollowUpInputSchema>;
@@ -1193,6 +1247,7 @@ export type PrepareCaseReplyDraftQaReviewInput = z.infer<typeof prepareCaseReply
 export type ListGovernanceEventsQuery = z.infer<typeof listGovernanceEventsQuerySchema>;
 export type ProjectCommercialReadinessSummary = z.infer<typeof projectCommercialReadinessSummarySchema>;
 export type RejectCommercialFactProposalInput = z.infer<typeof rejectCommercialFactProposalInputSchema>;
+export type ReviewCommercialFactExpiryInput = z.infer<typeof reviewCommercialFactExpiryInputSchema>;
 export type PersistedCaseDetail = z.infer<typeof persistedCaseDetailSchema>;
 export type PersistedCaseQaReview = z.infer<typeof persistedCaseQaReviewSchema>;
 export type PersistedBulkManagerFollowUp = z.infer<typeof persistedBulkManagerFollowUpSchema>;

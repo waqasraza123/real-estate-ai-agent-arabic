@@ -5,6 +5,8 @@ import type {
   ApproveHandoverCustomerUpdateInput,
   ApprovedCommercialFact,
   AutomationStatus,
+  BulkApproveCommercialFactProposalsInput,
+  BulkRejectCommercialFactProposalsInput,
   CalendarProvider,
   CaseAgentActionType,
   CaseAgentBlockedReason,
@@ -27,6 +29,8 @@ import type {
   CompleteHandoverInput,
   CommercialFact,
   CommercialFactEvidenceReference,
+  CommercialFactExpiryReview,
+  CommercialFactExpiryReviewOutcome,
   CommercialFactFreshnessStatus,
   CommercialFactGroundingStatus,
   CommercialFactKind,
@@ -83,6 +87,7 @@ import type {
   MessageProvider,
   ListGovernanceEventsQuery,
   ListActiveCommercialFactsQuery,
+  ListCommercialFactExpiryReviewsQuery,
   ListCommercialFactProposalsQuery,
   PersistedCaseAgentMemory,
   PersistedCaseAgentRun,
@@ -133,6 +138,7 @@ import type {
   ProjectCommercialReadinessSummary,
   RejectCommercialFactProposalInput,
   ApproveCommercialFactProposalInput,
+  ReviewCommercialFactExpiryInput,
   InventoryUnitStatus,
   UpdateHandoverArchiveStatusInput,
   UpdateHandoverMilestoneInput,
@@ -140,7 +146,7 @@ import type {
   UpdateHandoverTaskStatusInput,
   VisitBookingStatus
 } from "@real-estate-ai/contracts";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { normalizePhoneNumber } from "@real-estate-ai/integrations";
@@ -957,6 +963,18 @@ export interface LeadCaptureStore {
     projectInterest: string;
   }): Promise<ApprovedCommercialFact[]>;
   approveCommercialFactProposal(proposalId: string, input: ApproveCommercialFactProposalInput): Promise<CommercialFactProposal | null>;
+  bulkApproveCommercialFactProposals(input: BulkApproveCommercialFactProposalsInput): Promise<{
+    failedProposalIds: string[];
+    proposals: CommercialFactProposal[];
+    requestedCount: number;
+    updatedCount: number;
+  }>;
+  bulkRejectCommercialFactProposals(input: BulkRejectCommercialFactProposalsInput): Promise<{
+    failedProposalIds: string[];
+    proposals: CommercialFactProposal[];
+    requestedCount: number;
+    updatedCount: number;
+  }>;
   createCommercialSource(input: CreateCommercialSourceInput): Promise<CommercialSourceDetail>;
   createManualCommercialFact(input: CreateManualCommercialFactInput): Promise<CommercialFact>;
   getCommercialSourceDetail(sourceId: string): Promise<CommercialSourceDetail | null>;
@@ -972,6 +990,7 @@ export interface LeadCaptureStore {
     projectCode?: string;
     tenantId?: string;
   }): Promise<CommercialSourceSummary[]>;
+  listCommercialFactExpiryReviews(input: ListCommercialFactExpiryReviewsQuery): Promise<CommercialFactExpiryReview[]>;
   recordCommercialInventoryImport(
     sourceId: string,
     input: {
@@ -1006,6 +1025,7 @@ export interface LeadCaptureStore {
     }
   ): Promise<CommercialSourceDetail | null>;
   rejectCommercialFactProposal(proposalId: string, input: RejectCommercialFactProposalInput): Promise<CommercialFactProposal | null>;
+  reviewCommercialFactExpiry(factId: string, input: ReviewCommercialFactExpiryInput): Promise<CommercialFactExpiryReview | null>;
   getDocumentUploadRecord(
     caseId: string,
     documentRequestId: string,
@@ -3798,8 +3818,45 @@ export async function createAlphaLeadCaptureStore(options?: {
           sourceLookup,
           versionLookup,
           now
-        )
-      );
+          )
+        );
+    };
+
+  const listCommercialFactExpiryReviewsLocal = async (
+    input: ListCommercialFactExpiryReviewsQuery
+  ): Promise<CommercialFactExpiryReview[]> => {
+    const tenantId = input.tenantId ?? "local-alpha";
+    const projectCode = input.projectCode ? normalizeProjectCode(input.projectCode) : null;
+    const now = new Date().toISOString();
+    const [reviewRecords, factRecords, evidenceRecords, sourceRecords, versionRecords] = await Promise.all([
+      db.select().from(commercialFactExpiryReviews).orderBy(desc(commercialFactExpiryReviews.createdAt)),
+      db.select().from(commercialFacts),
+      db.select().from(commercialFactEvidence),
+      db.select().from(commercialSources),
+      db.select().from(commercialSourceVersions)
+    ]);
+    const sourceLookup = new Map(sourceRecords.map((source) => [source.id, source]));
+    const versionLookup = new Map(versionRecords.map((version) => [version.id, version]));
+    const factLookup = new Map(
+      factRecords
+        .filter((fact) => fact.tenantId === tenantId)
+        .filter((fact) => !projectCode || normalizeProjectCode(fact.projectCode) === projectCode)
+        .map((fact) => [
+          fact.id,
+          hydrateCommercialFact(
+            fact,
+            evidenceRecords.filter((evidence) => evidence.factId === fact.id),
+            sourceLookup,
+            versionLookup,
+            now
+          )
+        ])
+    );
+
+    return reviewRecords
+      .filter((review) => factLookup.has(review.factId))
+      .filter((review) => !input.factId || review.factId === input.factId)
+      .map((review) => hydrateCommercialFactExpiryReview(review, factLookup.get(review.factId) ?? null));
   };
 
   const getCommercialSourceDetailLocal = async (sourceId: string): Promise<CommercialSourceDetail | null> => {
@@ -3881,6 +3938,113 @@ export async function createAlphaLeadCaptureStore(options?: {
       updatedAt: sourceRecord.updatedAt,
       versions
     };
+  };
+
+  const approveCommercialFactProposalLocal = async (
+    proposalId: string,
+    input: ApproveCommercialFactProposalInput
+  ): Promise<CommercialFactProposal | null> => {
+    const proposal = (await db.select().from(commercialFactProposals).where(eq(commercialFactProposals.id, proposalId))).at(0);
+
+    if (!proposal || proposal.state !== "pending_review") {
+      return proposal ? (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null : null;
+    }
+
+    const now = new Date().toISOString();
+    const factId = randomUUID();
+    const proposalEvidence = await db.select().from(commercialFactEvidence).where(eq(commercialFactEvidence.proposalId, proposalId));
+
+    await db.transaction(async (transaction) => {
+      await transaction
+        .update(commercialFacts)
+        .set({
+          status: "superseded",
+          updatedAt: now
+        })
+        .where(
+          and(
+            eq(commercialFacts.tenantId, proposal.tenantId),
+            eq(commercialFacts.projectCode, proposal.projectCode),
+            eq(commercialFacts.kind, proposal.kind),
+            eq(commercialFacts.locale, proposal.locale),
+            eq(commercialFacts.scope, proposal.scope),
+            proposal.unitCode ? eq(commercialFacts.unitCode, proposal.unitCode) : isNull(commercialFacts.unitCode),
+            eq(commercialFacts.status, "active")
+          )
+        );
+      await transaction
+        .update(commercialFactProposals)
+        .set({
+          state: "approved",
+          updatedAt: now
+        })
+        .where(eq(commercialFactProposals.id, proposalId));
+      await transaction.insert(commercialFacts).values({
+        approvedAt: now,
+        approvedByName: input.approvedByName ?? null,
+        content: proposal.content,
+        createdAt: now,
+        expiresAt: input.expiresAt === undefined ? proposal.expiresAt : input.expiresAt,
+        freshnessStatus: "active",
+        id: factId,
+        kind: proposal.kind,
+        locale: proposal.locale,
+        projectCode: proposal.projectCode,
+        proposalId,
+        scope: proposal.scope,
+        sourceId: proposal.sourceId,
+        sourceVersionId: proposal.sourceVersionId,
+        status: "active",
+        tenantId: proposal.tenantId,
+        title: proposal.title,
+        unitCode: proposal.unitCode,
+        updatedAt: now
+      });
+      await transaction.insert(commercialFactApprovals).values({
+        approvedAt: now,
+        approvedByName: input.approvedByName ?? null,
+        factId,
+        id: randomUUID(),
+        proposalId
+      });
+
+      for (const evidence of proposalEvidence) {
+        await transaction.insert(commercialFactEvidence).values({
+          createdAt: now,
+          evidenceLabel: evidence.evidenceLabel,
+          factId,
+          id: randomUUID(),
+          proposalId: null,
+          sourceId: evidence.sourceId,
+          sourceVersionId: evidence.sourceVersionId,
+          unitCode: evidence.unitCode
+        });
+      }
+    });
+
+    return (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null;
+  };
+
+  const rejectCommercialFactProposalLocal = async (
+    proposalId: string,
+    input: RejectCommercialFactProposalInput
+  ): Promise<CommercialFactProposal | null> => {
+    const proposal = (await db.select().from(commercialFactProposals).where(eq(commercialFactProposals.id, proposalId))).at(0);
+
+    if (!proposal) {
+      return null;
+    }
+
+    await db
+      .update(commercialFactProposals)
+      .set({
+        rejectionReason: input.rejectionReason,
+        state: "rejected",
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(commercialFactProposals.id, proposalId));
+
+    return (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null;
   };
 
   return {
@@ -4258,86 +4422,58 @@ export async function createAlphaLeadCaptureStore(options?: {
         );
     },
     async approveCommercialFactProposal(proposalId, input) {
-      const proposal = (await db.select().from(commercialFactProposals).where(eq(commercialFactProposals.id, proposalId))).at(0);
+      return approveCommercialFactProposalLocal(proposalId, input);
+    },
+    async bulkApproveCommercialFactProposals(input) {
+      const proposals: CommercialFactProposal[] = [];
+      const failedProposalIds: string[] = [];
 
-      if (!proposal || proposal.state !== "pending_review") {
-        return proposal ? (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null : null;
+      for (const proposalId of input.proposalIds) {
+        const proposal = await approveCommercialFactProposalLocal(proposalId, {
+          approvedByName: input.approvedByName,
+          expiresAt: input.expiresAt
+        });
+
+        if (proposal?.state === "approved") {
+          proposals.push(proposal);
+        } else {
+          failedProposalIds.push(proposalId);
+        }
       }
 
-      const now = new Date().toISOString();
-      const factId = randomUUID();
-      const proposalEvidence = await db.select().from(commercialFactEvidence).where(eq(commercialFactEvidence.proposalId, proposalId));
-
-      await db.transaction(async (transaction) => {
-        await transaction
-          .update(commercialFactProposals)
-          .set({
-            state: "approved",
-            updatedAt: now
-          })
-          .where(eq(commercialFactProposals.id, proposalId));
-        await transaction.insert(commercialFacts).values({
-          approvedAt: now,
-          approvedByName: input.approvedByName ?? null,
-          content: proposal.content,
-          createdAt: now,
-          expiresAt: input.expiresAt === undefined ? proposal.expiresAt : input.expiresAt,
-          freshnessStatus: "active",
-          id: factId,
-          kind: proposal.kind,
-          locale: proposal.locale,
-          projectCode: proposal.projectCode,
-          proposalId,
-          scope: proposal.scope,
-          sourceId: proposal.sourceId,
-          sourceVersionId: proposal.sourceVersionId,
-          status: "active",
-          tenantId: proposal.tenantId,
-          title: proposal.title,
-          unitCode: proposal.unitCode,
-          updatedAt: now
-        });
-        await transaction.insert(commercialFactApprovals).values({
-          approvedAt: now,
-          approvedByName: input.approvedByName ?? null,
-          factId,
-          id: randomUUID(),
-          proposalId
-        });
-
-        for (const evidence of proposalEvidence) {
-          await transaction.insert(commercialFactEvidence).values({
-            createdAt: now,
-            evidenceLabel: evidence.evidenceLabel,
-            factId,
-            id: randomUUID(),
-            proposalId: null,
-            sourceId: evidence.sourceId,
-            sourceVersionId: evidence.sourceVersionId,
-            unitCode: evidence.unitCode
-          });
-        }
-      });
-
-      return (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null;
+      return {
+        failedProposalIds,
+        proposals,
+        requestedCount: input.proposalIds.length,
+        updatedCount: proposals.length
+      };
     },
     async rejectCommercialFactProposal(proposalId, input) {
-      const proposal = (await db.select().from(commercialFactProposals).where(eq(commercialFactProposals.id, proposalId))).at(0);
+      return rejectCommercialFactProposalLocal(proposalId, input);
+    },
+    async bulkRejectCommercialFactProposals(input) {
+      const proposals: CommercialFactProposal[] = [];
+      const failedProposalIds: string[] = [];
 
-      if (!proposal) {
-        return null;
+      for (const proposalId of input.proposalIds) {
+        const proposal = await rejectCommercialFactProposalLocal(proposalId, {
+          rejectedByName: input.rejectedByName,
+          rejectionReason: input.rejectionReason
+        });
+
+        if (proposal?.state === "rejected") {
+          proposals.push(proposal);
+        } else {
+          failedProposalIds.push(proposalId);
+        }
       }
 
-      await db
-        .update(commercialFactProposals)
-        .set({
-          rejectionReason: input.rejectionReason,
-          state: "rejected",
-          updatedAt: new Date().toISOString()
-        })
-        .where(eq(commercialFactProposals.id, proposalId));
-
-      return (await listCommercialFactProposalsLocal({ tenantId: proposal.tenantId })).find((item) => item.proposalId === proposalId) ?? null;
+      return {
+        failedProposalIds,
+        proposals,
+        requestedCount: input.proposalIds.length,
+        updatedCount: proposals.length
+      };
     },
     async createManualCommercialFact(input) {
       const now = new Date().toISOString();
@@ -4435,6 +4571,62 @@ export async function createAlphaLeadCaptureStore(options?: {
             now
           )
         );
+    },
+    async listCommercialFactExpiryReviews(input) {
+      return listCommercialFactExpiryReviewsLocal(input);
+    },
+    async reviewCommercialFactExpiry(factId, input) {
+      const fact = (await db.select().from(commercialFacts).where(eq(commercialFacts.id, factId))).at(0);
+
+      if (!fact) {
+        return null;
+      }
+
+      const now = new Date().toISOString();
+      const reviewId = randomUUID();
+
+      await db.transaction(async (transaction) => {
+        await transaction.insert(commercialFactExpiryReviews).values({
+          createdAt: now,
+          factId,
+          id: reviewId,
+          outcome: input.outcome,
+          reviewedByName: input.reviewedByName ?? null,
+          summary: input.summary
+        });
+
+        if (input.outcome === "renewed") {
+          await transaction
+            .update(commercialFacts)
+            .set({
+              expiresAt: input.nextExpiresAt ?? null,
+              status: "active",
+              updatedAt: now
+            })
+            .where(eq(commercialFacts.id, factId));
+        }
+
+        if (input.outcome === "archived") {
+          await transaction
+            .update(commercialFacts)
+            .set({
+              status: "archived",
+              updatedAt: now
+            })
+            .where(eq(commercialFacts.id, factId));
+        }
+
+        if (input.outcome === "source_refresh_required" || input.outcome === "left_expired") {
+          await transaction
+            .update(commercialFacts)
+            .set({
+              updatedAt: now
+            })
+            .where(eq(commercialFacts.id, factId));
+        }
+      });
+
+      return (await listCommercialFactExpiryReviewsLocal({ factId, tenantId: fact.tenantId })).find((review) => review.reviewId === reviewId) ?? null;
     },
     async getProjectCommercialReadinessSummary(input) {
       const tenantId = input.tenantId ?? "local-alpha";
@@ -9305,6 +9497,14 @@ function toCommercialFactUsageScope(value: string): CommercialFactUsageScope {
   throw new Error(`unsupported_commercial_fact_usage_scope:${value}`);
 }
 
+function toCommercialFactExpiryReviewOutcome(value: string): CommercialFactExpiryReviewOutcome {
+  if (value === "renewed" || value === "archived" || value === "source_refresh_required" || value === "left_expired") {
+    return value;
+  }
+
+  throw new Error(`unsupported_commercial_fact_expiry_review_outcome:${value}`);
+}
+
 function toInventoryUnitStatus(value: string): InventoryUnitStatus {
   if (value === "available" || value === "reserved" || value === "sold" || value === "blocked" || value === "unknown") {
     return value;
@@ -9470,6 +9670,28 @@ function hydrateCommercialFact(
     title: value.title,
     unitCode: value.unitCode,
     updatedAt: value.updatedAt
+  };
+}
+
+function hydrateCommercialFactExpiryReview(
+  value: {
+    createdAt: string;
+    factId: string;
+    id: string;
+    outcome: string;
+    reviewedByName: string | null;
+    summary: string;
+  },
+  fact: CommercialFact | null
+): CommercialFactExpiryReview {
+  return {
+    createdAt: value.createdAt,
+    fact,
+    factId: value.factId,
+    outcome: toCommercialFactExpiryReviewOutcome(value.outcome),
+    reviewedByName: value.reviewedByName,
+    reviewId: value.id,
+    summary: value.summary
   };
 }
 
